@@ -1,0 +1,176 @@
+<Window x:Class="RustyXr.Companion.App.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Rusty XR Companion"
+        Width="1120"
+        Height="760"
+        MinWidth="940"
+        MinHeight="620"
+        Background="#F7F7F4"
+        Foreground="#1E2328">
+    <Window.Resources>
+        <Style TargetType="Button">
+            <Setter Property="MinHeight" Value="32" />
+            <Setter Property="Padding" Value="12,6" />
+            <Setter Property="Margin" Value="0,0,8,8" />
+        </Style>
+        <Style TargetType="TextBox">
+            <Setter Property="MinHeight" Value="30" />
+            <Setter Property="Padding" Value="6,4" />
+            <Setter Property="Margin" Value="0,4,10,10" />
+        </Style>
+        <Style TargetType="TextBlock">
+            <Setter Property="TextWrapping" Value="Wrap" />
+        </Style>
+        <Style x:Key="PanelBorder" TargetType="Border">
+            <Setter Property="BorderBrush" Value="#CED4DA" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Background" Value="#FFFFFF" />
+            <Setter Property="Padding" Value="14" />
+            <Setter Property="Margin" Value="0,0,12,12" />
+        </Style>
+    </Window.Resources>
+
+    <DockPanel>
+        <Border DockPanel.Dock="Top" Background="#20242A" Padding="18,14">
+            <DockPanel>
+                <StackPanel DockPanel.Dock="Left">
+                    <TextBlock Text="Rusty XR Companion"
+                               Foreground="#FFFFFF"
+                               FontSize="22"
+                               FontWeight="SemiBold" />
+                    <TextBlock Text="Public Windows utility for Quest install, launch, device checks, casting, and diagnostics."
+                               Foreground="#D9E2EA"
+                               Margin="0,3,0,0" />
+                </StackPanel>
+                <TextBlock DockPanel.Dock="Right"
+                           Text="{Binding Status}"
+                           Foreground="#FFE8A3"
+                           VerticalAlignment="Center"
+                           TextAlignment="Right" />
+            </DockPanel>
+        </Border>
+
+        <Grid Margin="18">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="320" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*" />
+                <RowDefinition Height="180" />
+            </Grid.RowDefinitions>
+
+            <StackPanel Grid.Column="0" Grid.RowSpan="2">
+                <Border Style="{StaticResource PanelBorder}">
+                    <StackPanel>
+                        <TextBlock Text="Tooling" FontWeight="SemiBold" FontSize="15" />
+                        <TextBlock Text="ADB is required. hzdb and scrcpy are optional utility lanes." Margin="0,4,0,10" />
+                        <Button Content="Refresh Tooling" Command="{Binding RefreshToolsCommand}" />
+                        <ItemsControl ItemsSource="{Binding Tools}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <StackPanel Margin="0,8,0,0">
+                                        <TextBlock FontWeight="SemiBold" Text="{Binding DisplayName}" />
+                                        <TextBlock Text="{Binding Detail}" Foreground="#485057" />
+                                        <TextBlock Text="{Binding Path}" FontFamily="Consolas" FontSize="11" Foreground="#6B7280" />
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource PanelBorder}">
+                    <StackPanel>
+                        <TextBlock Text="Quest Selector" FontWeight="SemiBold" FontSize="15" />
+                        <Button Content="Refresh Devices" Command="{Binding RefreshDevicesCommand}" Margin="0,10,8,8" />
+                        <ComboBox ItemsSource="{Binding Devices}"
+                                  DisplayMemberPath="Label"
+                                  SelectedValuePath="Serial"
+                                  SelectedValue="{Binding SelectedSerial, Mode=TwoWay}"
+                                  MinHeight="32"
+                                  Margin="0,0,10,10" />
+                        <TextBlock Text="Wi-Fi ADB endpoint" />
+                        <DockPanel>
+                            <TextBox Text="{Binding Endpoint, UpdateSourceTrigger=PropertyChanged}" DockPanel.Dock="Left" Width="190" />
+                            <Button Content="Connect" Command="{Binding ConnectCommand}" />
+                        </DockPanel>
+                        <Button Content="Capture Snapshot" Command="{Binding SnapshotCommand}" />
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+
+            <TabControl Grid.Column="1" Grid.Row="0">
+                <TabItem Header="Install / Launch">
+                    <Grid Margin="12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="280" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="APK" FontWeight="SemiBold" />
+                            <DockPanel>
+                                <TextBox Text="{Binding ApkPath, UpdateSourceTrigger=PropertyChanged}" DockPanel.Dock="Left" Width="520" />
+                                <Button Content="Browse" Command="{Binding BrowseApkCommand}" />
+                                <Button Content="Install" Command="{Binding InstallCommand}" />
+                            </DockPanel>
+
+                            <TextBlock Text="Target package" FontWeight="SemiBold" />
+                            <TextBox Text="{Binding PackageName, UpdateSourceTrigger=PropertyChanged}" />
+                            <TextBlock Text="Activity name (optional)" FontWeight="SemiBold" />
+                            <TextBox Text="{Binding ActivityName, UpdateSourceTrigger=PropertyChanged}" />
+
+                            <StackPanel Orientation="Horizontal">
+                                <Button Content="Launch" Command="{Binding LaunchCommand}" />
+                                <Button Content="Stop" Command="{Binding StopCommand}" />
+                            </StackPanel>
+                        </StackPanel>
+
+                        <Border Grid.Column="1" Style="{StaticResource PanelBorder}">
+                            <StackPanel>
+                                <TextBlock Text="Last Snapshot" FontWeight="SemiBold" />
+                                <TextBlock Text="{Binding LastSnapshot}" FontFamily="Consolas" Margin="0,10,0,0" />
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+                </TabItem>
+
+                <TabItem Header="Device Profile">
+                    <StackPanel Margin="12" MaxWidth="520" HorizontalAlignment="Left">
+                        <TextBlock Text="Quest performance levels" FontWeight="SemiBold" />
+                        <TextBlock Text="These development settings are sent through ADB properties. Target apps may expose additional runtime settings through their own catalog files." Margin="0,4,0,12" />
+                        <TextBlock Text="CPU level" />
+                        <TextBox Text="{Binding CpuLevel, UpdateSourceTrigger=PropertyChanged}" Width="120" HorizontalAlignment="Left" />
+                        <TextBlock Text="GPU level" />
+                        <TextBox Text="{Binding GpuLevel, UpdateSourceTrigger=PropertyChanged}" Width="120" HorizontalAlignment="Left" />
+                        <Button Content="Apply Device Profile" Command="{Binding ApplyProfileCommand}" Width="180" HorizontalAlignment="Left" />
+                    </StackPanel>
+                </TabItem>
+
+                <TabItem Header="Streams">
+                    <StackPanel Margin="12" MaxWidth="560" HorizontalAlignment="Left">
+                        <TextBlock Text="Display Cast" FontWeight="SemiBold" />
+                        <TextBlock Text="Starts a scrcpy display stream for the selected Quest. Install scrcpy or add it to PATH first." Margin="0,4,0,12" />
+                        <Button Content="Start Display Cast" Command="{Binding StartCastCommand}" Width="180" HorizontalAlignment="Left" />
+                    </StackPanel>
+                </TabItem>
+
+                <TabItem Header="Diagnostics">
+                    <StackPanel Margin="12" MaxWidth="620" HorizontalAlignment="Left">
+                        <TextBlock Text="Diagnostics Bundle" FontWeight="SemiBold" />
+                        <TextBlock Text="Writes JSON and Markdown diagnostics under LocalAppData so another machine can be debugged without a source checkout." Margin="0,4,0,12" />
+                        <Button Content="Write Diagnostics Bundle" Command="{Binding DiagnosticsCommand}" Width="210" HorizontalAlignment="Left" />
+                    </StackPanel>
+                </TabItem>
+            </TabControl>
+
+            <Border Grid.Column="1" Grid.Row="1" Style="{StaticResource PanelBorder}">
+                <DockPanel>
+                    <TextBlock DockPanel.Dock="Top" Text="Operator Log" FontWeight="SemiBold" Margin="0,0,0,8" />
+                    <ListBox ItemsSource="{Binding Log}" FontFamily="Consolas" FontSize="12" />
+                </DockPanel>
+            </Border>
+        </Grid>
+    </DockPanel>
+</Window>

@@ -1,0 +1,101 @@
+# Rusty XR Companion Apps
+
+Rusty XR Companion Apps is a public Windows-first utility workspace for people
+who need a practical bridge between a Windows computer and a Meta Quest device.
+
+The first app is **Rusty XR Companion**, a WPF operator tool with a matching CLI.
+It helps you find Quest development tooling, connect a headset over USB or
+Wi-Fi ADB, install a user-supplied APK, launch or stop a target app, apply
+simple development profiles, start a display cast through `scrcpy`, and export
+diagnostics that can be shared without a source checkout.
+
+This repo is designed to work alongside the public
+[Rusty XR](https://github.com/MesmerPrism/Rusty-XR) core workspace. Rusty XR
+owns reusable Rust contracts and schemas. This repo owns app UX, Windows
+release tooling, Quest device operations, and contributor-facing docs.
+
+## Current Scope
+
+- WPF Windows app for Quest install, launch, device profile, cast, and
+  diagnostics workflows
+- CLI for the same core actions
+- public sample catalog schemas with placeholder targets
+- GitHub Pages docs and onboarding
+- portable Windows release workflow with a guided setup helper
+- Git LFS patterns for future APK assets, with APK bytes intentionally ignored
+  in this first version
+
+The first release does **not** bundle an APK. Use a local APK path or a public
+catalog entry that points at an APK you already have.
+
+## Quick Start
+
+```powershell
+git clone https://github.com/MesmerPrism/Rusty-XR-Companion-Apps.git
+cd Rusty-XR-Companion-Apps
+dotnet build RustyXr.Companion.slnx
+dotnet test RustyXr.Companion.slnx
+dotnet run --project src/RustyXr.Companion.Cli -- doctor
+dotnet run --project src/RustyXr.Companion.App
+```
+
+For a source-built single-file app launcher:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\tools\app\Start-Desktop-App.ps1
+```
+
+Build the docs site:
+
+```powershell
+npm install
+npm run pages:build
+```
+
+## CLI Examples
+
+```powershell
+dotnet run --project src/RustyXr.Companion.Cli -- devices
+dotnet run --project src/RustyXr.Companion.Cli -- connect --endpoint 192.168.1.25:5555
+dotnet run --project src/RustyXr.Companion.Cli -- snapshot --serial <serial>
+dotnet run --project src/RustyXr.Companion.Cli -- install --serial <serial> --apk C:\path\app.apk
+dotnet run --project src/RustyXr.Companion.Cli -- launch --serial <serial> --package com.example.questapp
+dotnet run --project src/RustyXr.Companion.Cli -- profile apply --serial <serial> --cpu 2 --gpu 2
+dotnet run --project src/RustyXr.Companion.Cli -- cast --serial <serial> --max-size 1280
+dotnet run --project src/RustyXr.Companion.Cli -- doctor --snapshots --out .\artifacts\diagnostics
+```
+
+## Documentation
+
+- [Docs home](docs/index.md)
+- [Getting started](docs/getting-started.md)
+- [Quest connection](docs/quest-connection.md)
+- [APK install and launch](docs/apk-install-launch.md)
+- [Streaming](docs/streaming.md)
+- [Diagnostics](docs/diagnostics.md)
+- [Release workflow](docs/release-workflow.md)
+- [Git LFS and assets](docs/lfs-and-assets.md)
+- [Contributing](CONTRIBUTING.md)
+
+## Release Shape
+
+The current release workflow publishes:
+
+- `RustyXrCompanion-Setup.exe`
+- `RustyXrCompanion-win-x64.zip`
+- `rusty-xr-companion-cli-win-x64.zip`
+- `SHA256SUMS.txt`
+
+The setup helper installs the portable app under the user's LocalAppData
+programs folder and creates a Start Menu shortcut. It can be signed by the
+release workflow when a signing certificate is configured in GitHub secrets.
+
+MSIX and `.appinstaller` support are intentionally documented as the next
+packaging lane. The portable installer is the low-friction first release path
+because this first version does not need Windows package identity and does not
+ship APK payloads.
+
+## License
+
+MIT for this repository. Upstream tools and user-supplied APKs keep their own
+licenses and distribution rules. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

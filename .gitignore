@@ -1,0 +1,28 @@
+bin/
+obj/
+.vs/
+.vscode/
+.idea/
+TestResults/
+/artifacts/
+/site/
+/node_modules/
+*.user
+*.suo
+*.nupkg
+*.snupkg
+
+# The first public release is designed for user-supplied APKs and local catalogs.
+# Do not commit APK bytes unless a future release deliberately enables LFS for
+# an approved public sample.
+samples/quest-session-kit/APKs/*.apk
+samples/quest-session-kit/APKs/*.aab
+
+# Signing material must stay outside source control.
+*.pfx
+*.p12
+*.pvk
+*.snk
+*.keystore
+*.jks
+*.mobileprovision
