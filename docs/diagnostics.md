@@ -25,6 +25,15 @@ The report includes:
 - optional live headset snapshots
 - notes for command failures
 
+Catalog verification writes a separate bundle:
+
+```powershell
+dotnet run --project src/RustyXr.Companion.Cli -- catalog verify --path samples\quest-session-kit\apk-catalog.example.json --app rusty-xr-quest-minimal --serial <serial> --launch --device-profile perf-smoke-test --out .\artifacts\verify
+```
+
+That bundle includes before/after snapshots, target process state, foreground
+activity matching, `gfxinfo`, `meminfo`, command results, and notes.
+
 The WPF app writes diagnostics under:
 
 ```text

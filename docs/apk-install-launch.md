@@ -48,3 +48,20 @@ APK files can still stay as local paths or GitHub Release assets.
 ```powershell
 dotnet run --project src/RustyXr.Companion.Cli -- catalog list --json
 ```
+
+Install and launch a catalog app by ID:
+
+```powershell
+dotnet run --project src/RustyXr.Companion.Cli -- catalog install --path samples\quest-session-kit\apk-catalog.example.json --app rusty-xr-quest-minimal --serial <serial>
+dotnet run --project src/RustyXr.Companion.Cli -- catalog launch --path samples\quest-session-kit\apk-catalog.example.json --app rusty-xr-quest-minimal --serial <serial>
+```
+
+Run a launch verification pass with a device profile and a diagnostics bundle:
+
+```powershell
+dotnet run --project src/RustyXr.Companion.Cli -- catalog verify --path samples\quest-session-kit\apk-catalog.example.json --app rusty-xr-quest-minimal --serial <serial> --launch --device-profile perf-smoke-test --settle-ms 4000 --out .\artifacts\verify
+```
+
+The verifier records headset snapshots plus process, foreground, `gfxinfo`, and
+`meminfo` signals. Visual confirmation still requires the headset or a cast
+stream.

@@ -64,6 +64,7 @@ dotnet run --project src/RustyXr.Companion.Cli -- launch --serial <serial> --pac
 dotnet run --project src/RustyXr.Companion.Cli -- profile apply --serial <serial> --cpu 2 --gpu 2
 dotnet run --project src/RustyXr.Companion.Cli -- cast --serial <serial> --max-size 1280
 dotnet run --project src/RustyXr.Companion.Cli -- doctor --snapshots --out .\artifacts\diagnostics
+dotnet run --project src/RustyXr.Companion.Cli -- catalog verify --path samples\quest-session-kit\apk-catalog.example.json --app rusty-xr-quest-minimal --serial <serial> --launch --device-profile perf-smoke-test --out .\artifacts\verify
 ```
 
 ## Documentation

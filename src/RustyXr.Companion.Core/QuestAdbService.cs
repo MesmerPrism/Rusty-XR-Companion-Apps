@@ -81,6 +81,33 @@ public sealed class QuestAdbService
         return RunAdbAsync(serial, $"shell am force-stop {ShellQuote(packageName)}", TimeSpan.FromSeconds(20), cancellationToken);
     }
 
+    public async Task<QuestAppDiagnostics> GetAppDiagnosticsAsync(
+        string serial,
+        string packageName,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(packageName))
+        {
+            throw new ArgumentException("Package name is required.", nameof(packageName));
+        }
+
+        var pidResult = await ShellAsync(serial, $"pidof {ShellQuote(packageName)}", cancellationToken).ConfigureAwait(false);
+        var foreground = ParseForeground(await ShellTextAsync(serial, "dumpsys activity activities", cancellationToken).ConfigureAwait(false));
+        var gfxResult = await ShellAsync(serial, $"dumpsys gfxinfo {ShellQuote(packageName)}", cancellationToken).ConfigureAwait(false);
+        var memoryResult = await ShellAsync(serial, $"dumpsys meminfo {ShellQuote(packageName)}", cancellationToken).ConfigureAwait(false);
+        var pid = pidResult.StandardOutput.Trim();
+
+        return new QuestAppDiagnostics(
+            packageName,
+            ProcessRunning: pid.Length > 0,
+            ProcessId: pid.Length > 0 ? pid : null,
+            ForegroundMatchesPackage: foreground.StartsWith(packageName + "/", StringComparison.Ordinal),
+            Foreground: foreground,
+            GfxInfoSummary: SummarizeGfxInfo(gfxResult.StandardOutput),
+            MemorySummary: SummarizeMemory(memoryResult.StandardOutput),
+            CapturedAt: DateTimeOffset.Now);
+    }
+
     public async Task<IReadOnlyList<CommandResult>> ApplyDeviceProfileAsync(
         string serial,
         int? cpuLevel,
@@ -197,6 +224,41 @@ public sealed class QuestAdbService
     {
         var match = Regex.Match(output, @"(?m)(mResumedActivity|topResumedActivity).*?\s(?<component>[A-Za-z0-9_.]+/[A-Za-z0-9_.$]+)");
         return match.Success ? match.Groups["component"].Value : "unknown";
+    }
+
+    private static string SummarizeGfxInfo(string output)
+    {
+        var interesting = output.Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries)
+            .Select(static line => line.Trim())
+            .Where(static line =>
+                line.StartsWith("Total frames rendered:", StringComparison.OrdinalIgnoreCase) ||
+                line.StartsWith("Janky frames:", StringComparison.OrdinalIgnoreCase) ||
+                line.StartsWith("50th percentile:", StringComparison.OrdinalIgnoreCase) ||
+                line.StartsWith("90th percentile:", StringComparison.OrdinalIgnoreCase) ||
+                line.StartsWith("95th percentile:", StringComparison.OrdinalIgnoreCase) ||
+                line.StartsWith("99th percentile:", StringComparison.OrdinalIgnoreCase) ||
+                line.StartsWith("Number Missed Vsync:", StringComparison.OrdinalIgnoreCase) ||
+                line.StartsWith("HISTOGRAM:", StringComparison.OrdinalIgnoreCase))
+            .Take(8)
+            .ToArray();
+
+        return interesting.Length > 0
+            ? string.Join(" | ", interesting)
+            : "gfxinfo unavailable or no frame stats reported";
+    }
+
+    private static string SummarizeMemory(string output)
+    {
+        var total = Regex.Match(output, @"(?m)^\s*TOTAL\s+(?<value>\d+)");
+        if (total.Success)
+        {
+            return $"TOTAL {total.Groups["value"].Value} KiB";
+        }
+
+        var nativeHeap = Regex.Match(output, @"(?m)^\s*Native Heap\s+(?<value>\d+)");
+        return nativeHeap.Success
+            ? $"Native Heap {nativeHeap.Groups["value"].Value} KiB"
+            : "meminfo unavailable";
     }
 
     private static string ShellQuote(string value) => "'" + value.Replace("'", "'\"'\"'", StringComparison.Ordinal) + "'";

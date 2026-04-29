@@ -57,4 +57,41 @@ public sealed class CoreModelTests
             File.Delete(path);
         }
     }
+
+    [Fact]
+    public async Task CatalogLoaderSelectsAndResolvesRelativeApkPath()
+    {
+        var root = Path.Combine(Path.GetTempPath(), $"rusty-xr-catalog-{Guid.NewGuid():N}");
+        var path = Path.Combine(root, "catalogs", "apps.json");
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        await File.WriteAllTextAsync(path, """
+            {
+              "schemaVersion": "rusty.xr.quest-app-catalog.v1",
+              "apps": [
+                {
+                  "id": "example",
+                  "label": "Example",
+                  "packageName": "com.example.questapp",
+                  "activityName": ".MainActivity",
+                  "apkFile": "../build/example.apk",
+                  "description": "Example target."
+                }
+              ],
+              "deviceProfiles": [],
+              "runtimeProfiles": []
+            }
+            """);
+
+        try
+        {
+            var selection = await new CatalogLoader().SelectAppAsync(path, "example");
+
+            Assert.Equal("com.example.questapp", selection.App.PackageName);
+            Assert.Equal(Path.GetFullPath(Path.Combine(root, "catalogs", "..", "build", "example.apk")), selection.ResolvedApkPath);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
 }

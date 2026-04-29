@@ -19,6 +19,16 @@ Future public example APKs should publish catalog metadata in this shape so the
 Companion app can install, launch, and profile them without taking a build-time
 dependency on the Rust workspace.
 
+The current sample catalog includes the Rusty XR minimal Quest APK entry:
+
+- app id: `rusty-xr-quest-minimal`
+- package: `com.example.rustyxr.minimal`
+- activity: `.MainActivity`
+- APK path: sibling Rusty-XR checkout build output, if built locally
+
+The APK bytes are not committed. Build the APK from Rusty XR, then use
+Companion's catalog install, launch, and verify commands.
+
 When the Rusty XR core repo is checked out next to this repo, validate this
 sample catalog with:
 

@@ -67,6 +67,16 @@ public sealed record QuestSnapshot(
     string Foreground,
     DateTimeOffset CapturedAt);
 
+public sealed record QuestAppDiagnostics(
+    string PackageName,
+    bool ProcessRunning,
+    string? ProcessId,
+    bool ForegroundMatchesPackage,
+    string Foreground,
+    string GfxInfoSummary,
+    string MemorySummary,
+    DateTimeOffset CapturedAt);
+
 public sealed record QuestAppTarget(
     string Id,
     string Label,
@@ -88,6 +98,12 @@ public sealed record RuntimeProfile(
     string Label,
     IReadOnlyDictionary<string, string> Values,
     string Description);
+
+public sealed record CatalogAppSelection(
+    QuestSessionCatalog Catalog,
+    QuestAppTarget App,
+    string CatalogPath,
+    string? ResolvedApkPath);
 
 public sealed record QuestSessionCatalog(
     string SchemaVersion,

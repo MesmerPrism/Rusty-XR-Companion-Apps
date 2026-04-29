@@ -161,16 +161,216 @@ internal static class CliProgram
 
     private static async Task<int> CatalogAsync(string[] args)
     {
-        if (args.Length == 0 || args[0] != "list")
+        if (args.Length == 0)
         {
-            return Fail("Use: catalog list --path <catalog.json>");
+            return Fail("Use: catalog <list|install|launch|stop|verify> --path <catalog.json>");
         }
 
-        var options = ArgOptions.Parse(args.Skip(1));
-        var path = options.ValueOrNull("--path") ?? Path.Combine("samples", "quest-session-kit", "apk-catalog.example.json");
+        return args[0] switch
+        {
+            "list" => await CatalogListAsync(ArgOptions.Parse(args.Skip(1))).ConfigureAwait(false),
+            "install" => await CatalogInstallAsync(ArgOptions.Parse(args.Skip(1))).ConfigureAwait(false),
+            "launch" => await CatalogLaunchAsync(ArgOptions.Parse(args.Skip(1))).ConfigureAwait(false),
+            "stop" => await CatalogStopAsync(ArgOptions.Parse(args.Skip(1))).ConfigureAwait(false),
+            "verify" => await CatalogVerifyAsync(ArgOptions.Parse(args.Skip(1))).ConfigureAwait(false),
+            _ => Fail("Use: catalog <list|install|launch|stop|verify> --path <catalog.json>")
+        };
+    }
+
+    private static async Task<int> CatalogListAsync(ArgOptions options)
+    {
+        var path = CatalogPath(options);
         var catalog = await new CatalogLoader().LoadAsync(path).ConfigureAwait(false);
         WriteObject(catalog, options.Has("--json"));
         return 0;
+    }
+
+    private static async Task<int> CatalogInstallAsync(ArgOptions options)
+    {
+        var selection = await CatalogSelectionAsync(options).ConfigureAwait(false);
+        var apkPath = options.ValueOrNull("--apk") ?? selection.ResolvedApkPath;
+        if (string.IsNullOrWhiteSpace(apkPath))
+        {
+            return Fail("Catalog app has no apkFile. Pass --apk <path>.");
+        }
+
+        var result = await new QuestAdbService()
+            .InstallAsync(Required(options, "--serial"), apkPath)
+            .ConfigureAwait(false);
+        WriteCommandResult(result);
+        return result.Succeeded ? 0 : result.ExitCode;
+    }
+
+    private static async Task<int> CatalogLaunchAsync(ArgOptions options)
+    {
+        var selection = await CatalogSelectionAsync(options).ConfigureAwait(false);
+        var result = await new QuestAdbService()
+            .LaunchAsync(Required(options, "--serial"), selection.App.PackageName, selection.App.ActivityName)
+            .ConfigureAwait(false);
+        WriteCommandResult(result);
+        return result.Succeeded ? 0 : result.ExitCode;
+    }
+
+    private static async Task<int> CatalogStopAsync(ArgOptions options)
+    {
+        var selection = await CatalogSelectionAsync(options).ConfigureAwait(false);
+        var result = await new QuestAdbService()
+            .StopAsync(Required(options, "--serial"), selection.App.PackageName)
+            .ConfigureAwait(false);
+        WriteCommandResult(result);
+        return result.Succeeded ? 0 : result.ExitCode;
+    }
+
+    private static async Task<int> CatalogVerifyAsync(ArgOptions options)
+    {
+        var serial = Required(options, "--serial");
+        var selection = await CatalogSelectionAsync(options).ConfigureAwait(false);
+        var adb = new QuestAdbService();
+        var commands = new List<CommandResult>();
+        var notes = new List<string>();
+        var deviceProfileId = options.ValueOrNull("--device-profile");
+        var runtimeProfileId = options.ValueOrNull("--runtime-profile");
+
+        var before = await adb.GetSnapshotAsync(serial).ConfigureAwait(false);
+
+        if (!string.IsNullOrWhiteSpace(deviceProfileId))
+        {
+            var profile = selection.Catalog.DeviceProfiles.FirstOrDefault(profile =>
+                string.Equals(profile.Id, deviceProfileId, StringComparison.OrdinalIgnoreCase));
+            if (profile is null)
+            {
+                return Fail($"Device profile '{deviceProfileId}' was not found.");
+            }
+
+            var properties = profile.Properties.ToDictionary(static item => item.Key, static item => item.Value, StringComparer.Ordinal);
+            commands.AddRange(await adb.ApplyDeviceProfileAsync(serial, null, null, properties).ConfigureAwait(false));
+        }
+
+        if (!string.IsNullOrWhiteSpace(runtimeProfileId) &&
+            !selection.Catalog.RuntimeProfiles.Any(profile => string.Equals(profile.Id, runtimeProfileId, StringComparison.OrdinalIgnoreCase)))
+        {
+            return Fail($"Runtime profile '{runtimeProfileId}' was not found.");
+        }
+
+        if (options.Has("--install"))
+        {
+            var apkPath = options.ValueOrNull("--apk") ?? selection.ResolvedApkPath;
+            if (string.IsNullOrWhiteSpace(apkPath))
+            {
+                return Fail("Catalog app has no apkFile. Pass --apk <path>.");
+            }
+
+            commands.Add(await adb.InstallAsync(serial, apkPath).ConfigureAwait(false));
+        }
+
+        if (options.Has("--launch"))
+        {
+            commands.Add(await adb.LaunchAsync(serial, selection.App.PackageName, selection.App.ActivityName).ConfigureAwait(false));
+        }
+
+        var settleMs = options.TryGet("--settle-ms", out var settleText) && int.TryParse(settleText, out var parsedSettle)
+            ? parsedSettle
+            : 2500;
+        if (settleMs > 0)
+        {
+            await Task.Delay(settleMs).ConfigureAwait(false);
+        }
+
+        var after = await adb.GetSnapshotAsync(serial).ConfigureAwait(false);
+        var diagnostics = await adb.GetAppDiagnosticsAsync(serial, selection.App.PackageName).ConfigureAwait(false);
+
+        if (!diagnostics.ProcessRunning)
+        {
+            notes.Add("Target process was not running when diagnostics were captured.");
+        }
+
+        if (!diagnostics.ForegroundMatchesPackage)
+        {
+            notes.Add("Foreground activity did not match the catalog package.");
+        }
+
+        var report = new CatalogVerificationReport(
+            DateTimeOffset.Now,
+            selection.CatalogPath,
+            selection.App,
+            selection.ResolvedApkPath,
+            deviceProfileId,
+            runtimeProfileId,
+            before,
+            after,
+            diagnostics,
+            commands,
+            notes);
+
+        if (options.TryGet("--out", out var outputRoot))
+        {
+            var folder = WriteVerificationBundle(report, outputRoot);
+            Console.Error.WriteLine($"Verification bundle written to {folder}");
+        }
+
+        WriteObject(report, options.Has("--json"));
+        return commands.All(static command => command.Succeeded) && diagnostics.ProcessRunning ? 0 : 2;
+    }
+
+    private static string CatalogPath(ArgOptions options) =>
+        options.ValueOrNull("--path") ?? Path.Combine("samples", "quest-session-kit", "apk-catalog.example.json");
+
+    private static Task<CatalogAppSelection> CatalogSelectionAsync(ArgOptions options) =>
+        new CatalogLoader().SelectAppAsync(CatalogPath(options), Required(options, "--app"));
+
+    private static string WriteVerificationBundle(CatalogVerificationReport report, string outputRoot)
+    {
+        var folder = Path.Combine(outputRoot, $"verify-{DateTimeOffset.Now:yyyyMMdd-HHmmss}");
+        Directory.CreateDirectory(folder);
+        File.WriteAllText(Path.Combine(folder, "verification.json"), JsonSerializer.Serialize(report, JsonOptions));
+        File.WriteAllText(Path.Combine(folder, "verification.md"), ToMarkdown(report));
+        return folder;
+    }
+
+    private static string ToMarkdown(CatalogVerificationReport report)
+    {
+        var lines = new List<string>
+        {
+            "# Rusty XR Catalog Verification",
+            string.Empty,
+            $"Captured: `{report.CapturedAt:O}`",
+            $"Catalog: `{report.CatalogPath}`",
+            $"App: `{report.App.Label}` (`{report.App.Id}`)",
+            $"Package: `{report.App.PackageName}`",
+            $"Activity: `{report.App.ActivityName ?? "launcher"}`",
+            $"APK: `{report.ResolvedApkPath ?? "none"}`",
+            $"Device profile: `{report.DeviceProfileId ?? "none"}`",
+            $"Runtime profile: `{report.RuntimeProfileId ?? "none"}`",
+            string.Empty,
+            "## Snapshots",
+            string.Empty,
+            $"Before: `{report.BeforeSnapshot.Foreground}` / `{report.BeforeSnapshot.Wakefulness}`",
+            $"After: `{report.AfterSnapshot.Foreground}` / `{report.AfterSnapshot.Wakefulness}`",
+            string.Empty,
+            "## App Diagnostics",
+            string.Empty,
+            $"- Process running: `{report.Diagnostics.ProcessRunning}`",
+            $"- PID: `{report.Diagnostics.ProcessId ?? "none"}`",
+            $"- Foreground matches package: `{report.Diagnostics.ForegroundMatchesPackage}`",
+            $"- Foreground: `{report.Diagnostics.Foreground}`",
+            $"- Gfx: `{report.Diagnostics.GfxInfoSummary}`",
+            $"- Memory: `{report.Diagnostics.MemorySummary}`",
+            string.Empty,
+            "## Commands",
+            string.Empty
+        };
+
+        lines.AddRange(report.Commands.Select(static command =>
+            $"- `{command.FileName} {command.Arguments}` -> `{command.ExitCode}`"));
+
+        if (report.Notes.Count > 0)
+        {
+            lines.AddRange(new[] { string.Empty, "## Notes", string.Empty });
+            lines.AddRange(report.Notes.Select(static note => $"- {note}"));
+        }
+
+        lines.Add(string.Empty);
+        return string.Join(Environment.NewLine, lines);
     }
 
     private static void WriteObject<T>(T value, bool json)
@@ -226,8 +426,25 @@ internal static class CliProgram
           profile apply --serial <serial> [--cpu <level>] [--gpu <level>] [--prop key=value]
           cast --serial <serial> [--max-size <pixels>] [--bitrate-mbps <n>]
           catalog list [--path <catalog.json>] [--json]
+          catalog install --path <catalog.json> --app <id> --serial <serial> [--apk <path>]
+          catalog launch --path <catalog.json> --app <id> --serial <serial>
+          catalog stop --path <catalog.json> --app <id> --serial <serial>
+          catalog verify --path <catalog.json> --app <id> --serial <serial> [--install] [--launch] [--device-profile <id>] [--runtime-profile <id>] [--settle-ms <n>] [--out <folder>] [--json]
         """);
     }
+
+    private sealed record CatalogVerificationReport(
+        DateTimeOffset CapturedAt,
+        string CatalogPath,
+        QuestAppTarget App,
+        string? ResolvedApkPath,
+        string? DeviceProfileId,
+        string? RuntimeProfileId,
+        QuestSnapshot BeforeSnapshot,
+        QuestSnapshot AfterSnapshot,
+        QuestAppDiagnostics Diagnostics,
+        IReadOnlyList<CommandResult> Commands,
+        IReadOnlyList<string> Notes);
 
     private sealed class ArgOptions
     {
