@@ -15,9 +15,13 @@ Use the guided setup helper when a release is available:
 [Download RustyXrCompanion-Setup.exe](https://github.com/MesmerPrism/Rusty-XR-Companion-Apps/releases/latest/download/RustyXrCompanion-Setup.exe)
 
 The helper downloads the latest portable app zip, installs it under the user's
-LocalAppData programs folder, creates a Start Menu shortcut, and launches the
-app. Installed release-channel apps check GitHub Releases on startup and replace
-the local release install when a newer portable app zip is published.
+LocalAppData programs folder, refreshes the managed Quest tooling cache, creates
+a Start Menu shortcut, and launches the app. Installed release-channel apps
+check GitHub Releases on startup and replace the local release install when a
+newer portable app zip is published.
+
+If the helper cannot reach an upstream tooling source, the app install still
+completes and the **Install / Update Managed Tooling** button can retry later.
 
 ## Direct Assets
 

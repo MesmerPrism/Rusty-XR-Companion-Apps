@@ -35,6 +35,9 @@ internal static class CliProgram
                 "stop" => await StopAsync(options).ConfigureAwait(false),
                 "profile" => await ProfileAsync(args.Skip(1).ToArray()).ConfigureAwait(false),
                 "cast" => Cast(options),
+                "wifi" => await WifiAsync(args.Skip(1).ToArray()).ConfigureAwait(false),
+                "hzdb" => await HzdbAsync(args.Skip(1).ToArray()).ConfigureAwait(false),
+                "tooling" => await ToolingAsync(args.Skip(1).ToArray()).ConfigureAwait(false),
                 "catalog" => await CatalogAsync(args.Skip(1).ToArray()).ConfigureAwait(false),
                 _ => Fail($"Unknown command '{command}'. Run --help for commands.")
             };
@@ -157,6 +160,160 @@ internal static class CliProgram
         var session = new ScrcpyService().Start(new StreamLaunchRequest(Required(options, "--serial"), maxSize, bitrate));
         Console.WriteLine($"Started scrcpy process {session.ProcessId}: {session.ToolPath} {session.Arguments}");
         return 0;
+    }
+
+    private static async Task<int> WifiAsync(string[] args)
+    {
+        var subcommand = args.Length == 0 || args[0].StartsWith("--", StringComparison.Ordinal)
+            ? "enable"
+            : args[0].ToLowerInvariant();
+        var optionArgs = subcommand == "enable" && args.Length > 0 && !args[0].StartsWith("--", StringComparison.Ordinal)
+            ? args.Skip(1)
+            : args;
+        var options = ArgOptions.Parse(optionArgs);
+
+        if (subcommand != "enable")
+        {
+            return Fail("Use: wifi enable --serial <usb-serial> [--port <port>] [--json]");
+        }
+
+        var port = options.TryGet("--port", out var portText)
+            ? int.Parse(portText)
+            : QuestEndpoint.DefaultAdbPort;
+        var result = await new QuestAdbService()
+            .EnableWifiAdbAsync(Required(options, "--serial"), port)
+            .ConfigureAwait(false);
+
+        WriteObject(result, options.Has("--json"));
+        return result.Succeeded ? 0 : 2;
+    }
+
+    private static async Task<int> HzdbAsync(string[] args)
+    {
+        if (args.Length == 0)
+        {
+            return Fail("Use: hzdb <status|proximity|wake|screenshot|info> --serial <serial>");
+        }
+
+        var subcommand = args[0].ToLowerInvariant();
+        var options = ArgOptions.Parse(args.Skip(1));
+        var hzdb = new HzdbService();
+
+        return subcommand switch
+        {
+            "status" => await HzdbStatusAsync(hzdb, options).ConfigureAwait(false),
+            "proximity" => await HzdbProximityAsync(hzdb, args.Skip(1).ToArray()).ConfigureAwait(false),
+            "wake" => await HzdbWakeAsync(hzdb, options).ConfigureAwait(false),
+            "screenshot" => await HzdbScreenshotAsync(hzdb, options).ConfigureAwait(false),
+            "info" => await HzdbInfoAsync(hzdb, options).ConfigureAwait(false),
+            _ => Fail("Use: hzdb <status|proximity|wake|screenshot|info> --serial <serial>")
+        };
+    }
+
+    private static async Task<int> HzdbStatusAsync(HzdbService hzdb, ArgOptions options)
+    {
+        var status = await hzdb.GetProximityStatusAsync(Required(options, "--serial")).ConfigureAwait(false);
+        WriteObject(status, options.Has("--json"));
+        return status.Available ? 0 : 2;
+    }
+
+    private static async Task<int> HzdbProximityAsync(HzdbService hzdb, string[] args)
+    {
+        var mode = args.Length > 0 && !args[0].StartsWith("--", StringComparison.Ordinal)
+            ? args[0]
+            : null;
+        var options = ArgOptions.Parse(mode is null ? args : args.Skip(1));
+        mode ??= options.ValueOrNull("--mode") ?? "keep-awake";
+
+        var enableNormalProximity = mode.ToLowerInvariant() switch
+        {
+            "normal" or "enable" or "enabled" or "on" => true,
+            "keep-awake" or "disable" or "disabled" or "off" => false,
+            _ => throw new ArgumentException("Proximity mode must be keep-awake or normal.")
+        };
+
+        int? durationMs = options.TryGet("--duration-ms", out var durationText) ? int.Parse(durationText) : 28_800_000;
+        if (enableNormalProximity)
+        {
+            durationMs = null;
+        }
+
+        var result = await hzdb
+            .SetProximityAsync(Required(options, "--serial"), enableNormalProximity, durationMs)
+            .ConfigureAwait(false);
+        WriteCommandResult(result);
+
+        var status = await hzdb.GetProximityStatusAsync(Required(options, "--serial")).ConfigureAwait(false);
+        Console.WriteLine(status.Detail);
+        return result.Succeeded ? 0 : result.ExitCode;
+    }
+
+    private static async Task<int> HzdbWakeAsync(HzdbService hzdb, ArgOptions options)
+    {
+        var result = await hzdb.WakeDeviceAsync(Required(options, "--serial")).ConfigureAwait(false);
+        WriteCommandResult(result);
+        return result.Succeeded ? 0 : result.ExitCode;
+    }
+
+    private static async Task<int> HzdbInfoAsync(HzdbService hzdb, ArgOptions options)
+    {
+        var result = await hzdb.GetDeviceInfoAsync(Required(options, "--serial")).ConfigureAwait(false);
+        WriteCommandResult(result);
+        return result.Succeeded ? 0 : result.ExitCode;
+    }
+
+    private static async Task<int> HzdbScreenshotAsync(HzdbService hzdb, ArgOptions options)
+    {
+        var serial = Required(options, "--serial");
+        var output = options.ValueOrNull("--out") ??
+                     Path.Combine(
+                         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                         "RustyXrCompanion",
+                         "screenshots");
+        var outputPath = output.EndsWith(".png", StringComparison.OrdinalIgnoreCase)
+            ? output
+            : HzdbService.CreateDefaultScreenshotPath(output, serial);
+        var capture = await hzdb
+            .CaptureScreenshotAsync(serial, outputPath, options.ValueOrNull("--method"))
+            .ConfigureAwait(false);
+
+        WriteObject(capture, options.Has("--json"));
+        return capture.Succeeded ? 0 : 2;
+    }
+
+    private static async Task<int> ToolingAsync(string[] args)
+    {
+        if (args.Length == 0)
+        {
+            return Fail("Use: tooling <status|install-official> [--json]");
+        }
+
+        using var service = new OfficialQuestToolingService();
+        var subcommand = args[0].ToLowerInvariant();
+        var options = ArgOptions.Parse(args.Skip(1));
+        switch (subcommand)
+        {
+            case "status":
+            {
+                var status = options.Has("--latest")
+                    ? await service.GetStatusAsync().ConfigureAwait(false)
+                    : service.GetLocalStatus();
+                WriteObject(status, options.Has("--json"));
+                return status.IsReady ? 0 : 2;
+            }
+
+            case "install-official":
+            {
+                var progress = new InlineProgress<OfficialQuestToolingProgress>(item =>
+                    Console.Error.WriteLine($"[{item.PercentComplete,3}%] {item.Status}: {item.Detail}"));
+                var result = await service.InstallOrUpdateAsync(progress).ConfigureAwait(false);
+                WriteObject(result, options.Has("--json"));
+                return result.Status.IsReady ? 0 : 2;
+            }
+
+            default:
+                return Fail("Use: tooling <status|install-official> [--json]");
+        }
     }
 
     private static async Task<int> CatalogAsync(string[] args)
@@ -425,6 +582,13 @@ internal static class CliProgram
           stop --serial <serial> --package <package>
           profile apply --serial <serial> [--cpu <level>] [--gpu <level>] [--prop key=value]
           cast --serial <serial> [--max-size <pixels>] [--bitrate-mbps <n>]
+          wifi enable --serial <usb-serial> [--port <port>] [--json]
+          hzdb status --serial <serial> [--json]
+          hzdb proximity <keep-awake|normal> --serial <serial> [--duration-ms <n>]
+          hzdb wake --serial <serial>
+          hzdb screenshot --serial <serial> [--method <screencap|metacam>] [--out <folder-or-png>] [--json]
+          tooling status [--latest] [--json]
+          tooling install-official [--json]
           catalog list [--path <catalog.json>] [--json]
           catalog install --path <catalog.json> --app <id> --serial <serial> [--apk <path>]
           catalog launch --path <catalog.json> --app <id> --serial <serial>
@@ -497,5 +661,17 @@ internal static class CliProgram
 
         public string? ValueOrNull(string key) => TryGet(key, out var value) ? value : null;
         public IReadOnlyList<string> Values(string key) => _values.TryGetValue(key, out var values) ? values : Array.Empty<string>();
+    }
+
+    private sealed class InlineProgress<T> : IProgress<T>
+    {
+        private readonly Action<T> _report;
+
+        public InlineProgress(Action<T> report)
+        {
+            _report = report;
+        }
+
+        public void Report(T value) => _report(value);
     }
 }

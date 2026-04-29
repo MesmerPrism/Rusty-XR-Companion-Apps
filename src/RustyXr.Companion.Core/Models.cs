@@ -67,6 +67,38 @@ public sealed record QuestSnapshot(
     string Foreground,
     DateTimeOffset CapturedAt);
 
+public sealed record QuestWifiAdbResult(
+    string Serial,
+    QuestEndpoint Endpoint,
+    CommandResult TcpipResult,
+    CommandResult ConnectResult,
+    DateTimeOffset CompletedAt)
+{
+    public bool Succeeded => TcpipResult.Succeeded && ConnectResult.Succeeded;
+    public string Detail => string.Join(
+        Environment.NewLine,
+        new[] { TcpipResult.CondensedOutput, ConnectResult.CondensedOutput }
+            .Where(static value => !string.IsNullOrWhiteSpace(value)));
+}
+
+public sealed record QuestProximityStatus(
+    bool Available,
+    bool HoldActive,
+    string VirtualState,
+    bool IsAutosleepDisabled,
+    string HeadsetState,
+    int? AutoSleepTimeMs,
+    DateTimeOffset RetrievedAt,
+    DateTimeOffset? HoldUntil,
+    string Detail);
+
+public sealed record QuestScreenshotCapture(
+    bool Succeeded,
+    string OutputPath,
+    string Method,
+    string Detail,
+    DateTimeOffset CapturedAt);
+
 public sealed record QuestAppDiagnostics(
     string PackageName,
     bool ProcessRunning,

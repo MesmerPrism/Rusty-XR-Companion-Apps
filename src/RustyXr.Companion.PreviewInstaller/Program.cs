@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.IO.Compression;
 using System.Net.Http;
 using System.Security.Principal;
+using RustyXr.Companion.Core;
 
 namespace RustyXr.Companion.PreviewInstaller;
 
@@ -71,7 +72,26 @@ internal static class Program
         progress.Report(new InstallerProgress("Creating shortcut", "Creating a Start Menu shortcut for the installed app.", 85));
         CreateShortcut(installRoot);
 
-        progress.Report(new InstallerProgress("Launching app", "Opening Rusty XR Companion.", 95));
+        progress.Report(new InstallerProgress("Refreshing Quest tooling", "Installing or updating managed hzdb, Android platform-tools, and scrcpy.", 88));
+        try
+        {
+            using var tooling = new OfficialQuestToolingService();
+            var toolingProgress = new Progress<OfficialQuestToolingProgress>(update =>
+                progress.Report(new InstallerProgress(
+                    update.Status,
+                    update.Detail,
+                    Math.Clamp(88 + update.PercentComplete / 8, 88, 98))));
+            await tooling.InstallOrUpdateAsync(toolingProgress, cancellationToken).ConfigureAwait(true);
+        }
+        catch (Exception exception)
+        {
+            progress.Report(new InstallerProgress(
+                "Quest tooling refresh skipped",
+                $"The app was installed, but the managed tool cache could not be refreshed now: {exception.Message}",
+                94));
+        }
+
+        progress.Report(new InstallerProgress("Launching app", "Opening Rusty XR Companion.", 98));
         var exePath = Path.Combine(installRoot, AppExeName);
         if (!File.Exists(exePath))
         {
@@ -177,7 +197,7 @@ internal sealed class InstallerForm : Form
         };
 
         _status.Text = "Install Rusty XR Companion";
-        _detail.Text = "This helper installs the latest portable Windows release into your user profile and creates a Start Menu shortcut.";
+        _detail.Text = "This helper installs the latest portable Windows release, refreshes the managed Quest tooling cache, and creates a Start Menu shortcut.";
         _installButton.Click += async (_, _) => await RunInstallAsync().ConfigureAwait(true);
         _releaseButton.Click += (_, _) => Process.Start(new ProcessStartInfo(_releasePageUrl) { UseShellExecute = true });
 

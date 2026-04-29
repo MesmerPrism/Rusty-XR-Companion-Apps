@@ -31,6 +31,38 @@ public sealed class QuestAdbService
         return await _runner.RunAsync(adb, $"connect {endpoint}", TimeSpan.FromSeconds(15), cancellationToken).ConfigureAwait(false);
     }
 
+    public async Task<QuestWifiAdbResult> EnableWifiAdbAsync(
+        string serial,
+        int port = QuestEndpoint.DefaultAdbPort,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(serial))
+        {
+            throw new ArgumentException("Device serial is required.", nameof(serial));
+        }
+
+        if (port is <= 0 or > 65535)
+        {
+            throw new ArgumentOutOfRangeException(nameof(port), "Port must be between 1 and 65535.");
+        }
+
+        var route = await ShellAsync(serial, "ip route", cancellationToken).ConfigureAwait(false);
+        var ipAddress = TryParseWifiIpAddress(route.StandardOutput)
+            ?? TryParseWifiIpAddress((await ShellAsync(serial, "ip addr show wlan0", cancellationToken).ConfigureAwait(false)).StandardOutput);
+
+        if (string.IsNullOrWhiteSpace(ipAddress))
+        {
+            throw new InvalidOperationException("Could not determine the selected Quest Wi-Fi IP address from ADB.");
+        }
+
+        var tcpip = await RunAdbAsync(serial, $"tcpip {port}", TimeSpan.FromSeconds(20), cancellationToken).ConfigureAwait(false);
+        await Task.Delay(TimeSpan.FromMilliseconds(1500), cancellationToken).ConfigureAwait(false);
+        var endpoint = new QuestEndpoint(ipAddress, port);
+        var connect = await ConnectAsync(endpoint, cancellationToken).ConfigureAwait(false);
+
+        return new QuestWifiAdbResult(serial, endpoint, tcpip, connect, DateTimeOffset.Now);
+    }
+
     public async Task<QuestSnapshot> GetSnapshotAsync(string serial, CancellationToken cancellationToken = default)
     {
         var model = await ShellTextAsync(serial, "getprop ro.product.model", cancellationToken).ConfigureAwait(false);
@@ -194,6 +226,23 @@ public sealed class QuestAdbService
         }
 
         return devices;
+    }
+
+    public static string? TryParseWifiIpAddress(string output)
+    {
+        if (string.IsNullOrWhiteSpace(output))
+        {
+            return null;
+        }
+
+        var routeMatch = Regex.Match(output, @"\bsrc\s+(?<ip>(?:\d{1,3}\.){3}\d{1,3})\b");
+        if (routeMatch.Success)
+        {
+            return routeMatch.Groups["ip"].Value;
+        }
+
+        var wlanMatch = Regex.Match(output, @"\binet\s+(?<ip>(?:\d{1,3}\.){3}\d{1,3})/");
+        return wlanMatch.Success ? wlanMatch.Groups["ip"].Value : null;
     }
 
     private static string ParseBattery(string output)

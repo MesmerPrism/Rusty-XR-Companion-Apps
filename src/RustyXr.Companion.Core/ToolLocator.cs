@@ -12,8 +12,8 @@ public sealed class ToolLocator
     public async Task<IReadOnlyList<ToolStatus>> GetToolStatusesAsync(CancellationToken cancellationToken = default)
     {
         var adbPath = FindAdb();
-        var hzdbPath = FindOnPath("hzdb.cmd") ?? FindOnPath("hzdb.exe") ?? FindManagedTool("hzdb", "hzdb.cmd");
-        var scrcpyPath = FindOnPath("scrcpy.exe") ?? FindManagedTool("scrcpy", "scrcpy.exe");
+        var hzdbPath = FindHzdb();
+        var scrcpyPath = FindScrcpy();
 
         return new[]
         {
@@ -28,6 +28,7 @@ public sealed class ToolLocator
         var candidates = new[]
         {
             Environment.GetEnvironmentVariable("RUSTY_XR_ADB"),
+            OfficialQuestToolingLayout.AdbExecutablePath,
             Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Android", "Sdk", "platform-tools", "adb.exe"),
             Environment.GetEnvironmentVariable("ANDROID_SDK_ROOT") is { Length: > 0 } sdkRoot ? Path.Combine(sdkRoot, "platform-tools", "adb.exe") : null,
             Environment.GetEnvironmentVariable("ANDROID_HOME") is { Length: > 0 } androidHome ? Path.Combine(androidHome, "platform-tools", "adb.exe") : null,
@@ -37,7 +38,33 @@ public sealed class ToolLocator
         return candidates.FirstOrDefault(static path => !string.IsNullOrWhiteSpace(path) && File.Exists(path));
     }
 
-    public string? FindScrcpy() => FindOnPath("scrcpy.exe") ?? FindManagedTool("scrcpy", "scrcpy.exe");
+    public string? FindHzdb()
+    {
+        var candidates = new[]
+        {
+            Environment.GetEnvironmentVariable("RUSTY_XR_HZDB"),
+            OfficialQuestToolingLayout.HzdbExecutablePath,
+            FindOnPath("hzdb.exe"),
+            FindOnPath("hzdb.cmd"),
+            FindManagedTool("hzdb", "hzdb.exe"),
+            FindManagedTool("hzdb", "hzdb.cmd")
+        };
+
+        return candidates.FirstOrDefault(static path => !string.IsNullOrWhiteSpace(path) && File.Exists(path));
+    }
+
+    public string? FindScrcpy()
+    {
+        var candidates = new[]
+        {
+            Environment.GetEnvironmentVariable("RUSTY_XR_SCRCPY"),
+            OfficialQuestToolingLayout.ScrcpyExecutablePath,
+            FindOnPath("scrcpy.exe"),
+            FindManagedTool("scrcpy", "scrcpy.exe")
+        };
+
+        return candidates.FirstOrDefault(static path => !string.IsNullOrWhiteSpace(path) && File.Exists(path));
+    }
 
     private async Task<ToolStatus> BuildToolStatusAsync(
         ToolKind kind,

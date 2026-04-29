@@ -11,6 +11,8 @@ cover phone-side Quest workflows:
 - foreground service host
 - USB-host ADB bootstrap
 - Wi-Fi ADB handoff from USB
+- visual proof capture compatible with the Windows companion's screenshot
+  workflow
 - staged APK install
 - launch and stop actions
 - diagnostics bundle export

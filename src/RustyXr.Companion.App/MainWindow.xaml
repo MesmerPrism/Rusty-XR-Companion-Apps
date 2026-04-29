@@ -70,8 +70,9 @@
                 <Border Style="{StaticResource PanelBorder}">
                     <StackPanel>
                         <TextBlock Text="Tooling" FontWeight="SemiBold" FontSize="15" />
-                        <TextBlock Text="ADB is required. hzdb and scrcpy are optional utility lanes." Margin="0,4,0,10" />
+                        <TextBlock Text="ADB is required. Managed tooling can install official hzdb, Android platform-tools, and scrcpy into LocalAppData." Margin="0,4,0,10" />
                         <Button Content="Refresh Tooling" Command="{Binding RefreshToolsCommand}" />
+                        <Button Content="Install / Update Managed Tooling" Command="{Binding InstallToolingCommand}" />
                         <ItemsControl ItemsSource="{Binding Tools}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
@@ -101,6 +102,7 @@
                             <TextBox Text="{Binding Endpoint, UpdateSourceTrigger=PropertyChanged}" DockPanel.Dock="Left" Width="190" />
                             <Button Content="Connect" Command="{Binding ConnectCommand}" />
                         </DockPanel>
+                        <Button Content="Enable Wi-Fi ADB From USB" Command="{Binding EnableWifiAdbCommand}" />
                         <Button Content="Capture Snapshot" Command="{Binding SnapshotCommand}" />
                     </StackPanel>
                 </Border>
@@ -198,11 +200,45 @@
                 </TabItem>
 
                 <TabItem Header="Streams">
-                    <StackPanel Margin="12" MaxWidth="560" HorizontalAlignment="Left">
-                        <TextBlock Text="Display Cast" FontWeight="SemiBold" />
-                        <TextBlock Text="Starts a scrcpy display stream for the selected Quest. Install scrcpy or add it to PATH first." Margin="0,4,0,12" />
-                        <Button Content="Start Display Cast" Command="{Binding StartCastCommand}" Width="180" HorizontalAlignment="Left" />
-                    </StackPanel>
+                    <Grid Margin="12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="320" />
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0" MaxWidth="620" HorizontalAlignment="Left">
+                            <TextBlock Text="Display Cast" FontWeight="SemiBold" />
+                            <TextBlock Text="Starts a scrcpy display stream for the selected Quest. Use managed tooling to install scrcpy when it is not already on PATH." Margin="0,4,0,12" />
+                            <StackPanel Orientation="Horizontal">
+                                <Button Content="Start Display Cast" Command="{Binding StartCastCommand}" Width="180" />
+                                <Button Content="Install / Update Tooling" Command="{Binding InstallToolingCommand}" Width="190" />
+                            </StackPanel>
+
+                            <TextBlock Text="Visual Inspection" FontWeight="SemiBold" Margin="0,14,0,0" />
+                            <TextBlock Text="Capture a headset screenshot for agent or operator verification. screencap uses ADB first; alternate hzdb methods can be entered when needed." Margin="0,4,0,10" />
+                            <TextBlock Text="Screenshot method" />
+                            <TextBox Text="{Binding ScreenshotMethod, UpdateSourceTrigger=PropertyChanged}" Width="160" HorizontalAlignment="Left" />
+                            <Button Content="Capture Headset Screenshot" Command="{Binding CaptureScreenshotCommand}" Width="230" HorizontalAlignment="Left" />
+
+                            <TextBlock Text="Wake And Proximity" FontWeight="SemiBold" Margin="0,14,0,0" />
+                            <TextBlock Text="Keep-awake disables the Quest wear sensor through hzdb for the requested duration. Restore normal proximity when you want headset sleep behavior back." Margin="0,4,0,10" />
+                            <TextBlock Text="Keep-awake duration (ms)" />
+                            <TextBox Text="{Binding ProximityDurationMs, UpdateSourceTrigger=PropertyChanged}" Width="160" HorizontalAlignment="Left" />
+                            <WrapPanel>
+                                <Button Content="Wake Headset" Command="{Binding WakeHeadsetCommand}" />
+                                <Button Content="Keep Awake" Command="{Binding KeepAwakeCommand}" />
+                                <Button Content="Restore Normal Proximity" Command="{Binding RestoreProximityCommand}" />
+                                <Button Content="Read Proximity Status" Command="{Binding ReadProximityCommand}" />
+                            </WrapPanel>
+                        </StackPanel>
+
+                        <Border Grid.Column="1" Style="{StaticResource PanelBorder}">
+                            <StackPanel>
+                                <TextBlock Text="Last Visual Proof" FontWeight="SemiBold" />
+                                <TextBlock Text="{Binding LastVisualProof}" FontFamily="Consolas" Margin="0,10,0,0" />
+                            </StackPanel>
+                        </Border>
+                    </Grid>
                 </TabItem>
 
                 <TabItem Header="Diagnostics">

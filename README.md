@@ -6,8 +6,9 @@ who need a practical bridge between a Windows computer and a Meta Quest device.
 The first app is **Rusty XR Companion**, a WPF operator tool with a matching CLI.
 It helps you find Quest development tooling, connect a headset over USB or
 Wi-Fi ADB, install a user-supplied APK, launch or stop a target app, apply
-simple development profiles, start a display cast through `scrcpy`, and export
-diagnostics that can be shared without a source checkout.
+simple development profiles, install official operator tooling, start a display
+cast through `scrcpy`, capture visual proof, manage a keep-awake proximity
+hold, and export diagnostics that can be shared without a source checkout.
 
 This repo is designed to work alongside the public
 [Rusty XR](https://github.com/MesmerPrism/Rusty-XR) core workspace. Rusty XR
@@ -21,6 +22,8 @@ release tooling, Quest device operations, and contributor-facing docs.
 - CLI for the same core actions
 - public sample catalog metadata aligned with the Rusty XR core
   `quest-app-catalog` schema
+- managed LocalAppData tool cache for Meta `hzdb`, Android platform-tools, and
+  `scrcpy`
 - GitHub Pages docs and onboarding
 - portable Windows release workflow with a guided setup helper
 - Git LFS patterns for future APK assets, with APK bytes intentionally ignored
@@ -64,12 +67,16 @@ npm run pages:build
 
 ```powershell
 dotnet run --project src/RustyXr.Companion.Cli -- devices
+dotnet run --project src/RustyXr.Companion.Cli -- tooling install-official
+dotnet run --project src/RustyXr.Companion.Cli -- wifi enable --serial <usb-serial>
 dotnet run --project src/RustyXr.Companion.Cli -- connect --endpoint 192.168.1.25:5555
 dotnet run --project src/RustyXr.Companion.Cli -- snapshot --serial <serial>
 dotnet run --project src/RustyXr.Companion.Cli -- install --serial <serial> --apk C:\path\app.apk
 dotnet run --project src/RustyXr.Companion.Cli -- launch --serial <serial> --package com.example.questapp
 dotnet run --project src/RustyXr.Companion.Cli -- profile apply --serial <serial> --cpu 2 --gpu 2
 dotnet run --project src/RustyXr.Companion.Cli -- cast --serial <serial> --max-size 1280
+dotnet run --project src/RustyXr.Companion.Cli -- hzdb proximity keep-awake --serial <serial> --duration-ms 28800000
+dotnet run --project src/RustyXr.Companion.Cli -- hzdb screenshot --serial <serial> --out .\artifacts\screenshots
 dotnet run --project src/RustyXr.Companion.Cli -- doctor --snapshots --out .\artifacts\diagnostics
 dotnet run --project src/RustyXr.Companion.Cli -- catalog verify --path samples\quest-session-kit\apk-catalog.example.json --app rusty-xr-quest-minimal --serial <serial> --launch --device-profile perf-smoke-test --out .\artifacts\verify
 ```

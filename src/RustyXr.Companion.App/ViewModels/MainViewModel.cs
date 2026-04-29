@@ -11,6 +11,7 @@ public sealed class MainViewModel : ObservableObject
     private readonly ToolLocator _toolLocator = new();
     private readonly QuestAdbService _adbService;
     private readonly ScrcpyService _scrcpyService;
+    private readonly HzdbService _hzdbService;
     private readonly WindowsEnvironmentAnalyzer _analyzer;
     private readonly CatalogLoader _catalogLoader = new();
     private readonly PortableReleaseUpdateService _updateService = new();
@@ -31,6 +32,9 @@ public sealed class MainViewModel : ObservableObject
     private string _cpuLevel = "2";
     private string _gpuLevel = "2";
     private string _lastSnapshot = "No headset snapshot captured yet.";
+    private string _lastVisualProof = "No visual proof captured yet.";
+    private string _proximityDurationMs = "28800000";
+    private string _screenshotMethod = "screencap";
     private QuestSessionCatalog? _catalog;
     private QuestAppTarget? _selectedCatalogApp;
 
@@ -42,11 +46,14 @@ public sealed class MainViewModel : ObservableObject
             : "Release updates disabled for this channel.";
         _adbService = new QuestAdbService(_toolLocator);
         _scrcpyService = new ScrcpyService(_toolLocator);
+        _hzdbService = new HzdbService(_toolLocator, _adbService);
         _analyzer = new WindowsEnvironmentAnalyzer(_toolLocator, _adbService);
 
         RefreshToolsCommand = new AsyncRelayCommand(RefreshToolsAsync);
+        InstallToolingCommand = new AsyncRelayCommand(InstallToolingAsync);
         RefreshDevicesCommand = new AsyncRelayCommand(RefreshDevicesAsync);
         ConnectCommand = new AsyncRelayCommand(ConnectAsync);
+        EnableWifiAdbCommand = new AsyncRelayCommand(EnableWifiAdbAsync, HasSerial);
         SnapshotCommand = new AsyncRelayCommand(SnapshotAsync, HasSerial);
         BrowseCatalogCommand = new AsyncRelayCommand(BrowseCatalogAsync);
         LoadCatalogCommand = new AsyncRelayCommand(LoadCatalogAsync);
@@ -58,6 +65,11 @@ public sealed class MainViewModel : ObservableObject
         StopCommand = new AsyncRelayCommand(StopAsync, HasSerial);
         ApplyProfileCommand = new AsyncRelayCommand(ApplyProfileAsync, HasSerial);
         StartCastCommand = new AsyncRelayCommand(StartCastAsync, HasSerial);
+        CaptureScreenshotCommand = new AsyncRelayCommand(CaptureScreenshotAsync, HasSerial);
+        KeepAwakeCommand = new AsyncRelayCommand(KeepAwakeAsync, HasSerial);
+        RestoreProximityCommand = new AsyncRelayCommand(RestoreProximityAsync, HasSerial);
+        ReadProximityCommand = new AsyncRelayCommand(ReadProximityAsync, HasSerial);
+        WakeHeadsetCommand = new AsyncRelayCommand(WakeHeadsetAsync, HasSerial);
         DiagnosticsCommand = new AsyncRelayCommand(WriteDiagnosticsAsync);
     }
 
@@ -175,9 +187,29 @@ public sealed class MainViewModel : ObservableObject
         set => SetProperty(ref _lastSnapshot, value);
     }
 
+    public string LastVisualProof
+    {
+        get => _lastVisualProof;
+        set => SetProperty(ref _lastVisualProof, value);
+    }
+
+    public string ProximityDurationMs
+    {
+        get => _proximityDurationMs;
+        set => SetProperty(ref _proximityDurationMs, value);
+    }
+
+    public string ScreenshotMethod
+    {
+        get => _screenshotMethod;
+        set => SetProperty(ref _screenshotMethod, value);
+    }
+
     public AsyncRelayCommand RefreshToolsCommand { get; }
+    public AsyncRelayCommand InstallToolingCommand { get; }
     public AsyncRelayCommand RefreshDevicesCommand { get; }
     public AsyncRelayCommand ConnectCommand { get; }
+    public AsyncRelayCommand EnableWifiAdbCommand { get; }
     public AsyncRelayCommand SnapshotCommand { get; }
     public AsyncRelayCommand BrowseCatalogCommand { get; }
     public AsyncRelayCommand LoadCatalogCommand { get; }
@@ -189,6 +221,11 @@ public sealed class MainViewModel : ObservableObject
     public AsyncRelayCommand StopCommand { get; }
     public AsyncRelayCommand ApplyProfileCommand { get; }
     public AsyncRelayCommand StartCastCommand { get; }
+    public AsyncRelayCommand CaptureScreenshotCommand { get; }
+    public AsyncRelayCommand KeepAwakeCommand { get; }
+    public AsyncRelayCommand RestoreProximityCommand { get; }
+    public AsyncRelayCommand ReadProximityCommand { get; }
+    public AsyncRelayCommand WakeHeadsetCommand { get; }
     public AsyncRelayCommand DiagnosticsCommand { get; }
 
     public async Task InitializeAsync()
@@ -247,6 +284,22 @@ public sealed class MainViewModel : ObservableObject
         }).ConfigureAwait(true);
     }
 
+    private async Task InstallToolingAsync()
+    {
+        await RunUiActionAsync("Installing managed Quest tooling...", async () =>
+        {
+            using var service = new OfficialQuestToolingService();
+            var progress = new Progress<OfficialQuestToolingProgress>(item =>
+            {
+                Status = $"{item.Status} ({item.PercentComplete}%)";
+                AddLog($"{item.Status}: {item.Detail}");
+            });
+            var result = await service.InstallOrUpdateAsync(progress).ConfigureAwait(true);
+            AddLog($"{result.Summary} {result.Detail}");
+            await RefreshToolsAsync().ConfigureAwait(true);
+        }).ConfigureAwait(true);
+    }
+
     private async Task RefreshDevicesAsync()
     {
         await RunUiActionAsync("Refreshing Quest devices...", async () =>
@@ -277,6 +330,25 @@ public sealed class MainViewModel : ObservableObject
 
             var result = await _adbService.ConnectAsync(endpoint).ConfigureAwait(true);
             AddLog(result.CondensedOutput);
+            await RefreshDevicesAsync().ConfigureAwait(true);
+        }).ConfigureAwait(true);
+    }
+
+    private async Task EnableWifiAdbAsync()
+    {
+        await RunUiActionAsync("Enabling Wi-Fi ADB...", async () =>
+        {
+            var result = await _adbService.EnableWifiAdbAsync(SelectedSerial).ConfigureAwait(true);
+            Endpoint = result.Endpoint.ToString();
+            SelectedSerial = result.Endpoint.ToString();
+            AddLog(result.Succeeded
+                ? $"Wi-Fi ADB enabled at {result.Endpoint}."
+                : $"Wi-Fi ADB attempted at {result.Endpoint}; verify device list.");
+            if (!string.IsNullOrWhiteSpace(result.Detail))
+            {
+                AddLog(result.Detail);
+            }
+
             await RefreshDevicesAsync().ConfigureAwait(true);
         }).ConfigureAwait(true);
     }
@@ -492,6 +564,84 @@ public sealed class MainViewModel : ObservableObject
         });
     }
 
+    private async Task CaptureScreenshotAsync()
+    {
+        await RunUiActionAsync("Capturing headset screenshot...", async () =>
+        {
+            var root = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "RustyXrCompanion",
+                "screenshots");
+            var outputPath = HzdbService.CreateDefaultScreenshotPath(root, SelectedSerial);
+            var capture = await _hzdbService
+                .CaptureScreenshotAsync(SelectedSerial, outputPath, ScreenshotMethod)
+                .ConfigureAwait(true);
+            LastVisualProof =
+                $"Screenshot: {(capture.Succeeded ? "captured" : "failed")}{Environment.NewLine}" +
+                $"Method: {capture.Method}{Environment.NewLine}" +
+                $"Path: {capture.OutputPath}{Environment.NewLine}" +
+                $"Detail: {capture.Detail}";
+            AddLog(capture.Succeeded
+                ? $"Screenshot captured: {capture.OutputPath}"
+                : $"Screenshot failed: {capture.Detail}");
+        }).ConfigureAwait(true);
+    }
+
+    private async Task KeepAwakeAsync()
+    {
+        await RunUiActionAsync("Disabling wear sensor for keep-awake...", async () =>
+        {
+            var durationMs = int.TryParse(ProximityDurationMs, out var parsedDuration) ? parsedDuration : 28_800_000;
+            var result = await _hzdbService
+                .SetProximityAsync(SelectedSerial, enableNormalProximity: false, durationMs)
+                .ConfigureAwait(true);
+            AddLog(result.CondensedOutput.Length > 0
+                ? result.CondensedOutput
+                : $"Keep-awake proximity hold requested for {durationMs} ms.");
+            await ReadProximityCoreAsync().ConfigureAwait(true);
+        }).ConfigureAwait(true);
+    }
+
+    private async Task RestoreProximityAsync()
+    {
+        await RunUiActionAsync("Restoring normal proximity behavior...", async () =>
+        {
+            var result = await _hzdbService
+                .SetProximityAsync(SelectedSerial, enableNormalProximity: true)
+                .ConfigureAwait(true);
+            AddLog(result.CondensedOutput.Length > 0
+                ? result.CondensedOutput
+                : "Normal proximity behavior requested.");
+            await ReadProximityCoreAsync().ConfigureAwait(true);
+        }).ConfigureAwait(true);
+    }
+
+    private async Task ReadProximityAsync()
+    {
+        await RunUiActionAsync("Reading proximity status...", ReadProximityCoreAsync).ConfigureAwait(true);
+    }
+
+    private async Task WakeHeadsetAsync()
+    {
+        await RunUiActionAsync("Sending hzdb wake request...", async () =>
+        {
+            var result = await _hzdbService.WakeDeviceAsync(SelectedSerial).ConfigureAwait(true);
+            AddLog(result.CondensedOutput.Length > 0 ? result.CondensedOutput : "Wake request sent.");
+        }).ConfigureAwait(true);
+    }
+
+    private async Task ReadProximityCoreAsync()
+    {
+        var status = await _hzdbService.GetProximityStatusAsync(SelectedSerial).ConfigureAwait(true);
+        LastVisualProof =
+            $"Proximity: {status.Detail}{Environment.NewLine}" +
+            $"Virtual state: {status.VirtualState}{Environment.NewLine}" +
+            $"Autosleep disabled: {status.IsAutosleepDisabled}{Environment.NewLine}" +
+            $"Headset state: {status.HeadsetState}{Environment.NewLine}" +
+            $"Hold until: {status.HoldUntil?.ToString("G") ?? "unknown"}";
+        AddLog(status.Detail);
+    }
+
     private async Task WriteDiagnosticsAsync()
     {
         await RunUiActionAsync("Writing diagnostics bundle...", async () =>
@@ -527,6 +677,7 @@ public sealed class MainViewModel : ObservableObject
 
     private void RaiseCommandStates()
     {
+        EnableWifiAdbCommand.RaiseCanExecuteChanged();
         SnapshotCommand.RaiseCanExecuteChanged();
         VerifyCatalogAppCommand.RaiseCanExecuteChanged();
         InstallCommand.RaiseCanExecuteChanged();
@@ -534,6 +685,11 @@ public sealed class MainViewModel : ObservableObject
         StopCommand.RaiseCanExecuteChanged();
         ApplyProfileCommand.RaiseCanExecuteChanged();
         StartCastCommand.RaiseCanExecuteChanged();
+        CaptureScreenshotCommand.RaiseCanExecuteChanged();
+        KeepAwakeCommand.RaiseCanExecuteChanged();
+        RestoreProximityCommand.RaiseCanExecuteChanged();
+        ReadProximityCommand.RaiseCanExecuteChanged();
+        WakeHeadsetCommand.RaiseCanExecuteChanged();
     }
 
     private void AddLog(string message)

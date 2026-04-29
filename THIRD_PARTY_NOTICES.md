@@ -7,20 +7,24 @@ or work beside tools that keep their own licenses.
 
 `adb.exe` comes from Android SDK Platform Tools. Users can install it through
 Android Studio, the Android SDK command-line tools, or another official Android
-SDK distribution.
+SDK distribution. Rusty XR Companion can also download the Windows
+platform-tools archive from Google's official Android SDK repository metadata
+into the user's LocalAppData tool cache.
 
 ## Meta Quest Tooling
 
 Meta Quest command-line tools are provided by Meta under Meta's own terms.
-This repository can locate such tools when they are already installed, but does
-not relicense them.
+This repository can locate such tools when they are already installed, and it
+can download Meta's published `@meta-quest/hzdb-win32-x64` package into the
+user's LocalAppData tool cache. Rusty XR Companion does not relicense Meta
+tools.
 
 ## scrcpy
 
 `scrcpy` is an open-source Android display and control tool. Rusty XR
-Companion can launch it when it is installed or present on `PATH`. If a future
-release downloads or bundles scrcpy, that release must preserve scrcpy's
-license notices and source attribution.
+Companion can launch it when it is installed, present on `PATH`, or installed
+into the managed LocalAppData tool cache from the upstream GitHub release.
+Rusty XR Companion does not relicense scrcpy.
 
 ## User-Supplied APKs
 

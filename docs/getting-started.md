@@ -10,8 +10,9 @@ nav_order: 2
 - Windows 10 or later
 - .NET 10 SDK for source builds
 - Quest developer mode enabled
-- Android Platform Tools, or `adb.exe` on `PATH`
-- optional: `scrcpy.exe` on `PATH` for display casting
+- Android Platform Tools, `adb.exe` on `PATH`, or the companion's managed
+  tooling install
+- optional: managed `scrcpy` or `scrcpy.exe` on `PATH` for display casting
 
 ## Source Build
 
@@ -40,10 +41,24 @@ powershell -ExecutionPolicy Bypass -File .\tools\app\Start-Desktop-App.ps1
 dotnet run --project src/RustyXr.Companion.Cli -- devices
 ```
 
-4. Capture a snapshot:
+4. Install managed tooling if you want Wi-Fi ADB bootstrap, `hzdb`
+   proximity/wake controls, and display casting without separate manual tool
+   setup:
+
+```powershell
+dotnet run --project src/RustyXr.Companion.Cli -- tooling install-official
+```
+
+5. Capture a snapshot:
 
 ```powershell
 dotnet run --project src/RustyXr.Companion.Cli -- snapshot --serial <serial>
+```
+
+6. Optional: enable Wi-Fi ADB from the trusted USB connection:
+
+```powershell
+dotnet run --project src/RustyXr.Companion.Cli -- wifi enable --serial <usb-serial>
 ```
 
 ## No Bundled APK

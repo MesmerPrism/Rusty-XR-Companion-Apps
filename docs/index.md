@@ -11,12 +11,14 @@ operator workflows.
 Use it when you need to:
 
 - confirm ADB, optional Quest tooling, and optional casting tools are available
+- install managed `hzdb`, Android platform-tools, and `scrcpy`
 - find Quest devices over ADB
 - connect to a Quest over Wi-Fi ADB
 - install a local APK
 - launch or stop a target app
 - apply simple headset development settings
 - start a display cast through `scrcpy`
+- capture headset screenshots and read proximity keep-awake state
 - export diagnostics that another developer can inspect
 
 The app is intentionally generic. It does not bundle a private runtime or assume

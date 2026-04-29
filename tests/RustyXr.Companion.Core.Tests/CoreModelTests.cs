@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using RustyXr.Companion.Core;
 
 namespace RustyXr.Companion.Core.Tests;
@@ -141,5 +143,79 @@ public sealed class CoreModelTests
 
         Assert.False(status.IsApplicable);
         Assert.False(status.UpdateAvailable);
+    }
+
+    [Theory]
+    [InlineData("192.168.4.1 dev wlan0 proto kernel scope link src 192.168.4.42", "192.168.4.42")]
+    [InlineData("3: wlan0: <UP> mtu 1500\r\n    inet 10.0.0.24/24 brd 10.0.0.255 scope global wlan0", "10.0.0.24")]
+    public void QuestAdbServiceParsesWifiIpAddress(string output, string expectedIp)
+    {
+        Assert.Equal(expectedIp, QuestAdbService.TryParseWifiIpAddress(output));
+    }
+
+    [Fact]
+    public void HzdbServiceParsesKeepAwakeProximityStatus()
+    {
+        var observedAt = DateTimeOffset.UtcNow;
+        var raw = """
+            VR Power Manager State:
+              State: HEADSET_MOUNTED
+              isAutosleepDisabled: true
+              AutoSleepTime: 300000 ms
+              Virtual proximity state: CLOSE
+                1.0s (2.0s ago) - received com.oculus.vrpowermanager.prox_close broadcast: duration=60000
+            """;
+
+        Assert.True(HzdbService.TryParseQuestProximityStatus(raw, observedAt, out var status));
+        Assert.True(status.Available);
+        Assert.True(status.HoldActive);
+        Assert.Equal("CLOSE", status.VirtualState);
+        Assert.True(status.IsAutosleepDisabled);
+        Assert.Equal(300000, status.AutoSleepTimeMs);
+        Assert.NotNull(status.HoldUntil);
+        Assert.Contains("Keep-awake", status.Detail, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void HzdbServiceParsesNormalProximityStatus()
+    {
+        var raw = """
+            VR Power Manager State:
+              State: IDLE
+              isAutosleepDisabled: false
+              Virtual proximity state: DISABLED
+            """;
+
+        Assert.True(HzdbService.TryParseQuestProximityStatus(raw, DateTimeOffset.UtcNow, out var status));
+        Assert.False(status.HoldActive);
+        Assert.Equal("DISABLED", status.VirtualState);
+        Assert.Contains("Normal proximity", status.Detail, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void OfficialQuestToolingServiceVerifiesChecksums()
+    {
+        var payload = Encoding.UTF8.GetBytes("rusty-xr-tooling");
+        var sha512Integrity = "sha512-" + Convert.ToBase64String(SHA512.HashData(payload));
+        var sha1 = Convert.ToHexString(SHA1.HashData(payload)).ToLowerInvariant();
+        var sha256 = Convert.ToHexString(SHA256.HashData(payload)).ToLowerInvariant();
+
+        Assert.True(OfficialQuestToolingService.IntegrityMatchesSha512(payload, sha512Integrity));
+        Assert.True(OfficialQuestToolingService.ChecksumMatchesSha1(payload, sha1));
+        Assert.True(OfficialQuestToolingService.ChecksumMatchesSha256(payload, "sha256:" + sha256));
+        Assert.False(OfficialQuestToolingService.ChecksumMatchesSha256(payload, new string('0', 64)));
+    }
+
+    [Fact]
+    public void OfficialQuestToolingServiceParsesReleaseMetadataHelpers()
+    {
+        Assert.Equal("37.0.0", OfficialQuestToolingService.ParsePlatformToolsRevision("Pkg.Revision = 37.0.0"));
+        Assert.Equal(
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            OfficialQuestToolingService.ParseSha256SumsFile(
+                "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa *scrcpy-win64-v1.0.zip",
+                "scrcpy-win64-v1.0.zip"));
+        Assert.True(OfficialQuestToolingService.NeedsInstall(null, "missing.exe", "1.0", _ => false));
+        Assert.False(OfficialQuestToolingService.NeedsInstall("1.0", "tool.exe", "1.0", _ => true));
     }
 }
