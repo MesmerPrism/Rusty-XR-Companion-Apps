@@ -94,4 +94,52 @@ public sealed class CoreModelTests
             Directory.Delete(root, recursive: true);
         }
     }
+
+    [Fact]
+    public void AppBuildIdentityDetectsReleaseAndDevInstallRoots()
+    {
+        var localAppData = Path.Combine(Path.GetTempPath(), $"rusty-xr-appdata-{Guid.NewGuid():N}");
+        var releaseBase = Path.Combine(localAppData, "Programs", "RustyXrCompanion");
+        var devBase = Path.Combine(localAppData, "Programs", "RustyXrCompanionDev");
+
+        var release = AppBuildIdentity.Detect(releaseBase, localAppData, "v1.2.3+build");
+        var dev = AppBuildIdentity.Detect(devBase, localAppData, "0.1.0-dev");
+        var source = AppBuildIdentity.Detect(Path.Combine(localAppData, "repo", "bin"), localAppData, "0.1.0-local");
+
+        Assert.Equal(AppInstallChannel.Release, release.Channel);
+        Assert.True(release.AutoUpdatesEnabled);
+        Assert.Equal("1.2.3", release.CurrentVersion);
+        Assert.Equal(AppInstallChannel.Dev, dev.Channel);
+        Assert.False(dev.AutoUpdatesEnabled);
+        Assert.Equal(AppInstallChannel.Source, source.Channel);
+        Assert.False(source.AutoUpdatesEnabled);
+    }
+
+    [Theory]
+    [InlineData("1.2.1", "1.2.0", 1)]
+    [InlineData("v1.2.0", "1.2.0.0", 0)]
+    [InlineData("1.2.0", "1.2.1", -1)]
+    public void PortableReleaseUpdateServiceComparesReleaseVersions(string left, string right, int expectedSign)
+    {
+        var comparison = PortableReleaseUpdateService.CompareVersions(left, right);
+
+        Assert.Equal(Math.Sign(expectedSign), Math.Sign(comparison));
+    }
+
+    [Fact]
+    public async Task PortableReleaseUpdateServiceIgnoresSourceChannel()
+    {
+        var identity = new AppBuildIdentity(
+            AppInstallChannel.Source,
+            "Source/dev run",
+            Path.GetTempPath(),
+            null,
+            "0.1.0-local",
+            AutoUpdatesEnabled: false);
+
+        var status = await new PortableReleaseUpdateService().CheckAsync(identity);
+
+        Assert.False(status.IsApplicable);
+        Assert.False(status.UpdateAvailable);
+    }
 }

@@ -48,6 +48,13 @@ dev output:
 powershell -ExecutionPolicy Bypass -File .\tools\app\Start-Desktop-App.ps1
 ```
 
+Use the separate dev install when testing user-facing WPF flows without
+touching the published release install:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\tools\app\Install-DevDesktopApp.ps1 -Launch
+```
+
 ## Architecture Rules
 
 - Keep external device/tool integrations behind services.
@@ -57,3 +64,7 @@ powershell -ExecutionPolicy Bypass -File .\tools\app\Start-Desktop-App.ps1
   repo rather than in the Rusty XR core repo.
 - Keep docs clear enough for someone who has never seen the author's local
   workspace.
+- Keep the public release install and dev install separate:
+  `%LOCALAPPDATA%\Programs\RustyXrCompanion` is release-only and may
+  auto-update from GitHub Releases; `%LOCALAPPDATA%\Programs\RustyXrCompanionDev`
+  is for local feature work and must not auto-update from public releases.

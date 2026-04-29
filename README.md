@@ -46,6 +46,13 @@ For a source-built single-file app launcher:
 powershell -ExecutionPolicy Bypass -File .\tools\app\Start-Desktop-App.ps1
 ```
 
+For a separate local dev install that does not overwrite the public release
+install:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\tools\app\Install-DevDesktopApp.ps1 -Launch
+```
+
 Build the docs site:
 
 ```powershell
@@ -76,6 +83,7 @@ dotnet run --project src/RustyXr.Companion.Cli -- catalog verify --path samples\
 - [Streaming](docs/streaming.md)
 - [Diagnostics](docs/diagnostics.md)
 - [Release workflow](docs/release-workflow.md)
+- [Dev and release channels](docs/dev-release-channels.md)
 - [Git LFS and assets](docs/lfs-and-assets.md)
 - [Contributing](CONTRIBUTING.md)
 
@@ -89,8 +97,10 @@ The current release workflow publishes:
 - `SHA256SUMS.txt`
 
 The setup helper installs the portable app under the user's LocalAppData
-programs folder and creates a Start Menu shortcut. It can be signed by the
-release workflow when a signing certificate is configured in GitHub secrets.
+programs folder and creates a Start Menu shortcut. Published installs check
+GitHub Releases on startup and update themselves from the latest portable app
+zip when a newer release exists. It can be signed by the release workflow when
+a signing certificate is configured in GitHub secrets.
 
 MSIX and `.appinstaller` support are intentionally documented as the next
 packaging lane. The portable installer is the low-friction first release path

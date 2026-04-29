@@ -16,7 +16,8 @@ Use the guided setup helper when a release is available:
 
 The helper downloads the latest portable app zip, installs it under the user's
 LocalAppData programs folder, creates a Start Menu shortcut, and launches the
-app.
+app. Installed release-channel apps check GitHub Releases on startup and replace
+the local release install when a newer portable app zip is published.
 
 ## Direct Assets
 
@@ -34,3 +35,6 @@ build from source.
 
 MSIX and `.appinstaller` support are planned for a later release once the app
 needs Windows package identity.
+
+Development builds use a separate dev install path and never auto-update from
+public releases. See [Dev And Release Channels](dev-release-channels.md).

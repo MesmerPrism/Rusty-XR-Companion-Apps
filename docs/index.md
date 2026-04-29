@@ -31,3 +31,4 @@ CLI.
 4. [Diagnostics](diagnostics.md)
 5. [Rusty XR core contracts](rusty-xr-core-contracts.md)
 6. [Download and release workflow](download.md)
+7. [Dev and release channels](dev-release-channels.md)

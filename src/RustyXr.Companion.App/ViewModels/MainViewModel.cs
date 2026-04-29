@@ -13,8 +13,12 @@ public sealed class MainViewModel : ObservableObject
     private readonly ScrcpyService _scrcpyService;
     private readonly WindowsEnvironmentAnalyzer _analyzer;
     private readonly CatalogLoader _catalogLoader = new();
+    private readonly PortableReleaseUpdateService _updateService = new();
+    private readonly AppBuildIdentity _buildIdentity = AppBuildIdentity.Detect();
 
     private string _status = "Ready.";
+    private string _buildLabel;
+    private string _updateStatus;
     private string _selectedSerial = string.Empty;
     private string _endpoint = "192.168.1.2:5555";
     private string _catalogPath = Path.Combine("samples", "quest-session-kit", "apk-catalog.example.json");
@@ -32,6 +36,10 @@ public sealed class MainViewModel : ObservableObject
 
     public MainViewModel()
     {
+        _buildLabel = _buildIdentity.DisplayLabel;
+        _updateStatus = _buildIdentity.AutoUpdatesEnabled
+            ? "Release updates enabled."
+            : "Release updates disabled for this channel.";
         _adbService = new QuestAdbService(_toolLocator);
         _scrcpyService = new ScrcpyService(_toolLocator);
         _analyzer = new WindowsEnvironmentAnalyzer(_toolLocator, _adbService);
@@ -57,6 +65,18 @@ public sealed class MainViewModel : ObservableObject
     public ObservableCollection<QuestDevice> Devices { get; } = new();
     public ObservableCollection<QuestAppTarget> CatalogApps { get; } = new();
     public ObservableCollection<string> Log { get; } = new();
+
+    public string BuildLabel
+    {
+        get => _buildLabel;
+        set => SetProperty(ref _buildLabel, value);
+    }
+
+    public string UpdateStatus
+    {
+        get => _updateStatus;
+        set => SetProperty(ref _updateStatus, value);
+    }
 
     public string Status
     {
@@ -173,8 +193,44 @@ public sealed class MainViewModel : ObservableObject
 
     public async Task InitializeAsync()
     {
+        await CheckForReleaseUpdateAsync().ConfigureAwait(true);
         await RefreshToolsAsync().ConfigureAwait(true);
         await RefreshDevicesAsync().ConfigureAwait(true);
+    }
+
+    private async Task CheckForReleaseUpdateAsync()
+    {
+        if (!_buildIdentity.AutoUpdatesEnabled)
+        {
+            AddLog($"{_buildIdentity.ChannelLabel}: public release auto-update is disabled.");
+            return;
+        }
+
+        try
+        {
+            UpdateStatus = "Checking for release updates...";
+            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(12));
+            var update = await _updateService.CheckAsync(_buildIdentity, timeout.Token).ConfigureAwait(true);
+            UpdateStatus = update.Detail;
+            AddLog(update.Detail);
+
+            if (!update.UpdateAvailable)
+            {
+                return;
+            }
+
+            Status = "Updating release install...";
+            await _updateService
+                .StartUpdateAsync(_buildIdentity, update, Environment.ProcessId, timeout.Token)
+                .ConfigureAwait(true);
+            AddLog("Release updater launched; this app instance will close and restart from the updated install.");
+            System.Windows.Application.Current.Shutdown();
+        }
+        catch (Exception exception)
+        {
+            UpdateStatus = $"Release update check skipped: {exception.Message}";
+            AddLog(UpdateStatus);
+        }
     }
 
     private async Task RefreshToolsAsync()

@@ -6,6 +6,7 @@ nav_order: 9
 # Release Workflow
 
 The first release lane is portable and does not require an APK payload.
+Published release installs and local dev installs are intentionally separate.
 
 The GitHub workflow:
 
@@ -18,6 +19,11 @@ The GitHub workflow:
 7. creates app and CLI zips
 8. writes `SHA256SUMS.txt`
 9. uploads release assets
+
+The published WPF app and CLI receive the release version during `dotnet
+publish`. Release-channel installs compare that version to the latest GitHub
+Release tag on startup and update from `RustyXrCompanion-win-x64.zip` only
+after a release is published.
 
 ## Signing Secrets
 
@@ -50,3 +56,14 @@ surface, docs, and diagnostics stabilize.
 
 Future MSIX support can reuse the same public docs structure and signing
 posture when package identity becomes useful.
+
+## Dev Channel
+
+Use a separate local dev install for feature work:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\tools\app\Install-DevDesktopApp.ps1 -Launch
+```
+
+This writes to `%LOCALAPPDATA%\Programs\RustyXrCompanionDev`, creates a
+`Rusty XR Companion Dev` shortcut, and disables public release auto-updates.

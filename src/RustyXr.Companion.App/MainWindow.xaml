@@ -42,6 +42,11 @@
                     <TextBlock Text="Public Windows utility for Quest install, launch, device checks, casting, and diagnostics."
                                Foreground="#D9E2EA"
                                Margin="0,3,0,0" />
+                    <TextBlock Foreground="#AFC1D0" Margin="0,3,0,0">
+                        <Run Text="{Binding BuildLabel}" />
+                        <Run Text=" | " />
+                        <Run Text="{Binding UpdateStatus}" />
+                    </TextBlock>
                 </StackPanel>
                 <TextBlock DockPanel.Dock="Right"
                            Text="{Binding Status}"

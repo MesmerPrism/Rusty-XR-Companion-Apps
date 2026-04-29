@@ -19,12 +19,16 @@ $outputPath = [System.IO.Path]::GetFullPath((Join-Path $repoRoot $OutputRelative
 
 New-Item -ItemType Directory -Force -Path $outputPath | Out-Null
 
+dotnet restore $projectPath --runtime $RuntimeIdentifier
+if ($LASTEXITCODE -ne 0) {
+    throw "dotnet restore failed with exit code $LASTEXITCODE"
+}
+
 dotnet publish $projectPath `
     --configuration $Configuration `
     --runtime $RuntimeIdentifier `
     -p:PublishSingleFile=true `
     -p:SelfContained=false `
-    -p:EnableCompressionInSingleFile=true `
     --output $outputPath
 
 if ($LASTEXITCODE -ne 0) {

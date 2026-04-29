@@ -83,6 +83,10 @@ jobs:
           -p:EnableCompressionInSingleFile=true
           -p:DebugType=None
           -p:DebugSymbols=false
+          "/p:Version=${{ steps.version.outputs.package_version }}"
+          "/p:AssemblyVersion=${{ steps.version.outputs.package_version }}"
+          "/p:FileVersion=${{ steps.version.outputs.package_version }}"
+          "/p:InformationalVersion=${{ steps.version.outputs.package_version }}"
           --output artifacts/app-win-x64
 
       - name: Publish CLI
@@ -95,6 +99,10 @@ jobs:
           -p:EnableCompressionInSingleFile=true
           -p:DebugType=None
           -p:DebugSymbols=false
+          "/p:Version=${{ steps.version.outputs.package_version }}"
+          "/p:AssemblyVersion=${{ steps.version.outputs.package_version }}"
+          "/p:FileVersion=${{ steps.version.outputs.package_version }}"
+          "/p:InformationalVersion=${{ steps.version.outputs.package_version }}"
           --output artifacts/cli-win-x64
 
       - name: Decode setup signing certificate
