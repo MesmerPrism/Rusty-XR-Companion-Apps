@@ -13,12 +13,13 @@ public sealed class CatalogLoader
     {
         await using var stream = File.OpenRead(path);
         var catalog = await JsonSerializer.DeserializeAsync<QuestSessionCatalog>(stream, JsonOptions, cancellationToken).ConfigureAwait(false);
-        return catalog ?? new QuestSessionCatalog(Array.Empty<QuestAppTarget>(), Array.Empty<DeviceProfile>(), Array.Empty<RuntimeProfile>());
+        return Normalize(catalog);
     }
 
     public async Task SaveExampleAsync(string path, CancellationToken cancellationToken = default)
     {
         var catalog = new QuestSessionCatalog(
+            QuestSessionCatalog.CurrentSchemaVersion,
             new[]
             {
                 new QuestAppTarget(
@@ -56,5 +57,24 @@ public sealed class CatalogLoader
         Directory.CreateDirectory(Path.GetDirectoryName(path) ?? ".");
         await using var stream = File.Create(path);
         await JsonSerializer.SerializeAsync(stream, catalog, JsonOptions, cancellationToken).ConfigureAwait(false);
+    }
+
+    private static QuestSessionCatalog Normalize(QuestSessionCatalog? catalog)
+    {
+        if (catalog is null)
+        {
+            return new QuestSessionCatalog(
+                QuestSessionCatalog.CurrentSchemaVersion,
+                Array.Empty<QuestAppTarget>(),
+                Array.Empty<DeviceProfile>(),
+                Array.Empty<RuntimeProfile>());
+        }
+
+        return catalog with
+        {
+            SchemaVersion = string.IsNullOrWhiteSpace(catalog.SchemaVersion)
+                ? QuestSessionCatalog.CurrentSchemaVersion
+                : catalog.SchemaVersion
+        };
     }
 }

@@ -27,4 +27,34 @@ public sealed class CoreModelTests
         Assert.EndsWith("...", result.CondensedOutput);
         Assert.True(result.CondensedOutput.Length <= 800);
     }
+
+    [Fact]
+    public void QuestSessionCatalogExposesRustyXrSchemaVersion()
+    {
+        var catalog = new QuestSessionCatalog(
+            QuestSessionCatalog.CurrentSchemaVersion,
+            Array.Empty<QuestAppTarget>(),
+            Array.Empty<DeviceProfile>(),
+            Array.Empty<RuntimeProfile>());
+
+        Assert.Equal("rusty.xr.quest-app-catalog.v1", catalog.SchemaVersion);
+    }
+
+    [Fact]
+    public async Task CatalogLoaderBackfillsMissingSchemaVersion()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"rusty-xr-catalog-{Guid.NewGuid():N}.json");
+        await File.WriteAllTextAsync(path, """{"apps":[],"deviceProfiles":[],"runtimeProfiles":[]}""");
+
+        try
+        {
+            var catalog = await new CatalogLoader().LoadAsync(path);
+
+            Assert.Equal(QuestSessionCatalog.CurrentSchemaVersion, catalog.SchemaVersion);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
 }

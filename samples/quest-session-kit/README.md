@@ -9,3 +9,7 @@ the WPF app, or publish large public payloads as GitHub Release assets.
 Files:
 
 - `apk-catalog.example.json`
+
+The sample uses `schemaVersion: "rusty.xr.quest-app-catalog.v1"`, matching the
+public Rusty XR core schema exporter. Keep APK bytes out of the sample folder
+unless a future release explicitly enables a public large-asset lane.

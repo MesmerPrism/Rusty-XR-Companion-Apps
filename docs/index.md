@@ -29,4 +29,5 @@ CLI.
 2. [Quest connection](quest-connection.md)
 3. [APK install and launch](apk-install-launch.md)
 4. [Diagnostics](diagnostics.md)
-5. [Download and release workflow](download.md)
+5. [Rusty XR core contracts](rusty-xr-core-contracts.md)
+6. [Download and release workflow](download.md)

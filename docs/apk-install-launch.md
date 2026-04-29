@@ -41,6 +41,10 @@ Catalogs are public JSON metadata, not a requirement to commit APK bytes. The
 example catalog under `samples/quest-session-kit/` uses placeholder package
 data so downstream projects can adapt the format safely.
 
+The catalog shape is aligned with Rusty XR core's `quest-app-catalog` schema.
+Use `schemaVersion: "rusty.xr.quest-app-catalog.v1"` for new public catalogs.
+APK files can still stay as local paths or GitHub Release assets.
+
 ```powershell
 dotnet run --project src/RustyXr.Companion.Cli -- catalog list --json
 ```

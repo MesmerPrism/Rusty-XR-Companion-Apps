@@ -90,9 +90,13 @@ public sealed record RuntimeProfile(
     string Description);
 
 public sealed record QuestSessionCatalog(
+    string SchemaVersion,
     IReadOnlyList<QuestAppTarget> Apps,
     IReadOnlyList<DeviceProfile> DeviceProfiles,
-    IReadOnlyList<RuntimeProfile> RuntimeProfiles);
+    IReadOnlyList<RuntimeProfile> RuntimeProfiles)
+{
+    public const string CurrentSchemaVersion = "rusty.xr.quest-app-catalog.v1";
+}
 
 public sealed record CommandResult(
     string FileName,

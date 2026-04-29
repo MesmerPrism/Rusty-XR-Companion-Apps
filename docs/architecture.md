@@ -41,3 +41,6 @@ WPF app / CLI
 - APK package IDs are user or catalog data, not private hard-coded defaults
 - Rusty XR core contracts should be consumed when stable, but app-shell release
   logic stays here
+- Quest app catalogs use the public Rusty XR `quest-app-catalog` schema shape
+  so future example APK metadata can be shared without coupling the repositories
+  at build time

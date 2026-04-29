@@ -1,4 +1,5 @@
 {
+  "schemaVersion": "rusty.xr.quest-app-catalog.v1",
   "apps": [
     {
       "id": "example-user-apk",

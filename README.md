@@ -19,7 +19,8 @@ release tooling, Quest device operations, and contributor-facing docs.
 - WPF Windows app for Quest install, launch, device profile, cast, and
   diagnostics workflows
 - CLI for the same core actions
-- public sample catalog schemas with placeholder targets
+- public sample catalog metadata aligned with the Rusty XR core
+  `quest-app-catalog` schema
 - GitHub Pages docs and onboarding
 - portable Windows release workflow with a guided setup helper
 - Git LFS patterns for future APK assets, with APK bytes intentionally ignored
