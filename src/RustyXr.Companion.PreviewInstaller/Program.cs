@@ -147,7 +147,7 @@ internal sealed class InstallerForm : Form
     private readonly CancellationTokenSource _cancellation = new();
     private readonly string _releasePageUrl;
     private readonly Label _status = new() { AutoSize = true, Font = new Font("Segoe UI", 12, FontStyle.Bold) };
-    private readonly Label _detail = new() { AutoSize = false, Height = 70, Width = 520 };
+    private readonly Label _detail = new() { AutoSize = false, Height = 92, Width = 520 };
     private readonly ProgressBar _progress = new() { Width = 520, Height = 24 };
     private readonly Button _installButton = new() { Text = "Install latest release", Width = 160 };
     private readonly Button _releaseButton = new() { Text = "Open release page", Width = 150 };
@@ -161,8 +161,9 @@ internal sealed class InstallerForm : Form
         ExitCode = 1;
 
         Text = "Rusty XR Companion Setup";
-        Width = 600;
-        Height = 260;
+        AutoScaleMode = AutoScaleMode.Dpi;
+        ClientSize = new Size(560, 300);
+        MinimumSize = new Size(600, 340);
         StartPosition = FormStartPosition.CenterScreen;
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox = false;
@@ -180,7 +181,7 @@ internal sealed class InstallerForm : Form
         _installButton.Click += async (_, _) => await RunInstallAsync().ConfigureAwait(true);
         _releaseButton.Click += (_, _) => Process.Start(new ProcessStartInfo(_releasePageUrl) { UseShellExecute = true });
 
-        var buttons = new FlowLayoutPanel { Width = 520, Height = 42, FlowDirection = FlowDirection.LeftToRight };
+        var buttons = new FlowLayoutPanel { Width = 520, Height = 56, FlowDirection = FlowDirection.LeftToRight };
         buttons.Controls.Add(_installButton);
         buttons.Controls.Add(_releaseButton);
 
