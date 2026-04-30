@@ -30,38 +30,123 @@
             <Setter Property="Padding" Value="14" />
             <Setter Property="Margin" Value="0,0,12,12" />
         </Style>
+        <Geometry x:Key="HeaderHeadsetIcon">M2,7 C2,4 3.7,3 6,3 H10 C12.3,3 14,4 14,7 V9 C14,11 12.8,12 11,12 H10 C9.2,12 9.1,10 8,10 C6.9,10 6.8,12 6,12 H5 C3.2,12 2,11 2,9 Z</Geometry>
+        <Geometry x:Key="HeaderBatteryIcon">M2,5 H12 V11 H2 Z M12,7 H14 V9 H12</Geometry>
+        <Geometry x:Key="HeaderPowerIcon">M8,2 V7 M4.5,4.5 C3.4,5.5 3,6.7 3,8 A5,5 0 1 0 13,8 C13,6.7 12.6,5.5 11.5,4.5</Geometry>
+        <Geometry x:Key="HeaderControllerIcon">M2,9 C2,6 4,5 6,6 H10 C12,5 14,6 14,9 L13,11.5 C12.5,12.5 11.2,12.5 10.6,11 L9.7,9.6 H6.3 L5.4,11 C4.8,12.5 3.5,12.5 3,11.5 Z M5,8 H7 M6,7 V9</Geometry>
+        <Geometry x:Key="HeaderProximityIcon">M2,8 C3.6,5.5 5.6,4.5 8,4.5 C10.4,4.5 12.4,5.5 14,8 C12.4,10.5 10.4,11.5 8,11.5 C5.6,11.5 3.6,10.5 2,8 Z M8,6.3 A1.7,1.7 0 1 1 8,9.7 A1.7,1.7 0 1 1 8,6.3</Geometry>
+        <Geometry x:Key="HeaderAppIcon">M2,3 H14 V13 H2 Z M2,6 H14</Geometry>
+        <Style x:Key="HeaderStatusChip" TargetType="Border">
+            <Setter Property="Background" Value="#252B32" />
+            <Setter Property="BorderBrush" Value="#4B5560" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="4" />
+            <Setter Property="Padding" Value="7,4" />
+            <Setter Property="Margin" Value="0,6,6,0" />
+        </Style>
+        <Style x:Key="HeaderStatusIcon" TargetType="Path">
+            <Setter Property="Width" Value="14" />
+            <Setter Property="Height" Value="14" />
+            <Setter Property="Stretch" Value="Uniform" />
+            <Setter Property="Stroke" Value="#AFC1D0" />
+            <Setter Property="StrokeThickness" Value="1.6" />
+            <Setter Property="StrokeStartLineCap" Value="Round" />
+            <Setter Property="StrokeEndLineCap" Value="Round" />
+            <Setter Property="StrokeLineJoin" Value="Round" />
+            <Setter Property="Fill" Value="Transparent" />
+            <Setter Property="Margin" Value="0,0,6,0" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style x:Key="HeaderStatusText" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#DCE5EC" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="TextWrapping" Value="NoWrap" />
+            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
     </Window.Resources>
 
     <DockPanel>
-        <Border DockPanel.Dock="Top" Background="#20242A" Padding="18,14">
-            <DockPanel>
-                <StackPanel DockPanel.Dock="Left" Orientation="Horizontal">
-                    <Image Source="Assets/RustyXrCompanion.png"
-                           Width="52"
-                           Height="52"
-                           Margin="0,0,14,0"
-                           VerticalAlignment="Center" />
-                    <StackPanel>
-                        <TextBlock Text="Rusty XR Companion"
-                                   Foreground="#FFFFFF"
-                                   FontSize="22"
-                                   FontWeight="SemiBold" />
-                        <TextBlock Text="Public Windows utility for Quest install, launch, device checks, casting, and diagnostics."
-                                   Foreground="#D9E2EA"
-                                   Margin="0,3,0,0" />
-                        <TextBlock Foreground="#AFC1D0" Margin="0,3,0,0">
-                            <Run Text="{Binding BuildLabel}" />
-                            <Run Text=" | " />
-                            <Run Text="{Binding UpdateStatus}" />
-                        </TextBlock>
-                    </StackPanel>
+        <Border DockPanel.Dock="Top" Background="#20242A" Padding="18,12">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <Image Grid.Column="0"
+                       Source="Assets/RustyXrCompanion.png"
+                       Width="52"
+                       Height="52"
+                       Margin="0,2,14,0"
+                       VerticalAlignment="Top" />
+
+                <StackPanel Grid.Column="1" Margin="0,0,18,0">
+                    <TextBlock Text="Rusty XR Companion"
+                               Foreground="#FFFFFF"
+                               FontSize="22"
+                               FontWeight="SemiBold"
+                               TextWrapping="NoWrap" />
+                    <TextBlock Text="Public Windows utility for Quest install, launch, device checks, casting, and diagnostics."
+                               Foreground="#D9E2EA"
+                               Margin="0,3,0,0" />
+                    <TextBlock Foreground="#AFC1D0" Margin="0,3,0,0">
+                        <Run Text="{Binding BuildLabel}" />
+                        <Run Text=" | " />
+                        <Run Text="{Binding UpdateStatus}" />
+                    </TextBlock>
+
+                    <WrapPanel Margin="0,1,0,0">
+                        <Border Style="{StaticResource HeaderStatusChip}">
+                            <StackPanel Orientation="Horizontal">
+                                <Path Data="{StaticResource HeaderHeadsetIcon}" Style="{StaticResource HeaderStatusIcon}" />
+                                <TextBlock Text="{Binding HeaderDeviceStatus}" Style="{StaticResource HeaderStatusText}" />
+                            </StackPanel>
+                        </Border>
+                        <Border Style="{StaticResource HeaderStatusChip}">
+                            <StackPanel Orientation="Horizontal">
+                                <Path Data="{StaticResource HeaderBatteryIcon}" Style="{StaticResource HeaderStatusIcon}" />
+                                <TextBlock Text="{Binding HeaderHeadsetBatteryStatus}" Style="{StaticResource HeaderStatusText}" />
+                            </StackPanel>
+                        </Border>
+                        <Border Style="{StaticResource HeaderStatusChip}">
+                            <StackPanel Orientation="Horizontal">
+                                <Path Data="{StaticResource HeaderPowerIcon}" Style="{StaticResource HeaderStatusIcon}" />
+                                <TextBlock Text="{Binding HeaderPowerStatus}" Style="{StaticResource HeaderStatusText}" />
+                            </StackPanel>
+                        </Border>
+                        <Border Style="{StaticResource HeaderStatusChip}">
+                            <StackPanel Orientation="Horizontal">
+                                <Path Data="{StaticResource HeaderControllerIcon}" Style="{StaticResource HeaderStatusIcon}" />
+                                <TextBlock Text="{Binding HeaderControllerStatus}" Style="{StaticResource HeaderStatusText}" />
+                            </StackPanel>
+                        </Border>
+                        <Border Style="{StaticResource HeaderStatusChip}">
+                            <StackPanel Orientation="Horizontal">
+                                <Path Data="{StaticResource HeaderProximityIcon}" Style="{StaticResource HeaderStatusIcon}" />
+                                <TextBlock Text="{Binding HeaderProximityStatus}" Style="{StaticResource HeaderStatusText}" />
+                            </StackPanel>
+                        </Border>
+                        <Border Style="{StaticResource HeaderStatusChip}" MaxWidth="440">
+                            <StackPanel Orientation="Horizontal">
+                                <Path Data="{StaticResource HeaderAppIcon}" Style="{StaticResource HeaderStatusIcon}" />
+                                <TextBlock Text="{Binding HeaderForegroundStatus}"
+                                           ToolTip="{Binding HeaderForegroundStatus}"
+                                           MaxWidth="390"
+                                           Style="{StaticResource HeaderStatusText}" />
+                            </StackPanel>
+                        </Border>
+                    </WrapPanel>
                 </StackPanel>
-                <TextBlock DockPanel.Dock="Right"
+
+                <TextBlock Grid.Column="2"
                            Text="{Binding Status}"
                            Foreground="#FFE8A3"
                            VerticalAlignment="Center"
-                           TextAlignment="Right" />
-            </DockPanel>
+                           TextAlignment="Right"
+                           TextWrapping="NoWrap" />
+            </Grid>
         </Border>
 
         <Grid Margin="18">

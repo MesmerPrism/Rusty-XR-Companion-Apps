@@ -21,6 +21,12 @@ public sealed class MainViewModel : ObservableObject
     private string _status = "Ready.";
     private string _buildLabel;
     private string _updateStatus;
+    private string _headerDeviceStatus = "No Quest selected";
+    private string _headerHeadsetBatteryStatus = "Battery --";
+    private string _headerPowerStatus = "Power --";
+    private string _headerControllerStatus = "Controllers --";
+    private string _headerProximityStatus = "Proximity --";
+    private string _headerForegroundStatus = "Foreground --";
     private string _selectedSerial = string.Empty;
     private string _endpoint = "192.168.1.2:5555";
     private string _catalogPath = CompanionContentLayout.DefaultOrFallbackCatalogPath();
@@ -110,6 +116,42 @@ public sealed class MainViewModel : ObservableObject
         set => SetProperty(ref _status, value);
     }
 
+    public string HeaderDeviceStatus
+    {
+        get => _headerDeviceStatus;
+        set => SetProperty(ref _headerDeviceStatus, value);
+    }
+
+    public string HeaderHeadsetBatteryStatus
+    {
+        get => _headerHeadsetBatteryStatus;
+        set => SetProperty(ref _headerHeadsetBatteryStatus, value);
+    }
+
+    public string HeaderPowerStatus
+    {
+        get => _headerPowerStatus;
+        set => SetProperty(ref _headerPowerStatus, value);
+    }
+
+    public string HeaderControllerStatus
+    {
+        get => _headerControllerStatus;
+        set => SetProperty(ref _headerControllerStatus, value);
+    }
+
+    public string HeaderProximityStatus
+    {
+        get => _headerProximityStatus;
+        set => SetProperty(ref _headerProximityStatus, value);
+    }
+
+    public string HeaderForegroundStatus
+    {
+        get => _headerForegroundStatus;
+        set => SetProperty(ref _headerForegroundStatus, value);
+    }
+
     public string SelectedSerial
     {
         get => _selectedSerial;
@@ -117,6 +159,7 @@ public sealed class MainViewModel : ObservableObject
         {
             if (SetProperty(ref _selectedSerial, value))
             {
+                ResetHeaderSnapshotStatus();
                 RaiseCommandStates();
             }
         }
@@ -393,6 +436,7 @@ public sealed class MainViewModel : ObservableObject
                 SelectedSerial = Devices.FirstOrDefault(static device => device.IsOnline)?.Serial ?? string.Empty;
             }
 
+            RefreshHeaderDeviceStatus();
             AddLog(Devices.Count == 0 ? "No ADB devices reported." : $"ADB reported {Devices.Count} device(s).");
         }).ConfigureAwait(true);
     }
@@ -835,6 +879,7 @@ public sealed class MainViewModel : ObservableObject
             $"Headset state: {status.HeadsetState}{Environment.NewLine}" +
             $"Auto sleep: {FormatMilliseconds(status.AutoSleepTimeMs)}{Environment.NewLine}" +
             $"Hold until: {status.HoldUntil?.ToString("G") ?? "unknown"}";
+        ApplyHeaderProximityStatus(status);
         AddLog(status.Detail);
     }
 
@@ -855,6 +900,12 @@ public sealed class MainViewModel : ObservableObject
             $"Foreground: {snapshot.Foreground}{Environment.NewLine}" +
             $"Captured: {snapshot.CapturedAt:t}";
 
+        HeaderDeviceStatus = FormatHeaderDeviceStatus(snapshot.Serial, snapshot.Model);
+        HeaderHeadsetBatteryStatus = FormatHeaderBattery(snapshot);
+        HeaderPowerStatus = FormatHeaderPower(snapshot);
+        HeaderControllerStatus = FormatHeaderControllers(snapshot.Controllers);
+        HeaderForegroundStatus = FormatHeaderForeground(snapshot.Foreground);
+
         ControllerStatuses.Clear();
         foreach (var controller in snapshot.Controllers ?? Array.Empty<QuestControllerStatus>())
         {
@@ -870,10 +921,12 @@ public sealed class MainViewModel : ObservableObject
                 $"Headset state: {snapshot.Proximity.HeadsetState}{Environment.NewLine}" +
                 $"Auto sleep: {FormatMilliseconds(snapshot.Proximity.AutoSleepTimeMs)}{Environment.NewLine}" +
                 $"Hold until: {snapshot.Proximity.HoldUntil?.ToString("G") ?? "unknown"}";
+            ApplyHeaderProximityStatus(snapshot.Proximity);
         }
         else
         {
             LastProximityStatus = "Proximity status was not reported by this snapshot. Use Read Proximity Status for direct readback.";
+            HeaderProximityStatus = "Proximity --";
         }
     }
 
@@ -948,6 +1001,135 @@ public sealed class MainViewModel : ObservableObject
         }
 
         return profile;
+    }
+
+    private void ResetHeaderSnapshotStatus()
+    {
+        RefreshHeaderDeviceStatus();
+        HeaderHeadsetBatteryStatus = "Battery --";
+        HeaderPowerStatus = "Power --";
+        HeaderControllerStatus = "Controllers --";
+        HeaderProximityStatus = "Proximity --";
+        HeaderForegroundStatus = "Foreground --";
+        ControllerStatuses.Clear();
+    }
+
+    private void RefreshHeaderDeviceStatus()
+    {
+        if (string.IsNullOrWhiteSpace(SelectedSerial))
+        {
+            HeaderDeviceStatus = "No Quest selected";
+            return;
+        }
+
+        var selected = Devices.FirstOrDefault(device =>
+            string.Equals(device.Serial, SelectedSerial, StringComparison.OrdinalIgnoreCase));
+        HeaderDeviceStatus = FormatHeaderDeviceStatus(SelectedSerial, selected?.Model);
+    }
+
+    private void ApplyHeaderProximityStatus(QuestProximityStatus status)
+    {
+        if (!status.Available)
+        {
+            HeaderProximityStatus = "Proximity unavailable";
+            return;
+        }
+
+        if (status.HoldActive)
+        {
+            HeaderProximityStatus = "Proximity keep-awake";
+            return;
+        }
+
+        HeaderProximityStatus = string.IsNullOrWhiteSpace(status.HeadsetState)
+            ? "Proximity normal"
+            : $"Proximity {FormatCompactState(status.HeadsetState)}";
+    }
+
+    private static string FormatHeaderDeviceStatus(string serial, string? model)
+    {
+        var device = string.IsNullOrWhiteSpace(model)
+            ? "Quest"
+            : model.Replace('_', ' ');
+        if (string.IsNullOrWhiteSpace(serial))
+        {
+            return device;
+        }
+
+        var suffix = serial.Length <= 4 ? serial : serial[^4..];
+        return $"{device} {suffix}";
+    }
+
+    private static string FormatHeaderBattery(QuestSnapshot snapshot)
+    {
+        if (snapshot.HeadsetBatteryLevel is int level)
+        {
+            var status = string.IsNullOrWhiteSpace(snapshot.HeadsetBatteryStatus) ||
+                         string.Equals(snapshot.HeadsetBatteryStatus, "unknown", StringComparison.OrdinalIgnoreCase)
+                ? string.Empty
+                : $" {snapshot.HeadsetBatteryStatus}";
+            return $"{level}%{status}";
+        }
+
+        return string.IsNullOrWhiteSpace(snapshot.Battery) || string.Equals(snapshot.Battery, "unknown", StringComparison.OrdinalIgnoreCase)
+            ? "Battery --"
+            : snapshot.Battery;
+    }
+
+    private static string FormatHeaderPower(QuestSnapshot snapshot)
+    {
+        var state = snapshot.IsAwake switch
+        {
+            true => "Awake",
+            false => "Asleep",
+            _ => string.IsNullOrWhiteSpace(snapshot.Wakefulness) ? "Power --" : snapshot.Wakefulness
+        };
+
+        return string.IsNullOrWhiteSpace(snapshot.DisplayPowerState)
+            ? state
+            : $"{state} / {snapshot.DisplayPowerState}";
+    }
+
+    private static string FormatHeaderControllers(IReadOnlyList<QuestControllerStatus>? controllers)
+    {
+        if (controllers is null || controllers.Count == 0)
+        {
+            return "Controllers --";
+        }
+
+        return string.Join("; ", controllers.Select(static controller =>
+        {
+            var hand = controller.HandLabel.StartsWith("Left", StringComparison.OrdinalIgnoreCase)
+                ? "L"
+                : controller.HandLabel.StartsWith("Right", StringComparison.OrdinalIgnoreCase)
+                    ? "R"
+                    : controller.HandLabel;
+            var connection = FormatCompactState(controller.ConnectionState);
+            return string.IsNullOrWhiteSpace(connection)
+                ? $"{hand} {controller.BatteryLabel}"
+                : $"{hand} {controller.BatteryLabel} {connection}";
+        }));
+    }
+
+    private static string FormatHeaderForeground(string foreground)
+    {
+        return string.IsNullOrWhiteSpace(foreground) || string.Equals(foreground, "unknown", StringComparison.OrdinalIgnoreCase)
+            ? "Foreground --"
+            : $"Foreground: {foreground}";
+    }
+
+    private static string FormatCompactState(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        return value
+            .Replace("CONNECTED_", string.Empty, StringComparison.OrdinalIgnoreCase)
+            .Replace("HEADSET_", string.Empty, StringComparison.OrdinalIgnoreCase)
+            .Replace('_', ' ')
+            .ToLowerInvariant();
     }
 
     private static string FormatPower(QuestSnapshot snapshot)

@@ -49,6 +49,7 @@ internal static class CliProgram
                 "media" => await MediaAsync(args.Skip(1).ToArray()).ConfigureAwait(false),
                 "tooling" => await ToolingAsync(args.Skip(1).ToArray()).ConfigureAwait(false),
                 "catalog" => await CatalogAsync(args.Skip(1).ToArray()).ConfigureAwait(false),
+                "workspace" => Workspace(args.Skip(1).ToArray()),
                 _ => Fail($"Unknown command '{command}'. Run --help for commands.")
             };
         }
@@ -412,6 +413,35 @@ internal static class CliProgram
             "verify" => await CatalogVerifyAsync(ArgOptions.Parse(args.Skip(1))).ConfigureAwait(false),
             _ => Fail("Use: catalog <list|install|launch|stop|verify> --path <catalog.json>")
         };
+    }
+
+    private static int Workspace(string[] args)
+    {
+        var subcommand = args.Length == 0 || args[0].StartsWith("--", StringComparison.Ordinal)
+            ? "guide"
+            : args[0].ToLowerInvariant();
+        if (subcommand is not ("guide" or "status"))
+        {
+            return Fail("Use: workspace <guide|status> [--root <folder>] [--json]");
+        }
+
+        var options = ArgOptions.Parse(subcommand == "guide" && args.Length > 0 && !args[0].StartsWith("--", StringComparison.Ordinal)
+            ? args.Skip(1)
+            : subcommand == "status" && args.Length > 0 && !args[0].StartsWith("--", StringComparison.Ordinal)
+                ? args.Skip(1)
+                : args);
+        var status = SourceWorkspaceGuide.Evaluate(options.ValueOrNull("--root"));
+        if (options.Has("--json"))
+        {
+            WriteObject(status, json: true);
+        }
+        else
+        {
+            Console.WriteLine(SourceWorkspaceGuide.ToMarkdown(status));
+        }
+
+        var workspaceReady = status.RustyXrRepoPresent && status.CompanionRepoPresent;
+        return subcommand == "status" && !workspaceReady ? 2 : 0;
     }
 
     private static async Task<int> CatalogListAsync(ArgOptions options)
@@ -907,6 +937,7 @@ internal static class CliProgram
           media receive [--host 127.0.0.1] [--port <n>] [--out <folder>] [--once] [--timeout-ms <n>] [--json]
           tooling status [--latest] [--json]
           tooling install-official [--json]
+          workspace guide [--root <folder>] [--json]
           catalog list [--path <catalog.json>] [--json]
           catalog install --path <catalog.json> --app <id> --serial <serial> [--apk <path-or-url>] [--apk-cache <folder>] [--refresh-apk-download]
           catalog launch --path <catalog.json> --app <id> --serial <serial> [--runtime-profile <id>]

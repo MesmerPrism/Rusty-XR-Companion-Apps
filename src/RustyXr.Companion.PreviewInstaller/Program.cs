@@ -227,7 +227,7 @@ internal sealed class InstallerForm : Form
     private readonly Icon? _formIcon;
     private readonly string _releasePageUrl;
     private readonly Label _status = new() { AutoSize = true, Font = new Font("Segoe UI", 12, FontStyle.Bold), Margin = new Padding(0, 0, 0, 8) };
-    private readonly Label _detail = new() { AutoSize = false, Height = 92, Width = 540, Margin = new Padding(0, 0, 0, 8) };
+    private readonly Label _detail = new() { AutoSize = false, Height = 116, Width = 540, Margin = new Padding(0, 0, 0, 8) };
     private readonly Label _location = new() { AutoSize = false, Height = 76, Width = 540, Margin = new Padding(0, 0, 0, 8) };
     private readonly ProgressBar _progress = new() { Width = 540, Height = 24, Margin = new Padding(0, 10, 0, 12) };
     private readonly Button _installButton = CreateActionButton("Install latest release", 172);
@@ -253,8 +253,8 @@ internal sealed class InstallerForm : Form
 
         Text = "Rusty XR Companion Setup";
         AutoScaleMode = AutoScaleMode.Dpi;
-        ClientSize = new Size(620, 452);
-        MinimumSize = new Size(660, 492);
+        ClientSize = new Size(620, 476);
+        MinimumSize = new Size(660, 516);
         StartPosition = FormStartPosition.CenterScreen;
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox = false;
@@ -274,7 +274,7 @@ internal sealed class InstallerForm : Form
         };
 
         _status.Text = "Install Rusty XR Companion";
-        _detail.Text = "This helper installs the latest portable Windows release, refreshes the managed Quest tooling cache, and creates a Start Menu launcher with the Companion icon.";
+        _detail.Text = "This helper installs the latest portable Windows release, refreshes the managed Quest tooling cache, and creates a Start Menu launcher. For source work, keep Rusty-XR and Rusty-XR-Companion-Apps as sibling folders and use the CLI workspace guide.";
         _location.Text =
             $"Install folder:{Environment.NewLine}{PortableInstallLayout.ReleaseInstallRoot()}{Environment.NewLine}" +
             $"Launcher icon:{Environment.NewLine}{PortableInstallLayout.ReleaseShortcutDisplayPath()}";

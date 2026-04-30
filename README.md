@@ -32,6 +32,7 @@ worked out upstream.
   `quest-app-catalog` schema
 - managed LocalAppData tool cache for Meta `hzdb`, Android platform-tools, and
   `scrcpy`
+- source-workspace guide for sibling Rusty XR and Companion checkouts
 - GitHub Pages docs and onboarding
 - portable Windows release workflow with a guided setup helper
 - release app zip bundling for the public Rusty XR Quest camera composite-layer
@@ -52,6 +53,7 @@ cd Rusty-XR-Companion-Apps
 dotnet build RustyXr.Companion.slnx
 dotnet test RustyXr.Companion.slnx
 dotnet run --project src/RustyXr.Companion.Cli -- doctor
+dotnet run --project src/RustyXr.Companion.Cli -- workspace guide
 dotnet run --project src/RustyXr.Companion.App
 ```
 
@@ -93,6 +95,7 @@ dotnet run --project src/RustyXr.Companion.Cli -- media receive --port 8787 --ou
 dotnet run --project src/RustyXr.Companion.Cli -- hzdb proximity keep-awake --serial <serial> --duration-ms 28800000
 dotnet run --project src/RustyXr.Companion.Cli -- hzdb screenshot --serial <serial> --out .\artifacts\screenshots
 dotnet run --project src/RustyXr.Companion.Cli -- doctor --snapshots --out .\artifacts\diagnostics
+dotnet run --project src/RustyXr.Companion.Cli -- workspace guide --root <workspace>
 dotnet run --project src/RustyXr.Companion.Cli -- catalog verify --path samples\quest-session-kit\apk-catalog.example.json --app rusty-xr-quest-minimal --serial <serial> --launch --device-profile perf-smoke-test --out .\artifacts\verify
 dotnet run --project src/RustyXr.Companion.Cli -- catalog verify --path samples\quest-session-kit\apk-catalog.example.json --app rusty-xr-quest-composite-layer --serial <serial> --stop-catalog-apps --install --launch --device-profile xr-composite-smoke-test --runtime-profile camera-diagnostic-cpu-copy --settle-ms 7000 --logcat-lines 1000 --out .\artifacts\verify
 dotnet run --project src/RustyXr.Companion.Cli -- catalog verify --path samples\quest-session-kit\apk-catalog.example.json --app rusty-xr-quest-composite-layer --serial <serial> --stop-catalog-apps --install --launch --device-profile xr-composite-smoke-test --runtime-profile camera-stereo-gpu-composite --settle-ms 9000 --logcat-lines 1400 --out .\artifacts\verify
@@ -106,6 +109,7 @@ dotnet run --project src/RustyXr.Companion.Cli -- catalog verify --path samples\
 - [Getting started](docs/getting-started.md)
 - [Quest connection](docs/quest-connection.md)
 - [APK install and launch](docs/apk-install-launch.md)
+- [Source workspace](docs/source-workspace.md)
 - [Streaming](docs/streaming.md)
 - [Diagnostics](docs/diagnostics.md)
 - [Release workflow](docs/release-workflow.md)

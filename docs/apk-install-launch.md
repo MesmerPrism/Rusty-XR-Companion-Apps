@@ -55,6 +55,16 @@ assets are downloaded into `%LOCALAPPDATA%\RustyXrCompanion\apk-cache` before
 install. Use `--apk-cache <folder>` to override the cache and
 `--refresh-apk-download` to force a fresh download.
 
+For local source builds, keep `Rusty-XR` and `Rusty-XR-Companion-Apps` as
+sibling folders. Then run:
+
+```powershell
+dotnet run --project src\RustyXr.Companion.Cli -- workspace guide
+```
+
+The guide reports the expected catalog and APK output paths for the Rusty XR
+minimal and composite-layer examples.
+
 ```powershell
 dotnet run --project src/RustyXr.Companion.Cli -- catalog list --json
 ```

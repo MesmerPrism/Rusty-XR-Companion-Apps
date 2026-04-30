@@ -14,6 +14,12 @@ nav_order: 3
   tooling install
 - optional: managed `scrcpy` or `scrcpy.exe` on `PATH` for display casting
 
+For Rusty XR APK source builds, keep `Rusty-XR` and
+`Rusty-XR-Companion-Apps` as sibling folders and follow
+[Source Workspace](source-workspace.md). The companion can install and launch
+APKs without Android Studio; Android build tooling is only required when
+building new APK bytes from source.
+
 ## Source Build
 
 ```powershell
@@ -22,6 +28,7 @@ cd Rusty-XR-Companion-Apps
 dotnet build RustyXr.Companion.slnx
 dotnet test RustyXr.Companion.slnx
 dotnet run --project src/RustyXr.Companion.Cli -- doctor
+dotnet run --project src/RustyXr.Companion.Cli -- workspace guide
 dotnet run --project src/RustyXr.Companion.App
 ```
 
@@ -76,3 +83,5 @@ dotnet run --project src/RustyXr.Companion.Cli -- install --serial <serial> --ap
 
 See [Git LFS and assets](lfs-and-assets.md) for why release packaging can
 bundle generated public APK assets without committing APK bytes to the repo.
+For sibling Rusty XR source builds and catalog verification, see
+[Source Workspace](source-workspace.md).

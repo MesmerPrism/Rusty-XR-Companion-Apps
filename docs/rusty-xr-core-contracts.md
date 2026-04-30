@@ -29,6 +29,19 @@ The current sample catalog includes the Rusty XR minimal Quest APK entry:
 The APK bytes are not committed. Build the APK from Rusty XR, then use
 Companion's catalog install, launch, and verify commands.
 
+For a local source workspace, keep both repos as siblings:
+
+```text
+<workspace>\Rusty-XR
+<workspace>\Rusty-XR-Companion-Apps
+```
+
+Then run the companion guide:
+
+```powershell
+dotnet run --project src\RustyXr.Companion.Cli -- workspace guide --root <workspace>
+```
+
 When the Rusty XR core repo is checked out next to this repo, validate this
 sample catalog with:
 

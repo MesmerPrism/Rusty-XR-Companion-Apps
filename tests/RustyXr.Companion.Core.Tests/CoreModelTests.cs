@@ -441,6 +441,41 @@ public sealed class CoreModelTests
     }
 
     [Fact]
+    public void SourceWorkspaceGuideDetectsSiblingReposAndApkOutputs()
+    {
+        var root = Path.Combine(Path.GetTempPath(), $"rusty-xr-workspace-{Guid.NewGuid():N}");
+        var rustyXr = Path.Combine(root, SourceWorkspaceGuide.RustyXrRepoName);
+        var companion = Path.Combine(root, SourceWorkspaceGuide.CompanionRepoName);
+        try
+        {
+            Directory.CreateDirectory(rustyXr);
+            Directory.CreateDirectory(companion);
+            File.WriteAllText(Path.Combine(rustyXr, "Cargo.toml"), string.Empty);
+            File.WriteAllText(Path.Combine(companion, "RustyXr.Companion.slnx"), string.Empty);
+            Directory.CreateDirectory(Path.Combine(rustyXr, "examples", "quest-minimal-apk", "build", "outputs"));
+            File.WriteAllText(
+                Path.Combine(rustyXr, "examples", "quest-minimal-apk", "build", "outputs", "rusty-xr-quest-minimal-debug.apk"),
+                "apk");
+
+            var status = SourceWorkspaceGuide.Evaluate(root);
+
+            Assert.True(status.RustyXrRepoPresent);
+            Assert.True(status.CompanionRepoPresent);
+            Assert.True(status.MinimalApkPresent);
+            Assert.False(status.CompositeApkPresent);
+            Assert.Contains(status.Commands, command => command.Id == "verify-minimal-apk");
+            Assert.Contains("Rusty XR Source Workspace", SourceWorkspaceGuide.ToMarkdown(status));
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
     public void RuntimeProfileLogValidatorRequiresRealGpuProjectionForFinalProfile()
     {
         var probeProfile = new RuntimeProfile(

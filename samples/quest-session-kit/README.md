@@ -32,6 +32,15 @@ for `synthetic-composite-layer`, `camera-source-diagnostics`,
 `camera-stereo-gpu-composite-quad-surface`, and optional
 `media-projection-stream`.
 
+For the full sibling-repo flow, run:
+
+```powershell
+dotnet run --project src\RustyXr.Companion.Cli -- workspace guide --root <workspace>
+```
+
+The guide prints the expected Rusty XR build outputs, catalog paths, and
+verification commands for local agents.
+
 The Tier 1 CPU profile is a mono diagnostic flat camera copy with a throttled
 CPU upload cadence. The GPU-buffer probe requests Camera2 `PRIVATE` hardware
 buffers, imports them for Vulkan sampling with CPU fallback disabled, and logs

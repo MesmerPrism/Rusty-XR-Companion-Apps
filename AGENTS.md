@@ -39,6 +39,7 @@ Run the CLI:
 
 ```powershell
 dotnet run --project src/RustyXr.Companion.Cli -- doctor
+dotnet run --project src/RustyXr.Companion.Cli -- workspace guide
 ```
 
 Use the single-file desktop launcher when Windows policy blocks a raw multi-file
@@ -68,3 +69,25 @@ powershell -ExecutionPolicy Bypass -File .\tools\app\Install-DevDesktopApp.ps1 -
   `%LOCALAPPDATA%\Programs\RustyXrCompanion` is release-only and may
   auto-update from GitHub Releases; `%LOCALAPPDATA%\Programs\RustyXrCompanionDev`
   is for local feature work and must not auto-update from public releases.
+
+## Source Workspace Rule
+
+When the public Rusty XR core repo is also installed, prefer this sibling
+layout:
+
+```text
+<workspace>\Rusty-XR
+<workspace>\Rusty-XR-Companion-Apps
+```
+
+Use the CLI guide before changing catalog or build-flow docs:
+
+```powershell
+dotnet run --project src/RustyXr.Companion.Cli -- workspace guide --root <workspace>
+```
+
+The companion owns managed `adb`, `hzdb`, `scrcpy`, install, launch, cast,
+diagnostics, and catalog verification. Rusty XR owns the public Rust contracts,
+schemas, examples, and APK source. Do not copy APK bytes, signing material,
+diagnostics bundles, screenshots, media frames, or local caches into either
+repo.

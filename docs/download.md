@@ -26,6 +26,18 @@ composite-layer APK and catalog. On first launch, the app auto-loads that
 catalog so the APK target is already present for install and launch on a
 connected Quest.
 
+The setup window also points source builders toward the recommended sibling
+workspace shape:
+
+```text
+<workspace>\Rusty-XR
+<workspace>\Rusty-XR-Companion-Apps
+```
+
+That source layout is optional for published-app users, but it is the supported
+way for local agents to build Rusty XR APKs from source and verify them through
+the companion catalog workflow. See [Source Workspace](source-workspace.md).
+
 Installed release-channel apps check GitHub Releases on startup and replace
 the local release install when a newer portable app zip is published.
 
