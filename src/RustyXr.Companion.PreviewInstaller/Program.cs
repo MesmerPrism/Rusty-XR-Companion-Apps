@@ -226,13 +226,13 @@ internal sealed class InstallerForm : Form
     private readonly CancellationTokenSource _cancellation = new();
     private readonly Icon? _formIcon;
     private readonly string _releasePageUrl;
-    private readonly Label _status = new() { AutoSize = true, Font = new Font("Segoe UI", 12, FontStyle.Bold) };
-    private readonly Label _detail = new() { AutoSize = false, Height = 92, Width = 520 };
-    private readonly Label _location = new() { AutoSize = false, Height = 76, Width = 520 };
-    private readonly ProgressBar _progress = new() { Width = 520, Height = 24 };
-    private readonly Button _installButton = new() { Text = "Install latest release", Width = 160 };
-    private readonly Button _uninstallButton = new() { Text = "Uninstall", Width = 120 };
-    private readonly Button _releaseButton = new() { Text = "Open release page", Width = 150 };
+    private readonly Label _status = new() { AutoSize = true, Font = new Font("Segoe UI", 12, FontStyle.Bold), Margin = new Padding(0, 0, 0, 8) };
+    private readonly Label _detail = new() { AutoSize = false, Height = 92, Width = 540, Margin = new Padding(0, 0, 0, 8) };
+    private readonly Label _location = new() { AutoSize = false, Height = 76, Width = 540, Margin = new Padding(0, 0, 0, 8) };
+    private readonly ProgressBar _progress = new() { Width = 540, Height = 24, Margin = new Padding(0, 10, 0, 12) };
+    private readonly Button _installButton = CreateActionButton("Install latest release", 172);
+    private readonly Button _uninstallButton = CreateActionButton("Uninstall", 124);
+    private readonly Button _releaseButton = CreateActionButton("Open release page", 156);
     private readonly CheckBox _purgeData = new()
     {
         Text = "Also remove managed tools, diagnostics, and caches",
@@ -253,8 +253,8 @@ internal sealed class InstallerForm : Form
 
         Text = "Rusty XR Companion Setup";
         AutoScaleMode = AutoScaleMode.Dpi;
-        ClientSize = new Size(600, 430);
-        MinimumSize = new Size(640, 470);
+        ClientSize = new Size(620, 452);
+        MinimumSize = new Size(660, 492);
         StartPosition = FormStartPosition.CenterScreen;
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox = false;
@@ -269,7 +269,8 @@ internal sealed class InstallerForm : Form
             Dock = DockStyle.Fill,
             FlowDirection = FlowDirection.TopDown,
             Padding = new Padding(24),
-            WrapContents = false
+            WrapContents = false,
+            AutoScroll = false
         };
 
         _status.Text = "Install Rusty XR Companion";
@@ -288,7 +289,14 @@ internal sealed class InstallerForm : Form
         _uninstallButton.Click += async (_, _) => await RunUninstallAsync().ConfigureAwait(true);
         _releaseButton.Click += (_, _) => Process.Start(new ProcessStartInfo(_releasePageUrl) { UseShellExecute = true });
 
-        var buttons = new FlowLayoutPanel { Width = 520, Height = 56, FlowDirection = FlowDirection.LeftToRight };
+        var buttons = new FlowLayoutPanel
+        {
+            Width = 540,
+            Height = 44,
+            FlowDirection = FlowDirection.LeftToRight,
+            WrapContents = false,
+            Margin = new Padding(0, 2, 0, 0)
+        };
         buttons.Controls.Add(_installButton);
         buttons.Controls.Add(_uninstallButton);
         buttons.Controls.Add(_releaseButton);
@@ -393,4 +401,15 @@ internal sealed class InstallerForm : Form
             return null;
         }
     }
+
+    private static Button CreateActionButton(string text, int width)
+        => new()
+        {
+            Text = text,
+            Width = width,
+            Height = 34,
+            Margin = new Padding(0, 0, 10, 0),
+            TextAlign = ContentAlignment.MiddleCenter,
+            UseCompatibleTextRendering = false
+        };
 }

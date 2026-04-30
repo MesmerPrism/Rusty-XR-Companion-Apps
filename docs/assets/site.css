@@ -82,6 +82,18 @@ table {
   width: 100%;
 }
 
+figure {
+  margin: 18px 0 26px;
+}
+
+figure img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  border: 1px solid #d5dadd;
+  background: #ffffff;
+}
+
 td, th {
   border: 1px solid #d5dadd;
   padding: 8px;

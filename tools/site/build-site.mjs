@@ -145,6 +145,14 @@ function markdownToHtml(markdown) {
       continue;
     }
 
+    const image = line.match(/^!\[([^\]]*)\]\(([^)]+)\)$/);
+    if (image) {
+      closeParagraph();
+      closeList();
+      html.push(`<figure><img src="${escapeAttribute(image[2])}" alt="${escapeAttribute(image[1])}"></figure>`);
+      continue;
+    }
+
     if (line.startsWith("- ")) {
       closeParagraph();
       if (!inList) {
@@ -187,4 +195,8 @@ function escapeHtml(value) {
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;");
+}
+
+function escapeAttribute(value) {
+  return escapeHtml(value).replaceAll("'", "&#39;");
 }

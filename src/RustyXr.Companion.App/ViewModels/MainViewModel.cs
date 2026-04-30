@@ -43,6 +43,7 @@ public sealed class MainViewModel : ObservableObject
         "media-stream");
     private QuestSessionCatalog? _catalog;
     private QuestAppTarget? _selectedCatalogApp;
+    private RuntimeProfile? _selectedRuntimeProfile;
 
     public MainViewModel()
     {
@@ -64,6 +65,8 @@ public sealed class MainViewModel : ObservableObject
         BrowseCatalogCommand = new AsyncRelayCommand(BrowseCatalogAsync);
         LoadCatalogCommand = new AsyncRelayCommand(LoadCatalogAsync);
         UseCatalogAppCommand = new AsyncRelayCommand(UseCatalogAppAsync, HasCatalogApp);
+        InstallCatalogAppCommand = new AsyncRelayCommand(InstallCatalogAppAsync, HasSerialAndCatalogApp);
+        LaunchCatalogAppCommand = new AsyncRelayCommand(LaunchCatalogAppAsync, HasSerialAndCatalogApp);
         VerifyCatalogAppCommand = new AsyncRelayCommand(VerifyCatalogAppAsync, HasSerialAndCatalogApp);
         BrowseApkCommand = new AsyncRelayCommand(BrowseApkAsync);
         InstallCommand = new AsyncRelayCommand(InstallAsync, HasSerial);
@@ -84,6 +87,7 @@ public sealed class MainViewModel : ObservableObject
     public ObservableCollection<ToolStatus> Tools { get; } = new();
     public ObservableCollection<QuestDevice> Devices { get; } = new();
     public ObservableCollection<QuestAppTarget> CatalogApps { get; } = new();
+    public ObservableCollection<RuntimeProfile> RuntimeProfiles { get; } = new();
     public ObservableCollection<string> Log { get; } = new();
 
     public string BuildLabel
@@ -135,11 +139,31 @@ public sealed class MainViewModel : ObservableObject
         {
             if (SetProperty(ref _selectedCatalogApp, value))
             {
+                ApplySelectedCatalogAppToFields();
+                RefreshRuntimeProfilesForSelectedApp();
                 UseCatalogAppCommand.RaiseCanExecuteChanged();
+                InstallCatalogAppCommand.RaiseCanExecuteChanged();
+                LaunchCatalogAppCommand.RaiseCanExecuteChanged();
                 VerifyCatalogAppCommand.RaiseCanExecuteChanged();
             }
         }
     }
+
+    public RuntimeProfile? SelectedRuntimeProfile
+    {
+        get => _selectedRuntimeProfile;
+        set
+        {
+            if (SetProperty(ref _selectedRuntimeProfile, value))
+            {
+                RuntimeProfileId = value?.Id ?? string.Empty;
+                OnPropertyChanged(nameof(SelectedRuntimeProfileDescription));
+            }
+        }
+    }
+
+    public string SelectedRuntimeProfileDescription =>
+        SelectedRuntimeProfile?.Description ?? "No launch mode selected. Launch will use the app's default behavior.";
 
     public string ApkPath
     {
@@ -222,6 +246,8 @@ public sealed class MainViewModel : ObservableObject
     public AsyncRelayCommand BrowseCatalogCommand { get; }
     public AsyncRelayCommand LoadCatalogCommand { get; }
     public AsyncRelayCommand UseCatalogAppCommand { get; }
+    public AsyncRelayCommand InstallCatalogAppCommand { get; }
+    public AsyncRelayCommand LaunchCatalogAppCommand { get; }
     public AsyncRelayCommand VerifyCatalogAppCommand { get; }
     public AsyncRelayCommand BrowseApkCommand { get; }
     public AsyncRelayCommand InstallCommand { get; }
@@ -474,10 +500,7 @@ public sealed class MainViewModel : ObservableObject
             : CatalogApps.FirstOrDefault(app => string.Equals(app.Id, preferredAppId, StringComparison.OrdinalIgnoreCase))
               ?? CatalogApps.FirstOrDefault();
         AddLog($"Loaded {CatalogApps.Count} catalog app(s).");
-        if (SelectedCatalogApp is not null)
-        {
-            await UseCatalogAppAsync().ConfigureAwait(true);
-        }
+        await UseCatalogAppAsync().ConfigureAwait(true);
     }
 
     private Task UseCatalogAppAsync()
@@ -487,11 +510,49 @@ public sealed class MainViewModel : ObservableObject
             return Task.CompletedTask;
         }
 
+        ApplySelectedCatalogAppToFields();
+        AddLog($"Using catalog app: {SelectedCatalogApp.Label}");
+        return Task.CompletedTask;
+    }
+
+    private void ApplySelectedCatalogAppToFields()
+    {
+        if (SelectedCatalogApp is null)
+        {
+            return;
+        }
+
         PackageName = SelectedCatalogApp.PackageName;
         ActivityName = SelectedCatalogApp.ActivityName ?? string.Empty;
         ApkPath = CatalogLoader.ResolveApkPath(CatalogPath, SelectedCatalogApp) ?? ApkPath;
-        AddLog($"Using catalog app: {SelectedCatalogApp.Label}");
-        return Task.CompletedTask;
+    }
+
+    private void RefreshRuntimeProfilesForSelectedApp()
+    {
+        RuntimeProfiles.Clear();
+        if (_catalog is null || SelectedCatalogApp is null)
+        {
+            SelectedRuntimeProfile = null;
+            return;
+        }
+
+        var matchingProfiles = _catalog.RuntimeProfiles
+            .Where(profile => RuntimeProfileBelongsToApp(SelectedCatalogApp, profile))
+            .ToArray();
+        if (matchingProfiles.Length == 0)
+        {
+            matchingProfiles = _catalog.RuntimeProfiles.ToArray();
+        }
+
+        foreach (var profile in matchingProfiles)
+        {
+            RuntimeProfiles.Add(profile);
+        }
+
+        SelectedRuntimeProfile =
+            RuntimeProfiles.FirstOrDefault(profile => string.Equals(profile.Id, RuntimeProfileId, StringComparison.OrdinalIgnoreCase)) ??
+            RuntimeProfiles.FirstOrDefault(profile => string.Equals(profile.Id, CompanionContentLayout.DefaultRuntimeProfileId, StringComparison.OrdinalIgnoreCase)) ??
+            RuntimeProfiles.FirstOrDefault();
     }
 
     private Task BrowseApkAsync()
@@ -520,6 +581,22 @@ public sealed class MainViewModel : ObservableObject
         }).ConfigureAwait(true);
     }
 
+    private async Task InstallCatalogAppAsync()
+    {
+        await RunUiActionAsync("Installing selected catalog APK...", async () =>
+        {
+            if (SelectedCatalogApp is null)
+            {
+                throw new InvalidOperationException("Load a catalog and select an app first.");
+            }
+
+            ApplySelectedCatalogAppToFields();
+            var apkPath = ResolveSelectedApkPathForInstall();
+            var result = await _adbService.InstallAsync(SelectedSerial, apkPath).ConfigureAwait(true);
+            AddLog(result.CondensedOutput);
+        }).ConfigureAwait(true);
+    }
+
     private async Task LaunchAsync()
     {
         await RunUiActionAsync("Launching target app...", async () =>
@@ -528,6 +605,31 @@ public sealed class MainViewModel : ObservableObject
                 SelectedSerial,
                 PackageName,
                 string.IsNullOrWhiteSpace(ActivityName) ? null : ActivityName).ConfigureAwait(true);
+            AddLog(result.CondensedOutput);
+        }).ConfigureAwait(true);
+    }
+
+    private async Task LaunchCatalogAppAsync()
+    {
+        await RunUiActionAsync("Launching selected catalog mode...", async () =>
+        {
+            if (SelectedCatalogApp is null)
+            {
+                throw new InvalidOperationException("Load a catalog and select an app first.");
+            }
+
+            ApplySelectedCatalogAppToFields();
+            var runtimeProfile = SelectedRuntimeProfile;
+            if (runtimeProfile is not null)
+            {
+                AddLog($"Launching mode: {runtimeProfile.Label}");
+            }
+
+            var result = await _adbService.LaunchAsync(
+                SelectedSerial,
+                PackageName,
+                string.IsNullOrWhiteSpace(ActivityName) ? null : ActivityName,
+                runtimeProfile?.Values).ConfigureAwait(true);
             AddLog(result.CondensedOutput);
         }).ConfigureAwait(true);
     }
@@ -589,21 +691,14 @@ public sealed class MainViewModel : ObservableObject
                 }
             }
 
-            var runtimeProfile = ResolveRuntimeProfile(_catalog, RuntimeProfileId);
+            var runtimeProfile = SelectedRuntimeProfile ?? ResolveRuntimeProfile(_catalog, RuntimeProfileId);
             if (runtimeProfile is not null)
             {
                 AddLog($"Using runtime profile: {runtimeProfile.Label}");
             }
 
-            if (!string.IsNullOrWhiteSpace(ApkPath) && File.Exists(ApkPath))
-            {
-                var install = await _adbService.InstallAsync(SelectedSerial, ApkPath).ConfigureAwait(true);
-                AddLog(install.CondensedOutput);
-            }
-            else
-            {
-                AddLog("Catalog APK path is missing; skipping install and verifying the installed package.");
-            }
+            var install = await _adbService.InstallAsync(SelectedSerial, ResolveSelectedApkPathForInstall()).ConfigureAwait(true);
+            AddLog(install.CondensedOutput);
 
             var launch = await _adbService.LaunchAsync(
                 SelectedSerial,
@@ -783,6 +878,29 @@ public sealed class MainViewModel : ObservableObject
     private bool HasCatalogApp() => SelectedCatalogApp is not null;
     private bool HasSerialAndCatalogApp() => HasSerial() && HasCatalogApp();
 
+    private string ResolveSelectedApkPathForInstall()
+    {
+        if (string.IsNullOrWhiteSpace(ApkPath) || !File.Exists(ApkPath))
+        {
+            throw new InvalidOperationException("The selected catalog APK is not available on disk.");
+        }
+
+        return ApkPath;
+    }
+
+    private static bool RuntimeProfileBelongsToApp(QuestAppTarget app, RuntimeProfile profile)
+    {
+        if (!profile.Values.TryGetValue("rustyxr.example", out var example))
+        {
+            return false;
+        }
+
+        return (string.Equals(app.Id, "rusty-xr-quest-composite-layer", StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(example, "quest-composite-layer-apk", StringComparison.OrdinalIgnoreCase)) ||
+               (string.Equals(app.Id, "rusty-xr-quest-minimal", StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(example, "quest-minimal-apk", StringComparison.OrdinalIgnoreCase));
+    }
+
     private static RuntimeProfile? ResolveRuntimeProfile(QuestSessionCatalog catalog, string? runtimeProfileId)
     {
         if (string.IsNullOrWhiteSpace(runtimeProfileId))
@@ -804,6 +922,8 @@ public sealed class MainViewModel : ObservableObject
     {
         EnableWifiAdbCommand.RaiseCanExecuteChanged();
         SnapshotCommand.RaiseCanExecuteChanged();
+        InstallCatalogAppCommand.RaiseCanExecuteChanged();
+        LaunchCatalogAppCommand.RaiseCanExecuteChanged();
         VerifyCatalogAppCommand.RaiseCanExecuteChanged();
         InstallCommand.RaiseCanExecuteChanged();
         LaunchCommand.RaiseCanExecuteChanged();

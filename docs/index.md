@@ -27,10 +27,11 @@ example and still supports local APK paths, public catalog files, and the CLI.
 
 ## Start Here
 
-1. [Getting started](getting-started.md)
-2. [Quest connection](quest-connection.md)
-3. [APK install and launch](apk-install-launch.md)
-4. [Diagnostics](diagnostics.md)
-5. [Rusty XR core contracts](rusty-xr-core-contracts.md)
-6. [Download and release workflow](download.md)
-7. [Dev and release channels](dev-release-channels.md)
+1. [Consumer quick start](consumer-quick-start.md)
+2. [Getting started](getting-started.md)
+3. [Quest connection](quest-connection.md)
+4. [APK install and launch](apk-install-launch.md)
+5. [Diagnostics](diagnostics.md)
+6. [Rusty XR core contracts](rusty-xr-core-contracts.md)
+7. [Download and release workflow](download.md)
+8. [Dev and release channels](dev-release-channels.md)
