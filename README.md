@@ -33,6 +33,7 @@ worked out upstream.
 - managed LocalAppData tool cache for Meta `hzdb`, Android platform-tools, and
   `scrcpy`
 - source-workspace guide for sibling Rusty XR and Companion checkouts
+- installed `agent-onboarding\` docs in the app and CLI release zips
 - GitHub Pages docs and onboarding
 - portable Windows release workflow with a guided setup helper
 - release app zip bundling for the public Rusty XR Quest camera composite-layer
@@ -138,6 +139,9 @@ The app zip includes a bundled `catalogs\` catalog and the public Rusty XR
 Quest camera composite-layer APK under `catalogs\apks\`. On first launch the
 WPF app auto-loads that catalog so the composite-layer example is already in
 the APK list for install and launch on a connected Quest.
+Both the app zip and CLI zip include `agent-onboarding\AGENTS.md` plus
+`agent-onboarding\source-workspace.md` so local agents can start from a
+released install even before the source repos are checked out.
 
 Published installs check GitHub Releases on startup and update themselves from
 the latest portable app zip when a newer release exists. It can be signed by

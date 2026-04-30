@@ -33,6 +33,10 @@ The same command is available from a published CLI zip as:
 .\RustyXr.Companion.Cli.exe workspace guide --root <workspace>
 ```
 
+Published app and CLI zips also include `agent-onboarding\AGENTS.md` and this
+document as `agent-onboarding\source-workspace.md`, so a local agent can start
+from a release install before the source repos exist.
+
 Use `--json` when an agent needs structured paths and commands instead of the
 Markdown guide.
 

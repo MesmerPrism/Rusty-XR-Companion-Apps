@@ -26,6 +26,11 @@ composite-layer APK and catalog. On first launch, the app auto-loads that
 catalog so the APK target is already present for install and launch on a
 connected Quest.
 
+Both the portable app zip and CLI zip include an `agent-onboarding\` folder.
+Use `agent-onboarding\AGENTS.md` as the installed-app instruction file for a
+local agent. It is available even when the source repos have not been checked
+out yet.
+
 The setup window also points source builders toward the recommended sibling
 workspace shape:
 

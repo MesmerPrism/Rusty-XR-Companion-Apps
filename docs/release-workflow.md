@@ -43,6 +43,12 @@ The portable app zip also includes:
 
 - `catalogs/rusty-xr-quest-composite-layer.catalog.json`
 - `catalogs/apks/rusty-xr-quest-composite-layer-debug.apk`
+- `agent-onboarding/AGENTS.md`
+- `agent-onboarding/README.md`
+- `agent-onboarding/source-workspace.md`
+
+The CLI zip includes the same `agent-onboarding/` folder so a local agent can
+start from the command-line-only release too.
 
 The WPF app auto-loads this catalog on startup and defaults to the accepted
 `camera-stereo-gpu-composite` runtime profile. The APK URL comes from the
