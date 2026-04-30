@@ -14,11 +14,12 @@ Use it when you need to:
 - install managed `hzdb`, Android platform-tools, and `scrcpy`
 - find Quest devices over ADB
 - connect to a Quest over Wi-Fi ADB
+- read headset battery, controller batteries, wake state, and proximity state
 - install a local APK
 - launch or stop a target app
 - apply simple headset development settings
 - start a display cast through `scrcpy`
-- capture headset screenshots and read proximity keep-awake state
+- capture headset screenshots and toggle proximity keep-awake state
 - export diagnostics that another developer can inspect
 
 The app is intentionally generic. It does not bundle a private runtime. The

@@ -49,10 +49,10 @@ dotnet run --project src/RustyXr.Companion.Cli -- devices
 dotnet run --project src/RustyXr.Companion.Cli -- tooling install-official
 ```
 
-5. Capture a snapshot:
+5. Refresh device status:
 
 ```powershell
-dotnet run --project src/RustyXr.Companion.Cli -- snapshot --serial <serial>
+dotnet run --project src/RustyXr.Companion.Cli -- status --serial <serial>
 ```
 
 6. Optional: enable Wi-Fi ADB from the trusted USB connection:

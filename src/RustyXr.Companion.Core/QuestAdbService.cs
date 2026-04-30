@@ -67,17 +67,35 @@ public sealed class QuestAdbService
     public async Task<QuestSnapshot> GetSnapshotAsync(string serial, CancellationToken cancellationToken = default)
     {
         var model = await ShellTextAsync(serial, "getprop ro.product.model", cancellationToken).ConfigureAwait(false);
-        var battery = ParseBattery(await ShellTextAsync(serial, "dumpsys battery", cancellationToken).ConfigureAwait(false));
-        var wakefulness = ParseWakefulness(await ShellTextAsync(serial, "dumpsys power", cancellationToken).ConfigureAwait(false));
+        var batteryOutput = await ShellTextAsync(serial, "dumpsys battery", cancellationToken).ConfigureAwait(false);
+        var powerOutput = await ShellTextAsync(serial, "dumpsys power", cancellationToken).ConfigureAwait(false);
+        var trackingResult = await ShellAsync(serial, "dumpsys tracking", cancellationToken).ConfigureAwait(false);
+        var proximityResult = await ShellAsync(serial, "dumpsys vrpowermanager", cancellationToken).ConfigureAwait(false);
+        var capturedAt = DateTimeOffset.Now;
+        var powerStatus = ParseQuestPowerStatus(powerOutput);
+        var controllers = trackingResult.Succeeded
+            ? ParseControllerStatuses(trackingResult.StandardOutput)
+            : Array.Empty<QuestControllerStatus>();
+        var proximity = proximityResult.Succeeded &&
+                        HzdbService.TryParseQuestProximityStatus(proximityResult.StandardOutput, capturedAt, out var proximityStatus)
+            ? proximityStatus
+            : null;
         var foreground = ParseForeground(await ShellTextAsync(serial, "dumpsys activity activities", cancellationToken).ConfigureAwait(false));
 
         return new QuestSnapshot(
             serial,
             string.IsNullOrWhiteSpace(model) ? "unknown Quest device" : model.Trim(),
-            battery,
-            wakefulness,
+            ParseBattery(batteryOutput),
+            powerStatus.Wakefulness.Length > 0 ? powerStatus.Wakefulness : ParseWakefulness(powerOutput),
             foreground,
-            DateTimeOffset.Now);
+            capturedAt,
+            ParseBatteryLevel(batteryOutput),
+            ParseBatteryStatusLabel(batteryOutput),
+            powerStatus.IsAwake,
+            powerStatus.IsInteractive,
+            powerStatus.DisplayPowerState,
+            controllers,
+            proximity);
     }
 
     public Task<CommandResult> InstallAsync(string serial, string apkPath, CancellationToken cancellationToken = default)
@@ -325,16 +343,169 @@ public sealed class QuestAdbService
         return wlanMatch.Success ? wlanMatch.Groups["ip"].Value : null;
     }
 
-    private static string ParseBattery(string output)
+    public static int? ParseBatteryLevel(string output)
     {
         var level = Regex.Match(output, @"(?m)^\s*level:\s*(?<level>\d+)\s*$").Groups["level"].Value;
+        return int.TryParse(level, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed)
+            ? parsed
+            : null;
+    }
+
+    public static string ParseBatteryStatusLabel(string output)
+    {
         var status = Regex.Match(output, @"(?m)^\s*status:\s*(?<status>.+?)\s*$").Groups["status"].Value;
-        return (level, status) switch
+        return status.Trim() switch
         {
-            ({ Length: > 0 }, { Length: > 0 }) => $"{level}% (status {status})",
-            ({ Length: > 0 }, _) => $"{level}%",
+            "1" => "unknown",
+            "2" => "charging",
+            "3" => "discharging",
+            "4" => "not charging",
+            "5" => "full",
+            { Length: > 0 } value => value,
             _ => "unknown"
         };
+    }
+
+    private static string ParseBattery(string output)
+    {
+        var level = ParseBatteryLevel(output);
+        var status = ParseBatteryStatusLabel(output);
+        return (level, status) switch
+        {
+            ({ } value, { Length: > 0 } label) when !string.Equals(label, "unknown", StringComparison.OrdinalIgnoreCase) => $"{value}% ({label})",
+            ({ } value, _) => $"{value}%",
+            _ => "unknown"
+        };
+    }
+
+    public static QuestPowerStatus ParseQuestPowerStatus(string output)
+    {
+        var wakefulness = string.Empty;
+        bool? isInteractive = null;
+        var displayPowerState = string.Empty;
+
+        foreach (var rawLine in output.Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            if (rawLine.StartsWith("mWakefulness=", StringComparison.OrdinalIgnoreCase))
+            {
+                wakefulness = rawLine["mWakefulness=".Length..].Trim();
+                continue;
+            }
+
+            if (rawLine.StartsWith("mInteractive=", StringComparison.OrdinalIgnoreCase))
+            {
+                var interactiveRaw = rawLine["mInteractive=".Length..].Trim();
+                if (bool.TryParse(interactiveRaw, out var parsedInteractive))
+                {
+                    isInteractive = parsedInteractive;
+                }
+
+                continue;
+            }
+
+            if (rawLine.StartsWith("Display Power:", StringComparison.OrdinalIgnoreCase))
+            {
+                var stateIndex = rawLine.IndexOf("state=", StringComparison.OrdinalIgnoreCase);
+                if (stateIndex >= 0)
+                {
+                    displayPowerState = rawLine[(stateIndex + "state=".Length)..].Trim();
+                }
+            }
+        }
+
+        bool? isAwake = null;
+        if (isInteractive.HasValue)
+        {
+            isAwake = isInteractive.Value;
+        }
+        else if (string.Equals(wakefulness, "Awake", StringComparison.OrdinalIgnoreCase) ||
+                 string.Equals(wakefulness, "Dreaming", StringComparison.OrdinalIgnoreCase))
+        {
+            isAwake = true;
+        }
+        else if (string.Equals(wakefulness, "Asleep", StringComparison.OrdinalIgnoreCase))
+        {
+            isAwake = false;
+        }
+        else if (string.Equals(displayPowerState, "ON", StringComparison.OrdinalIgnoreCase))
+        {
+            isAwake = true;
+        }
+        else if (string.Equals(displayPowerState, "OFF", StringComparison.OrdinalIgnoreCase))
+        {
+            isAwake = false;
+        }
+
+        var detailParts = new List<string>(3);
+        if (!string.IsNullOrWhiteSpace(wakefulness))
+        {
+            detailParts.Add($"wakefulness {wakefulness}");
+        }
+
+        if (isInteractive.HasValue)
+        {
+            detailParts.Add($"interactive {isInteractive.Value.ToString().ToLowerInvariant()}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(displayPowerState))
+        {
+            detailParts.Add($"display {displayPowerState}");
+        }
+
+        var detail = detailParts.Count == 0
+            ? "Quest power-state readback unavailable."
+            : string.Join("; ", detailParts);
+
+        return new QuestPowerStatus(wakefulness, isInteractive, displayPowerState, isAwake, detail);
+    }
+
+    public static IReadOnlyList<QuestControllerStatus> ParseControllerStatuses(string output)
+    {
+        var statuses = new Dictionary<string, QuestControllerStatus>(StringComparer.OrdinalIgnoreCase);
+        var currentHand = string.Empty;
+
+        foreach (var rawLine in output.Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries))
+        {
+            var line = rawLine.Trim();
+            var detectedHand = DetectControllerHand(line);
+            if (!string.IsNullOrWhiteSpace(detectedHand))
+            {
+                currentHand = detectedHand;
+            }
+
+            if (string.IsNullOrWhiteSpace(currentHand))
+            {
+                continue;
+            }
+
+            var entryIndex = line.IndexOf("[id:", StringComparison.OrdinalIgnoreCase);
+            if (entryIndex < 0)
+            {
+                continue;
+            }
+
+            var entry = line[entryIndex..];
+            var deviceId = ExtractLabeledSegment(entry, "id:");
+            var connectionState = ExtractLabeledSegment(entry, "conn:");
+            var batteryText = ExtractLabeledSegment(entry, "battery:").TrimEnd('%');
+            if (string.IsNullOrWhiteSpace(deviceId) &&
+                string.IsNullOrWhiteSpace(connectionState) &&
+                string.IsNullOrWhiteSpace(batteryText))
+            {
+                continue;
+            }
+
+            statuses[currentHand] = new QuestControllerStatus(
+                currentHand,
+                int.TryParse(batteryText, NumberStyles.Integer, CultureInfo.InvariantCulture, out var batteryLevel) ? batteryLevel : null,
+                connectionState,
+                deviceId);
+        }
+
+        return statuses.Values
+            .OrderBy(static status => string.Equals(status.HandLabel, "Left", StringComparison.OrdinalIgnoreCase) ? 0 : 1)
+            .ThenBy(static status => status.HandLabel, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
     }
 
     private static string ParseWakefulness(string output)
@@ -353,6 +524,42 @@ public sealed class QuestAdbService
     {
         var match = Regex.Match(output, @"(?m)(mResumedActivity|topResumedActivity).*?\s(?<component>[A-Za-z0-9_.]+/[A-Za-z0-9_.$]+)");
         return match.Success ? match.Groups["component"].Value : "unknown";
+    }
+
+    private static string DetectControllerHand(string line)
+    {
+        if (Regex.IsMatch(line, @"^Left(\b|\s|--)", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant))
+        {
+            return "Left";
+        }
+
+        if (Regex.IsMatch(line, @"^Right(\b|\s|--)", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant))
+        {
+            return "Right";
+        }
+
+        return string.Empty;
+    }
+
+    private static string ExtractLabeledSegment(string value, string label)
+    {
+        if (string.IsNullOrWhiteSpace(value) || string.IsNullOrWhiteSpace(label))
+        {
+            return string.Empty;
+        }
+
+        var index = value.IndexOf(label, StringComparison.OrdinalIgnoreCase);
+        if (index < 0)
+        {
+            return string.Empty;
+        }
+
+        var start = index + label.Length;
+        var end = value.IndexOfAny(new[] { ',', ']' }, start);
+        var segment = end >= 0
+            ? value[start..end]
+            : value[start..];
+        return segment.Trim();
     }
 
     private static string SummarizeGfxInfo(string output)

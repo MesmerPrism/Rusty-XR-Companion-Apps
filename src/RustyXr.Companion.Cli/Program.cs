@@ -37,6 +37,7 @@ internal static class CliProgram
                 "doctor" => await DoctorAsync(options).ConfigureAwait(false),
                 "devices" => await DevicesAsync(options).ConfigureAwait(false),
                 "connect" => await ConnectAsync(options).ConfigureAwait(false),
+                "status" => await SnapshotAsync(options).ConfigureAwait(false),
                 "snapshot" => await SnapshotAsync(options).ConfigureAwait(false),
                 "install" => await InstallAsync(options).ConfigureAwait(false),
                 "launch" => await LaunchAsync(options).ConfigureAwait(false),
@@ -890,6 +891,7 @@ internal static class CliProgram
           doctor [--snapshots] [--json] [--out <folder>]
           devices [--json]
           connect --endpoint <host[:port]>
+          status --serial <serial> [--json]
           snapshot --serial <serial> [--json]
           install --serial <serial> --apk <path>
           launch --serial <serial> --package <package> [--activity <activity>]

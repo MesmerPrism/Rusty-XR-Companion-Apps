@@ -65,7 +65,32 @@ public sealed record QuestSnapshot(
     string Battery,
     string Wakefulness,
     string Foreground,
-    DateTimeOffset CapturedAt);
+    DateTimeOffset CapturedAt,
+    int? HeadsetBatteryLevel = null,
+    string HeadsetBatteryStatus = "",
+    bool? IsAwake = null,
+    bool? IsInteractive = null,
+    string DisplayPowerState = "",
+    IReadOnlyList<QuestControllerStatus>? Controllers = null,
+    QuestProximityStatus? Proximity = null);
+
+public sealed record QuestControllerStatus(
+    string HandLabel,
+    int? BatteryLevel,
+    string ConnectionState,
+    string DeviceId)
+{
+    public string BatteryLabel => BatteryLevel is int level ? $"{level}%" : "n/a";
+    public string Detail => $"{HandLabel} controller: {BatteryLabel}; {ConnectionStateLabel}";
+    public string ConnectionStateLabel => string.IsNullOrWhiteSpace(ConnectionState) ? "connection unknown" : ConnectionState;
+}
+
+public sealed record QuestPowerStatus(
+    string Wakefulness,
+    bool? IsInteractive,
+    string DisplayPowerState,
+    bool? IsAwake,
+    string Detail);
 
 public sealed record QuestWifiAdbResult(
     string Serial,

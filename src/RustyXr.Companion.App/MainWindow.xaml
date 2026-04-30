@@ -111,7 +111,7 @@
                             <Button Content="Connect" Command="{Binding ConnectCommand}" />
                         </DockPanel>
                         <Button Content="Enable Wi-Fi ADB From USB" Command="{Binding EnableWifiAdbCommand}" />
-                        <Button Content="Capture Snapshot" Command="{Binding SnapshotCommand}" />
+                        <Button Content="Refresh Status" Command="{Binding SnapshotCommand}" />
                     </StackPanel>
                 </Border>
             </StackPanel>
@@ -181,6 +181,57 @@
                                 <TextBlock Text="Action Meaning" FontWeight="SemiBold" />
                                 <TextBlock Margin="0,10,0,0"
                                            Text="Install APK Only copies the selected APK onto the Quest and does not open it.&#x0a;&#x0a;Launch Selected Mode starts the already-installed app with the selected launch extras.&#x0a;&#x0a;Install + Launch + Verify performs both actions, applies the device profile, waits, and records process, foreground, gfxinfo, and memory signals." />
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+                </TabItem>
+
+                <TabItem Header="Device Status">
+                    <Grid Margin="12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="320" />
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0" MaxWidth="640" HorizontalAlignment="Left">
+                            <TextBlock Text="Headset status" FontWeight="SemiBold" />
+                            <TextBlock Text="Refresh the selected Quest to read headset battery, wake state, foreground app, controller batteries, and proximity state." Margin="0,4,0,10" />
+                            <WrapPanel>
+                                <Button Content="Refresh Status" Command="{Binding SnapshotCommand}" />
+                                <Button Content="Wake Headset" Command="{Binding WakeHeadsetCommand}" />
+                            </WrapPanel>
+                            <TextBlock Text="{Binding LastSnapshot}" FontFamily="Consolas" Margin="0,6,0,16" />
+
+                            <TextBlock Text="Controller batteries" FontWeight="SemiBold" />
+                            <ItemsControl ItemsSource="{Binding ControllerStatuses}" Margin="0,6,10,0">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid Margin="0,0,0,8">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="110" />
+                                                <ColumnDefinition Width="80" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0" Text="{Binding HandLabel}" FontWeight="SemiBold" />
+                                            <TextBlock Grid.Column="1" Text="{Binding BatteryLabel}" />
+                                            <TextBlock Grid.Column="2" Text="{Binding ConnectionStateLabel}" Foreground="#485057" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+
+                        <Border Grid.Column="1" Style="{StaticResource PanelBorder}">
+                            <StackPanel>
+                                <TextBlock Text="Proximity Sensor" FontWeight="SemiBold" />
+                                <TextBlock Text="{Binding LastProximityStatus}" FontFamily="Consolas" Margin="0,10,0,12" />
+                                <TextBlock Text="Keep-awake duration (ms)" />
+                                <TextBox Text="{Binding ProximityDurationMs, UpdateSourceTrigger=PropertyChanged}" Width="160" HorizontalAlignment="Left" />
+                                <WrapPanel>
+                                    <Button Content="Proximity Off / Keep Awake" Command="{Binding KeepAwakeCommand}" />
+                                    <Button Content="Proximity On / Normal" Command="{Binding RestoreProximityCommand}" />
+                                    <Button Content="Read Proximity Status" Command="{Binding ReadProximityCommand}" />
+                                </WrapPanel>
                             </StackPanel>
                         </Border>
                     </Grid>
@@ -264,16 +315,6 @@
                             <TextBox Text="{Binding ScreenshotMethod, UpdateSourceTrigger=PropertyChanged}" Width="160" HorizontalAlignment="Left" />
                             <Button Content="Capture Headset Screenshot" Command="{Binding CaptureScreenshotCommand}" Width="230" HorizontalAlignment="Left" />
 
-                            <TextBlock Text="Wake And Proximity" FontWeight="SemiBold" Margin="0,14,0,0" />
-                            <TextBlock Text="Keep-awake disables the Quest wear sensor through hzdb for the requested duration. Restore normal proximity when you want headset sleep behavior back." Margin="0,4,0,10" />
-                            <TextBlock Text="Keep-awake duration (ms)" />
-                            <TextBox Text="{Binding ProximityDurationMs, UpdateSourceTrigger=PropertyChanged}" Width="160" HorizontalAlignment="Left" />
-                            <WrapPanel>
-                                <Button Content="Wake Headset" Command="{Binding WakeHeadsetCommand}" />
-                                <Button Content="Keep Awake" Command="{Binding KeepAwakeCommand}" />
-                                <Button Content="Restore Normal Proximity" Command="{Binding RestoreProximityCommand}" />
-                                <Button Content="Read Proximity Status" Command="{Binding ReadProximityCommand}" />
-                            </WrapPanel>
                         </StackPanel>
 
                         <Border Grid.Column="1" Style="{StaticResource PanelBorder}">

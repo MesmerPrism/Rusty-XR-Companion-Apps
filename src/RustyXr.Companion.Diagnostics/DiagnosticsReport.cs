@@ -131,10 +131,10 @@ public sealed class DiagnosticsBundleWriter
         }
         else
         {
-            lines.Add("| Serial | Model | Battery | Wakefulness | Foreground |");
-            lines.Add("| --- | --- | --- | --- | --- |");
+            lines.Add("| Serial | Model | Headset Battery | Wake | Controllers | Proximity | Foreground |");
+            lines.Add("| --- | --- | --- | --- | --- | --- | --- |");
             lines.AddRange(report.Snapshots.Select(static snapshot =>
-                $"| {Escape(snapshot.Serial)} | {Escape(snapshot.Model)} | {Escape(snapshot.Battery)} | {Escape(snapshot.Wakefulness)} | {Escape(snapshot.Foreground)} |"));
+                $"| {Escape(snapshot.Serial)} | {Escape(snapshot.Model)} | {Escape(snapshot.Battery)} | {Escape(FormatWake(snapshot))} | {Escape(FormatControllers(snapshot.Controllers))} | {Escape(snapshot.Proximity?.Detail ?? "not reported")} | {Escape(snapshot.Foreground)} |"));
         }
 
         if (report.Notes.Count > 0)
@@ -149,4 +149,29 @@ public sealed class DiagnosticsBundleWriter
 
     private static string Escape(string? value) =>
         (value ?? string.Empty).Replace("|", "\\|", StringComparison.Ordinal).ReplaceLineEndings(" ");
+
+    private static string FormatWake(QuestSnapshot snapshot)
+    {
+        var label = snapshot.IsAwake switch
+        {
+            true => "awake",
+            false => "asleep",
+            _ => "unknown"
+        };
+
+        var parts = new[] { label, snapshot.Wakefulness, snapshot.DisplayPowerState }
+            .Where(static part => !string.IsNullOrWhiteSpace(part))
+            .Distinct(StringComparer.OrdinalIgnoreCase);
+        return string.Join(" / ", parts);
+    }
+
+    private static string FormatControllers(IReadOnlyList<QuestControllerStatus>? controllers)
+    {
+        if (controllers is null || controllers.Count == 0)
+        {
+            return "not reported";
+        }
+
+        return string.Join(", ", controllers.Select(static controller => controller.Detail));
+    }
 }

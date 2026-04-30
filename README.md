@@ -9,7 +9,7 @@ Wi-Fi ADB, install a user-supplied APK, launch or stop a target app, apply
 simple development profiles, install official operator tooling, start a display
 cast through `scrcpy`, receive MediaProjection display-composite frames,
 capture visual proof, pass catalog runtime profiles as launch extras, manage a
-keep-awake proximity hold, and export
+keep-awake proximity hold, read headset and controller battery status, and export
 diagnostics that can be shared without a source checkout.
 
 This repo is designed to work alongside the public
@@ -26,6 +26,8 @@ worked out upstream.
 - WPF Windows app for Quest install, launch, device profile, cast, and
   diagnostics workflows
 - CLI for the same core actions
+- general Quest status utilities for headset battery, controller batteries,
+  wake state, foreground app, and proximity sensor state
 - public sample catalog metadata aligned with the Rusty XR core
   `quest-app-catalog` schema
 - managed LocalAppData tool cache for Meta `hzdb`, Android platform-tools, and
@@ -80,7 +82,8 @@ dotnet run --project src/RustyXr.Companion.Cli -- devices
 dotnet run --project src/RustyXr.Companion.Cli -- tooling install-official
 dotnet run --project src/RustyXr.Companion.Cli -- wifi enable --serial <usb-serial>
 dotnet run --project src/RustyXr.Companion.Cli -- connect --endpoint 192.168.1.25:5555
-dotnet run --project src/RustyXr.Companion.Cli -- snapshot --serial <serial>
+dotnet run --project src/RustyXr.Companion.Cli -- status --serial <serial>
+dotnet run --project src/RustyXr.Companion.Cli -- snapshot --serial <serial> --json
 dotnet run --project src/RustyXr.Companion.Cli -- install --serial <serial> --apk C:\path\app.apk
 dotnet run --project src/RustyXr.Companion.Cli -- launch --serial <serial> --package com.example.questapp
 dotnet run --project src/RustyXr.Companion.Cli -- profile apply --serial <serial> --cpu 2 --gpu 2

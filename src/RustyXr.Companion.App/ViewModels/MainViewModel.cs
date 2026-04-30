@@ -33,6 +33,7 @@ public sealed class MainViewModel : ObservableObject
     private string _cpuLevel = "2";
     private string _gpuLevel = "2";
     private string _lastSnapshot = "No headset snapshot captured yet.";
+    private string _lastProximityStatus = "No proximity status read yet.";
     private string _lastVisualProof = "No visual proof captured yet.";
     private string _proximityDurationMs = "28800000";
     private string _screenshotMethod = "screencap";
@@ -86,6 +87,7 @@ public sealed class MainViewModel : ObservableObject
 
     public ObservableCollection<ToolStatus> Tools { get; } = new();
     public ObservableCollection<QuestDevice> Devices { get; } = new();
+    public ObservableCollection<QuestControllerStatus> ControllerStatuses { get; } = new();
     public ObservableCollection<QuestAppTarget> CatalogApps { get; } = new();
     public ObservableCollection<RuntimeProfile> RuntimeProfiles { get; } = new();
     public ObservableCollection<string> Log { get; } = new();
@@ -217,6 +219,12 @@ public sealed class MainViewModel : ObservableObject
     {
         get => _lastSnapshot;
         set => SetProperty(ref _lastSnapshot, value);
+    }
+
+    public string LastProximityStatus
+    {
+        get => _lastProximityStatus;
+        set => SetProperty(ref _lastProximityStatus, value);
     }
 
     public string LastVisualProof
@@ -425,18 +433,7 @@ public sealed class MainViewModel : ObservableObject
 
     private async Task SnapshotAsync()
     {
-        await RunUiActionAsync("Capturing headset snapshot...", async () =>
-        {
-            var snapshot = await _adbService.GetSnapshotAsync(SelectedSerial).ConfigureAwait(true);
-            LastSnapshot =
-                $"Serial: {snapshot.Serial}{Environment.NewLine}" +
-                $"Model: {snapshot.Model}{Environment.NewLine}" +
-                $"Battery: {snapshot.Battery}{Environment.NewLine}" +
-                $"Wakefulness: {snapshot.Wakefulness}{Environment.NewLine}" +
-                $"Foreground: {snapshot.Foreground}{Environment.NewLine}" +
-                $"Captured: {snapshot.CapturedAt:t}";
-            AddLog("Snapshot captured.");
-        }).ConfigureAwait(true);
+        await RunUiActionAsync("Refreshing headset status...", RefreshSnapshotCoreAsync).ConfigureAwait(true);
     }
 
     private Task BrowseCatalogAsync()
@@ -714,13 +711,7 @@ public sealed class MainViewModel : ObservableObject
             }
 
             var snapshot = await _adbService.GetSnapshotAsync(SelectedSerial).ConfigureAwait(true);
-            LastSnapshot =
-                $"Serial: {snapshot.Serial}{Environment.NewLine}" +
-                $"Model: {snapshot.Model}{Environment.NewLine}" +
-                $"Battery: {snapshot.Battery}{Environment.NewLine}" +
-                $"Wakefulness: {snapshot.Wakefulness}{Environment.NewLine}" +
-                $"Foreground: {snapshot.Foreground}{Environment.NewLine}" +
-                $"Captured: {snapshot.CapturedAt:t}";
+            ApplySnapshot(snapshot);
 
             var diagnostics = await _adbService.GetAppDiagnosticsAsync(SelectedSerial, PackageName).ConfigureAwait(true);
             AddLog($"Verify: running={diagnostics.ProcessRunning}; pid={diagnostics.ProcessId ?? "none"}; foreground={diagnostics.Foreground}; gfx={diagnostics.GfxInfoSummary}; memory={diagnostics.MemorySummary}");
@@ -830,19 +821,60 @@ public sealed class MainViewModel : ObservableObject
         {
             var result = await _hzdbService.WakeDeviceAsync(SelectedSerial).ConfigureAwait(true);
             AddLog(result.CondensedOutput.Length > 0 ? result.CondensedOutput : "Wake request sent.");
+            await RefreshSnapshotCoreAsync().ConfigureAwait(true);
         }).ConfigureAwait(true);
     }
 
     private async Task ReadProximityCoreAsync()
     {
         var status = await _hzdbService.GetProximityStatusAsync(SelectedSerial).ConfigureAwait(true);
-        LastVisualProof =
-            $"Proximity: {status.Detail}{Environment.NewLine}" +
+        LastProximityStatus =
+            $"{status.Detail}{Environment.NewLine}" +
             $"Virtual state: {status.VirtualState}{Environment.NewLine}" +
             $"Autosleep disabled: {status.IsAutosleepDisabled}{Environment.NewLine}" +
             $"Headset state: {status.HeadsetState}{Environment.NewLine}" +
+            $"Auto sleep: {FormatMilliseconds(status.AutoSleepTimeMs)}{Environment.NewLine}" +
             $"Hold until: {status.HoldUntil?.ToString("G") ?? "unknown"}";
         AddLog(status.Detail);
+    }
+
+    private async Task RefreshSnapshotCoreAsync()
+    {
+        var snapshot = await _adbService.GetSnapshotAsync(SelectedSerial).ConfigureAwait(true);
+        ApplySnapshot(snapshot);
+        AddLog("Headset status refreshed.");
+    }
+
+    private void ApplySnapshot(QuestSnapshot snapshot)
+    {
+        LastSnapshot =
+            $"Serial: {snapshot.Serial}{Environment.NewLine}" +
+            $"Model: {snapshot.Model}{Environment.NewLine}" +
+            $"Headset battery: {snapshot.Battery}{Environment.NewLine}" +
+            $"Power: {FormatPower(snapshot)}{Environment.NewLine}" +
+            $"Foreground: {snapshot.Foreground}{Environment.NewLine}" +
+            $"Captured: {snapshot.CapturedAt:t}";
+
+        ControllerStatuses.Clear();
+        foreach (var controller in snapshot.Controllers ?? Array.Empty<QuestControllerStatus>())
+        {
+            ControllerStatuses.Add(controller);
+        }
+
+        if (snapshot.Proximity is not null)
+        {
+            LastProximityStatus =
+                $"{snapshot.Proximity.Detail}{Environment.NewLine}" +
+                $"Virtual state: {snapshot.Proximity.VirtualState}{Environment.NewLine}" +
+                $"Autosleep disabled: {snapshot.Proximity.IsAutosleepDisabled}{Environment.NewLine}" +
+                $"Headset state: {snapshot.Proximity.HeadsetState}{Environment.NewLine}" +
+                $"Auto sleep: {FormatMilliseconds(snapshot.Proximity.AutoSleepTimeMs)}{Environment.NewLine}" +
+                $"Hold until: {snapshot.Proximity.HoldUntil?.ToString("G") ?? "unknown"}";
+        }
+        else
+        {
+            LastProximityStatus = "Proximity status was not reported by this snapshot. Use Read Proximity Status for direct readback.";
+        }
     }
 
     private async Task WriteDiagnosticsAsync()
@@ -916,6 +948,38 @@ public sealed class MainViewModel : ObservableObject
         }
 
         return profile;
+    }
+
+    private static string FormatPower(QuestSnapshot snapshot)
+    {
+        var awake = snapshot.IsAwake switch
+        {
+            true => "awake",
+            false => "asleep",
+            _ => "unknown"
+        };
+
+        var parts = new[]
+        {
+            awake,
+            string.IsNullOrWhiteSpace(snapshot.Wakefulness) ? null : $"wakefulness {snapshot.Wakefulness}",
+            snapshot.IsInteractive is null ? null : $"interactive {snapshot.IsInteractive.Value.ToString().ToLowerInvariant()}",
+            string.IsNullOrWhiteSpace(snapshot.DisplayPowerState) ? null : $"display {snapshot.DisplayPowerState}"
+        };
+
+        return string.Join("; ", parts.Where(static part => !string.IsNullOrWhiteSpace(part)));
+    }
+
+    private static string FormatMilliseconds(int? milliseconds)
+    {
+        if (milliseconds is null)
+        {
+            return "unknown";
+        }
+
+        return milliseconds.Value >= 1000
+            ? $"{milliseconds.Value / 1000d:0.#}s"
+            : $"{milliseconds.Value}ms";
     }
 
     private void RaiseCommandStates()

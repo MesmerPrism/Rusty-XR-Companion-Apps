@@ -49,17 +49,21 @@ dotnet run --project src/RustyXr.Companion.Cli -- connect --endpoint 192.168.1.2
 Then list devices again. If multiple devices are present, pass `--serial` for
 every action.
 
-## Snapshot
+## Device Status
 
-Snapshots collect safe, generic headset state:
+The WPF app has a **Device Status** tab for the selected Quest. It reads the
+same safe, generic state as the CLI:
 
 - model
-- battery summary
-- wakefulness/display state
+- headset battery summary
+- left and right controller battery summaries when `dumpsys tracking` reports them
+- wakefulness, interactivity, and display state
+- proximity sensor state from `dumpsys vrpowermanager`
 - foreground package/activity when Android reports it
 
 ```powershell
-dotnet run --project src/RustyXr.Companion.Cli -- snapshot --serial <serial>
+dotnet run --project src/RustyXr.Companion.Cli -- status --serial <serial>
+dotnet run --project src/RustyXr.Companion.Cli -- snapshot --serial <serial> --json
 ```
 
 The snapshot is not a substitute for looking inside the headset. If an app
@@ -75,6 +79,8 @@ disabling normal wear-sensor sleep behavior for a duration:
 dotnet run --project src/RustyXr.Companion.Cli -- hzdb proximity keep-awake --serial <serial> --duration-ms 28800000
 dotnet run --project src/RustyXr.Companion.Cli -- hzdb status --serial <serial>
 ```
+
+The WPF **Device Status** tab exposes the same actions as **Proximity Off / Keep Awake**, **Proximity On / Normal**, and **Read Proximity Status**.
 
 Use this state carefully. `Virtual proximity state: CLOSE` means the keep-awake
 hold is active. `Virtual proximity state: DISABLED` means normal wear-sensor

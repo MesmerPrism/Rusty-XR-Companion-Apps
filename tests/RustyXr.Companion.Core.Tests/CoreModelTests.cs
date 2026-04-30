@@ -244,6 +244,60 @@ public sealed class CoreModelTests
     }
 
     [Fact]
+    public void QuestAdbServiceParsesHeadsetPowerStatus()
+    {
+        var output = """
+            Power Manager State:
+              mWakefulness=Awake
+              mInteractive=true
+            Display Power: state=ON
+            """;
+
+        var status = QuestAdbService.ParseQuestPowerStatus(output);
+
+        Assert.Equal("Awake", status.Wakefulness);
+        Assert.True(status.IsInteractive);
+        Assert.True(status.IsAwake);
+        Assert.Equal("ON", status.DisplayPowerState);
+        Assert.Contains("wakefulness Awake", status.Detail);
+    }
+
+    [Fact]
+    public void QuestAdbServiceParsesControllerBatteryStatuses()
+    {
+        var output = """
+            Tracking state:
+              Left
+                [id: 41, conn: CONNECTED_ACTIVE, battery: 88]
+              Right -- primary
+                [id: 42, conn: CONNECTED_ACTIVE, battery: 91]
+            """;
+
+        var controllers = QuestAdbService.ParseControllerStatuses(output);
+
+        Assert.Equal(2, controllers.Count);
+        Assert.Equal("Left", controllers[0].HandLabel);
+        Assert.Equal(88, controllers[0].BatteryLevel);
+        Assert.Equal("CONNECTED_ACTIVE", controllers[0].ConnectionState);
+        Assert.Equal("Right", controllers[1].HandLabel);
+        Assert.Equal(91, controllers[1].BatteryLevel);
+    }
+
+    [Fact]
+    public void QuestAdbServiceParsesControllerStatusWhenHandAndEntryShareLine()
+    {
+        var output = """
+            Right -- [id: 99, conn: CONNECTED_IDLE, battery: 57]
+            """;
+
+        var controller = Assert.Single(QuestAdbService.ParseControllerStatuses(output));
+
+        Assert.Equal("Right", controller.HandLabel);
+        Assert.Equal(57, controller.BatteryLevel);
+        Assert.Equal("CONNECTED_IDLE", controller.ConnectionState);
+    }
+
+    [Fact]
     public async Task QuestAdbServiceLaunchPassesRuntimeProfileExtras()
     {
         var tempRoot = Path.Combine(Path.GetTempPath(), $"rusty-xr-adb-{Guid.NewGuid():N}");
