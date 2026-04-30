@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.RegularExpressions;
 
 namespace RustyXr.Companion.Core;
@@ -89,16 +90,24 @@ public sealed class QuestAdbService
         return RunAdbAsync(serial, $"install -r \"{apkPath}\"", TimeSpan.FromMinutes(4), cancellationToken);
     }
 
-    public Task<CommandResult> LaunchAsync(string serial, string packageName, string? activityName, CancellationToken cancellationToken = default)
+    public Task<CommandResult> LaunchAsync(
+        string serial,
+        string packageName,
+        string? activityName,
+        IReadOnlyDictionary<string, string>? extras = null,
+        CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(packageName))
         {
             throw new ArgumentException("Package name is required.", nameof(packageName));
         }
 
+        var extrasPart = BuildAmStartExtras(extras);
         var command = string.IsNullOrWhiteSpace(activityName)
-            ? $"shell monkey -p {ShellQuote(packageName)} -c android.intent.category.LAUNCHER 1"
-            : $"shell am start -n {ShellQuote(packageName + "/" + activityName)}";
+            ? string.IsNullOrEmpty(extrasPart)
+                ? $"shell monkey -p {ShellQuote(packageName)} -c android.intent.category.LAUNCHER 1"
+                : $"shell am start -a android.intent.action.MAIN -c android.intent.category.LAUNCHER -p {ShellQuote(packageName)}{extrasPart}"
+            : $"shell am start -n {ShellQuote(packageName + "/" + activityName)}{extrasPart}";
 
         return RunAdbAsync(serial, command, TimeSpan.FromSeconds(30), cancellationToken);
     }
@@ -111,6 +120,77 @@ public sealed class QuestAdbService
         }
 
         return RunAdbAsync(serial, $"shell am force-stop {ShellQuote(packageName)}", TimeSpan.FromSeconds(20), cancellationToken);
+    }
+
+    public Task<CommandResult> ClearLogcatAsync(string serial, CancellationToken cancellationToken = default) =>
+        RunAdbAsync(serial, "logcat -c", TimeSpan.FromSeconds(15), cancellationToken);
+
+    public async Task<string> DumpLogcatAsync(
+        string serial,
+        int lineCount,
+        CancellationToken cancellationToken = default)
+    {
+        if (lineCount is <= 0 or > 100_000)
+        {
+            throw new ArgumentOutOfRangeException(nameof(lineCount), "Line count must be between 1 and 100000.");
+        }
+
+        var result = await RunAdbAsync(
+            serial,
+            $"logcat -d -v time -t {lineCount}",
+            TimeSpan.FromSeconds(30),
+            cancellationToken).ConfigureAwait(false);
+
+        return string.Join(
+            Environment.NewLine,
+            new[] { result.StandardOutput.TrimEnd(), result.StandardError.TrimEnd() }
+                .Where(static value => !string.IsNullOrWhiteSpace(value)));
+    }
+
+    public Task<CommandResult> ReadRunAsTextFileAsync(
+        string serial,
+        string packageName,
+        string relativePath,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(packageName))
+        {
+            throw new ArgumentException("Package name is required.", nameof(packageName));
+        }
+
+        if (string.IsNullOrWhiteSpace(relativePath) || relativePath.StartsWith("/", StringComparison.Ordinal))
+        {
+            throw new ArgumentException("A relative app-private file path is required.", nameof(relativePath));
+        }
+
+        return RunAdbAsync(
+            serial,
+            $"shell run-as {ShellQuote(packageName)} cat {ShellQuote(relativePath)}",
+            TimeSpan.FromSeconds(15),
+            cancellationToken);
+    }
+
+    public Task<CommandResult> ReverseTcpAsync(
+        string serial,
+        int devicePort,
+        int hostPort,
+        CancellationToken cancellationToken = default)
+    {
+        if (devicePort is <= 0 or > 65535)
+        {
+            throw new ArgumentOutOfRangeException(nameof(devicePort), "Port must be between 1 and 65535.");
+        }
+
+        if (hostPort is <= 0 or > 65535)
+        {
+            throw new ArgumentOutOfRangeException(nameof(hostPort), "Port must be between 1 and 65535.");
+        }
+
+        return RunAdbAsync(
+            serial,
+            $"reverse tcp:{devicePort} tcp:{hostPort}",
+            TimeSpan.FromSeconds(15),
+            cancellationToken);
     }
 
     public async Task<QuestAppDiagnostics> GetAppDiagnosticsAsync(
@@ -311,4 +391,44 @@ public sealed class QuestAdbService
     }
 
     private static string ShellQuote(string value) => "'" + value.Replace("'", "'\"'\"'", StringComparison.Ordinal) + "'";
+
+    private static string BuildAmStartExtras(IReadOnlyDictionary<string, string>? extras)
+    {
+        if (extras is null || extras.Count == 0)
+        {
+            return string.Empty;
+        }
+
+        var parts = new List<string>();
+        foreach (var (key, value) in extras)
+        {
+            if (string.IsNullOrWhiteSpace(key))
+            {
+                continue;
+            }
+
+            if (bool.TryParse(value, out var boolValue))
+            {
+                parts.Add($"--ez {ShellQuote(key)} {boolValue.ToString().ToLowerInvariant()}");
+            }
+            else if (int.TryParse(value, out var intValue))
+            {
+                parts.Add($"--ei {ShellQuote(key)} {intValue}");
+            }
+            else if (long.TryParse(value, out var longValue))
+            {
+                parts.Add($"--el {ShellQuote(key)} {longValue}");
+            }
+            else if (float.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var floatValue))
+            {
+                parts.Add($"--ef {ShellQuote(key)} {floatValue.ToString(CultureInfo.InvariantCulture)}");
+            }
+            else
+            {
+                parts.Add($"--es {ShellQuote(key)} {ShellQuote(value)}");
+            }
+        }
+
+        return parts.Count == 0 ? string.Empty : " " + string.Join(' ', parts);
+    }
 }

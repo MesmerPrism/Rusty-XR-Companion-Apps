@@ -50,10 +50,10 @@ dotnet publish $projectPath `
     --runtime $RuntimeIdentifier `
     -p:PublishSingleFile=true `
     -p:SelfContained=false `
-    -p:Version=0.1.0-dev `
-    -p:AssemblyVersion=0.1.0.0 `
-    -p:FileVersion=0.1.0.0 `
-    -p:InformationalVersion=0.1.0-dev `
+    -p:Version=0.1.1-dev `
+    -p:AssemblyVersion=0.1.1.0 `
+    -p:FileVersion=0.1.1.0 `
+    -p:InformationalVersion=0.1.1-dev `
     --output $installRoot
 
 if ($LASTEXITCODE -ne 0) {

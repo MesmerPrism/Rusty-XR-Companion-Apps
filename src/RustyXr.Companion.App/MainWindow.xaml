@@ -137,7 +137,7 @@
 
                             <TextBlock Text="Device profile id" FontWeight="SemiBold" />
                             <TextBox Text="{Binding DeviceProfileId, UpdateSourceTrigger=PropertyChanged}" />
-                            <TextBlock Text="Runtime profile id (optional)" FontWeight="SemiBold" />
+                            <TextBlock Text="Runtime profile id (launch extras)" FontWeight="SemiBold" />
                             <TextBox Text="{Binding RuntimeProfileId, UpdateSourceTrigger=PropertyChanged}" />
                             <TextBlock Text="Settle time after launch (ms)" FontWeight="SemiBold" />
                             <TextBox Text="{Binding SettleMilliseconds, UpdateSourceTrigger=PropertyChanged}" Width="140" HorizontalAlignment="Left" />
@@ -147,7 +147,7 @@
                             <StackPanel>
                                 <TextBlock Text="Verifier Steps" FontWeight="SemiBold" />
                                 <TextBlock Margin="0,10,0,0"
-                                           Text="1. Resolve the APK path from the catalog.&#x0a;2. Install if the local APK exists.&#x0a;3. Apply the device profile.&#x0a;4. Launch the package/activity.&#x0a;5. Capture snapshot, process, gfxinfo, and meminfo signals." />
+                                           Text="1. Resolve the APK path from the catalog.&#x0a;2. Install if the local APK exists.&#x0a;3. Apply the device profile.&#x0a;4. Launch the package/activity with runtime-profile extras.&#x0a;5. Capture snapshot, process, gfxinfo, and meminfo signals." />
                             </StackPanel>
                         </Border>
                     </Grid>
@@ -213,6 +213,17 @@
                                 <Button Content="Start Display Cast" Command="{Binding StartCastCommand}" Width="180" />
                                 <Button Content="Install / Update Tooling" Command="{Binding InstallToolingCommand}" Width="190" />
                             </StackPanel>
+
+                            <TextBlock Text="MediaProjection Receiver" FontWeight="SemiBold" Margin="0,14,0,0" />
+                            <TextBlock Text="Use this with examples that stream display-composite frames over the Rusty XR media-pipeline protocol. Configure adb reverse first, then start the receiver and accept the headset capture prompt." Margin="0,4,0,10" />
+                            <TextBlock Text="Receiver port" />
+                            <TextBox Text="{Binding MediaPort, UpdateSourceTrigger=PropertyChanged}" Width="120" HorizontalAlignment="Left" />
+                            <TextBlock Text="Output folder" />
+                            <TextBox Text="{Binding MediaOutputRoot, UpdateSourceTrigger=PropertyChanged}" />
+                            <WrapPanel>
+                                <Button Content="ADB Reverse Media Port" Command="{Binding ReverseMediaPortCommand}" />
+                                <Button Content="Receive One Media Frame" Command="{Binding ReceiveMediaOnceCommand}" />
+                            </WrapPanel>
 
                             <TextBlock Text="Visual Inspection" FontWeight="SemiBold" Margin="0,14,0,0" />
                             <TextBlock Text="Capture a headset screenshot for agent or operator verification. screencap uses ADB first; alternate hzdb methods can be entered when needed." Margin="0,4,0,10" />

@@ -1,5 +1,9 @@
 using System.Security.Cryptography;
 using System.Text;
+using System.Buffers.Binary;
+using System.Net;
+using System.Net.Sockets;
+using System.Text.Json;
 using RustyXr.Companion.Core;
 
 namespace RustyXr.Companion.Core.Tests;
@@ -98,6 +102,40 @@ public sealed class CoreModelTests
     }
 
     [Fact]
+    public async Task CatalogLoaderPreservesHttpApkAssetUrl()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"rusty-xr-catalog-{Guid.NewGuid():N}.json");
+        await File.WriteAllTextAsync(path, """
+            {
+              "schemaVersion": "rusty.xr.quest-app-catalog.v1",
+              "apps": [
+                {
+                  "id": "example",
+                  "label": "Example",
+                  "packageName": "com.example.questapp",
+                  "activityName": ".MainActivity",
+                  "apkFile": "https://example.invalid/releases/example.apk",
+                  "description": "Example target."
+                }
+              ],
+              "deviceProfiles": [],
+              "runtimeProfiles": []
+            }
+            """);
+
+        try
+        {
+            var selection = await new CatalogLoader().SelectAppAsync(path, "example");
+
+            Assert.Equal("https://example.invalid/releases/example.apk", selection.ResolvedApkPath);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
     public void AppBuildIdentityDetectsReleaseAndDevInstallRoots()
     {
         var localAppData = Path.Combine(Path.GetTempPath(), $"rusty-xr-appdata-{Guid.NewGuid():N}");
@@ -151,6 +189,83 @@ public sealed class CoreModelTests
     public void QuestAdbServiceParsesWifiIpAddress(string output, string expectedIp)
     {
         Assert.Equal(expectedIp, QuestAdbService.TryParseWifiIpAddress(output));
+    }
+
+    [Fact]
+    public async Task QuestAdbServiceLaunchPassesRuntimeProfileExtras()
+    {
+        var tempRoot = Path.Combine(Path.GetTempPath(), $"rusty-xr-adb-{Guid.NewGuid():N}");
+        var adbPath = Path.Combine(tempRoot, "adb.exe");
+        Directory.CreateDirectory(tempRoot);
+        await File.WriteAllTextAsync(adbPath, string.Empty);
+        var previousAdb = Environment.GetEnvironmentVariable("RUSTY_XR_ADB");
+        Environment.SetEnvironmentVariable("RUSTY_XR_ADB", adbPath);
+
+        try
+        {
+            var runner = new RecordingCommandRunner();
+            var service = new QuestAdbService(new ToolLocator(runner), runner);
+
+            var result = await service.LaunchAsync(
+                "SERIAL",
+                "com.example.questapp",
+                ".MainActivity",
+                new Dictionary<string, string>
+                {
+                    ["rustyxr.camera"] = "true",
+                    ["rustyxr.cameraWidth"] = "1280",
+                    ["rustyxr.cameraRawOverlayOverscan"] = "1.06",
+                    ["rustyxr.xrRenderScale"] = "0.75",
+                    ["rustyxr.mediaProjectionDelayMs"] = "5000",
+                    ["rustyxr.source"] = "headset-camera"
+                });
+
+            Assert.True(result.Succeeded);
+            Assert.Equal(adbPath, result.FileName);
+            Assert.Contains("-s SERIAL shell am start -n 'com.example.questapp/.MainActivity'", result.Arguments);
+            Assert.Contains("--ez 'rustyxr.camera' true", result.Arguments);
+            Assert.Contains("--ei 'rustyxr.cameraWidth' 1280", result.Arguments);
+            Assert.Contains("--ef 'rustyxr.cameraRawOverlayOverscan' 1.06", result.Arguments);
+            Assert.Contains("--ef 'rustyxr.xrRenderScale' 0.75", result.Arguments);
+            Assert.Contains("--ei 'rustyxr.mediaProjectionDelayMs' 5000", result.Arguments);
+            Assert.Contains("--es 'rustyxr.source' 'headset-camera'", result.Arguments);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("RUSTY_XR_ADB", previousAdb);
+            Directory.Delete(tempRoot, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task QuestAdbServicePullsRunAsTextFile()
+    {
+        var tempRoot = Path.Combine(Path.GetTempPath(), $"rusty-xr-adb-{Guid.NewGuid():N}");
+        var adbPath = Path.Combine(tempRoot, "adb.exe");
+        Directory.CreateDirectory(tempRoot);
+        await File.WriteAllTextAsync(adbPath, string.Empty);
+        var previousAdb = Environment.GetEnvironmentVariable("RUSTY_XR_ADB");
+        Environment.SetEnvironmentVariable("RUSTY_XR_ADB", adbPath);
+
+        try
+        {
+            var runner = new RecordingCommandRunner();
+            var service = new QuestAdbService(new ToolLocator(runner), runner);
+
+            var result = await service.ReadRunAsTextFileAsync(
+                "SERIAL",
+                "com.example.questapp",
+                "files/camera-source-diagnostics.json");
+
+            Assert.True(result.Succeeded);
+            Assert.Equal(adbPath, result.FileName);
+            Assert.Contains("-s SERIAL shell run-as 'com.example.questapp' cat 'files/camera-source-diagnostics.json'", result.Arguments);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("RUSTY_XR_ADB", previousAdb);
+            Directory.Delete(tempRoot, recursive: true);
+        }
     }
 
     [Fact]
@@ -217,5 +332,147 @@ public sealed class CoreModelTests
                 "scrcpy-win64-v1.0.zip"));
         Assert.True(OfficialQuestToolingService.NeedsInstall(null, "missing.exe", "1.0", _ => false));
         Assert.False(OfficialQuestToolingService.NeedsInstall("1.0", "tool.exe", "1.0", _ => true));
+    }
+
+    [Fact]
+    public void RuntimeProfileLogValidatorRequiresRealGpuProjectionForFinalProfile()
+    {
+        var probeProfile = new RuntimeProfile(
+            "camera-gpu-buffer-probe",
+            "GPU buffer probe",
+            new Dictionary<string, string> { ["rustyxr.cameraTier"] = "gpu-buffer-probe" },
+            "Probe only.");
+        var finalProfile = new RuntimeProfile(
+            "camera-stereo-gpu-composite",
+            "Stereo GPU composite",
+            new Dictionary<string, string> { ["rustyxr.cameraTier"] = "gpu-projected" },
+            "Real stereo renderer.");
+
+        Assert.False(RuntimeProfileLogValidator.RequiresAlignedGpuProjection(probeProfile));
+        Assert.True(RuntimeProfileLogValidator.RequiresAlignedGpuProjection(finalProfile));
+        var passingLog = string.Join(
+            Environment.NewLine,
+            "Rusty XR OpenXR state FOCUSED",
+            "Rusty XR final projection status frame=1 openXrFrameCount=360 openXrFocused=true activeTier=gpu-projected alignedProjection=true stereoLayout=Separate pairedLeftRightGpuBuffers=true poseSource=estimated-profile sourceEyeMapping=display-left-from-left-source displayLeftCameraId=50 displayRightCameraId=51 leftCameraTextureTransform=rotate0 rightCameraTextureTransform=rotate0 cameraTextureTransformSource=public-check cameraTextureTransformReason=upright orientationCheck=true orientationAccepted=true cpuUploadCount=0 projectionShaderPath=projected noHardwareBufferLifetimeWarnings=true visualInspection=accepted visualReleaseAccepted=true",
+            "Rusty XR GPU stereo camera draw prepared frame=1 activeTier=gpu-projected alignedProjection=true stereoLayout=Separate pairedLeftRightGpuBuffers=true poseSource=estimated-profile leftCameraTextureTransform=rotate0 rightCameraTextureTransform=rotate0 orientationCheck=true orientationAccepted=true cpuUploadCount=0 projectionShaderPath=projected",
+            "Rusty XR OpenXR frame 360 rendered 1260x1320");
+        var releaseBlockedLog = string.Join(
+            Environment.NewLine,
+            "Rusty XR OpenXR state FOCUSED",
+            "Rusty XR final projection status frame=1 openXrFrameCount=360 openXrFocused=true activeTier=gpu-projected alignedProjection=false stereoLayout=Separate pairedLeftRightGpuBuffers=true poseSource=estimated-profile sourceEyeMapping=display-left-from-left-source displayLeftCameraId=50 displayRightCameraId=51 leftCameraTextureTransform=rotate0 rightCameraTextureTransform=rotate0 cameraTextureTransformSource=public-check cameraTextureTransformReason=upright orientationCheck=true orientationAccepted=false cpuUploadCount=0 projectionShaderPath=projected noHardwareBufferLifetimeWarnings=true visualInspection=required visualReleaseAccepted=false",
+            "Rusty XR OpenXR frame 360 rendered 1260x1320");
+        var scatteredLog = string.Join(
+            Environment.NewLine,
+            "Rusty XR final projection status frame=1 openXrFrameCount=360 openXrFocused=true activeTier=gpu-buffer-probe alignedProjection=false",
+            "activeTier=gpu-projected",
+            "alignedProjection=true",
+            "stereoLayout=Separate",
+            "poseSource=platform",
+            "pairedLeftRightGpuBuffers=true",
+            "cpuUploadCount=0");
+
+        Assert.True(RuntimeProfileLogValidator.Validate(finalProfile, passingLog).Succeeded);
+        var releaseBlockedResult = RuntimeProfileLogValidator.Validate(finalProfile, releaseBlockedLog);
+        Assert.False(releaseBlockedResult.Succeeded);
+        Assert.Contains("observed activeTier=gpu-projected alignedProjection=false", releaseBlockedResult.Detail);
+        Assert.Contains("manual visual release acceptance", releaseBlockedResult.Detail);
+        Assert.False(RuntimeProfileLogValidator.Validate(
+            finalProfile,
+            "Rusty XR final projection status frame=1 openXrFrameCount=360 openXrFocused=true activeTier=gpu-projected alignedProjection=true stereoLayout=Separate pairedLeftRightGpuBuffers=true poseSource=estimated-profile cpuUploadCount=0 projectionShaderPath=projected noHardwareBufferLifetimeWarnings=true").Succeeded);
+        Assert.False(RuntimeProfileLogValidator.Validate(finalProfile, "activeTier=gpu-buffer-probe alignedProjection=false").Succeeded);
+        Assert.False(RuntimeProfileLogValidator.Validate(finalProfile, scatteredLog).Succeeded);
+        Assert.False(RuntimeProfileLogValidator.Validate(finalProfile, null).Succeeded);
+    }
+
+    [Fact]
+    public void CameraSourceDiagnosticsLogExtractorReadsJsonPayload()
+    {
+        var logcat = "04-29 I/RustyXrHeadsetCamera: Rusty XR camera source diagnostics JSON: {\"schemaVersion\":\"rusty.xr.camera-source-diagnostics.v1\",\"selectedStereoPairScore\":42,\"selectedStereoPairReason\":\"selected concurrent-separate 50/51\",\"sources\":[{\"cameraId\":\"50\",\"intrinsicCalibration\":[1,2,3,4,0],\"lensPoseTranslation\":[0.01,0.0,0.02],\"lensPoseRotation\":[0,0,0,1],\"lensPoseReference\":1}],\"stereoCandidates\":[{\"providerKind\":\"concurrent-separate\",\"leftCameraId\":\"50\",\"rightCameraId\":\"51\",\"accepted\":true,\"score\":42,\"reason\":\"accepted\"}]}";
+
+        Assert.True(CameraSourceDiagnosticsLogExtractor.TryExtract(logcat, out var json));
+        using var document = JsonDocument.Parse(json);
+        Assert.Equal(
+            "rusty.xr.camera-source-diagnostics.v1",
+            document.RootElement.GetProperty("schemaVersion").GetString());
+        Assert.Equal(42, document.RootElement.GetProperty("selectedStereoPairScore").GetInt32());
+        var source = document.RootElement.GetProperty("sources")[0];
+        Assert.Equal(5, source.GetProperty("intrinsicCalibration").GetArrayLength());
+        Assert.Equal(3, source.GetProperty("lensPoseTranslation").GetArrayLength());
+        Assert.Equal(4, source.GetProperty("lensPoseRotation").GetArrayLength());
+    }
+
+    [Fact]
+    public void CameraSourceDiagnosticsLogExtractorRejectsTruncatedPayload()
+    {
+        var logcat = "04-29 I/RustyXrHeadsetCamera: Rusty XR camera source diagnostics JSON: {\"schemaVersion\":\"rusty.xr.camera-source-diagnostics.v1\",\"sources\":[";
+
+        Assert.False(CameraSourceDiagnosticsLogExtractor.TryExtract(logcat, out _));
+    }
+
+    [Fact]
+    public async Task MediaFrameReceiverWritesPayloadAndLedger()
+    {
+        var port = GetFreeTcpPort();
+        var root = Path.Combine(Path.GetTempPath(), $"rusty-xr-media-{Guid.NewGuid():N}");
+        var receiver = new MediaFrameReceiverService();
+        var receiveTask = receiver.ReceiveAsync("127.0.0.1", port, root, once: true);
+        await Task.Delay(100);
+
+        using (var client = new TcpClient())
+        {
+            await client.ConnectAsync(IPAddress.Loopback, port);
+            await using var stream = client.GetStream();
+            var payload = new byte[] { 1, 2, 3, 4 };
+            var header = JsonSerializer.Serialize(new
+            {
+                byte_len = payload.Length,
+                frame_index = 7,
+                timestamp_ns = 123L,
+                width = 1,
+                height = 1,
+                format = "rgba8888",
+                stream = "display_composite"
+            });
+            var headerBytes = Encoding.UTF8.GetBytes(header);
+            var prefix = new byte[4];
+            BinaryPrimitives.WriteUInt32LittleEndian(prefix, (uint)headerBytes.Length);
+            await stream.WriteAsync(prefix);
+            await stream.WriteAsync(headerBytes);
+            await stream.WriteAsync(payload);
+        }
+
+        var result = await receiveTask;
+
+        try
+        {
+            Assert.Equal(1, result.FrameCount);
+            Assert.Equal("display_composite", result.Frames[0].Stream);
+            Assert.True(File.Exists(result.Frames[0].PayloadPath));
+            Assert.True(File.Exists(Path.Combine(root, "frames.jsonl")));
+            Assert.Equal(new byte[] { 1, 2, 3, 4 }, await File.ReadAllBytesAsync(result.Frames[0].PayloadPath));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    private static int GetFreeTcpPort()
+    {
+        var listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        var port = ((IPEndPoint)listener.LocalEndpoint).Port;
+        listener.Stop();
+        return port;
+    }
+
+    private sealed class RecordingCommandRunner : ICommandRunner
+    {
+        public Task<CommandResult> RunAsync(
+            string fileName,
+            string arguments,
+            TimeSpan timeout,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(new CommandResult(fileName, arguments, 0, string.Empty, string.Empty, TimeSpan.Zero));
     }
 }

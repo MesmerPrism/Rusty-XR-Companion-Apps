@@ -14,12 +14,32 @@ The sample uses `schemaVersion: "rusty.xr.quest-app-catalog.v1"`, matching the
 public Rusty XR core schema exporter. Keep APK bytes out of the sample folder
 unless a future release explicitly enables a public large-asset lane.
 
-The sample includes a `rusty-xr-quest-minimal` entry that points at the sibling
-Rusty-XR checkout's ignored build output:
+The sample includes `rusty-xr-quest-minimal` and
+`rusty-xr-quest-composite-layer` entries that point at sibling Rusty-XR
+checkout ignored build outputs:
 
 ```text
 ../../../Rusty-XR/examples/quest-minimal-apk/build/outputs/rusty-xr-quest-minimal-debug.apk
+../../../Rusty-XR/examples/quest-composite-layer-apk/build/outputs/rusty-xr-quest-composite-layer-debug.apk
 ```
 
-Build that APK in Rusty-XR first, then install or verify it through the
-Companion catalog commands.
+Build the APKs in Rusty-XR first, then install or verify them through the
+Companion catalog commands. The composite-layer example uses runtime profiles
+for `synthetic-composite-layer`, `camera-source-diagnostics`,
+`camera-diagnostic-cpu-copy`, `camera-gpu-buffer-probe`,
+`camera-stereo-gpu-composite`, and optional `media-projection-stream`.
+
+The Tier 1 CPU profile is a mono diagnostic flat camera copy with a throttled
+CPU upload cadence. The GPU-buffer probe requests Camera2 `PRIVATE` hardware
+buffers, imports them for Vulkan sampling with CPU fallback disabled, and logs
+any remaining projection blockers instead of claiming true stereo or
+camera/view alignment without active metadata-backed projection. The final
+stereo profile is the accepted public raw-camera reference for the tested Quest
+Camera2 provider: one projection-status line must report paired left/right GPU
+buffers, `activeTier=gpu-projected`, `alignedProjection=true`, zero CPU
+diagnostic upload, OpenXR focus/frame evidence, platform or public
+estimated-profile pose metadata, explicit per-eye texture orientation, and
+manual visual acceptance. For new headset firmware or device variants, rerun
+camera diagnostics and treat the manual visual gate as open until the feed is
+upright, the per-eye content is not swapped or divergent, and the public soft
+projection-feedback border is visible.

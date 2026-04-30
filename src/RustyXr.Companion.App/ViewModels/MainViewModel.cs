@@ -35,6 +35,11 @@ public sealed class MainViewModel : ObservableObject
     private string _lastVisualProof = "No visual proof captured yet.";
     private string _proximityDurationMs = "28800000";
     private string _screenshotMethod = "screencap";
+    private string _mediaPort = "8787";
+    private string _mediaOutputRoot = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        "RustyXrCompanion",
+        "media-stream");
     private QuestSessionCatalog? _catalog;
     private QuestAppTarget? _selectedCatalogApp;
 
@@ -65,6 +70,8 @@ public sealed class MainViewModel : ObservableObject
         StopCommand = new AsyncRelayCommand(StopAsync, HasSerial);
         ApplyProfileCommand = new AsyncRelayCommand(ApplyProfileAsync, HasSerial);
         StartCastCommand = new AsyncRelayCommand(StartCastAsync, HasSerial);
+        ReverseMediaPortCommand = new AsyncRelayCommand(ReverseMediaPortAsync, HasSerial);
+        ReceiveMediaOnceCommand = new AsyncRelayCommand(ReceiveMediaOnceAsync);
         CaptureScreenshotCommand = new AsyncRelayCommand(CaptureScreenshotAsync, HasSerial);
         KeepAwakeCommand = new AsyncRelayCommand(KeepAwakeAsync, HasSerial);
         RestoreProximityCommand = new AsyncRelayCommand(RestoreProximityAsync, HasSerial);
@@ -221,12 +228,26 @@ public sealed class MainViewModel : ObservableObject
     public AsyncRelayCommand StopCommand { get; }
     public AsyncRelayCommand ApplyProfileCommand { get; }
     public AsyncRelayCommand StartCastCommand { get; }
+    public AsyncRelayCommand ReverseMediaPortCommand { get; }
+    public AsyncRelayCommand ReceiveMediaOnceCommand { get; }
     public AsyncRelayCommand CaptureScreenshotCommand { get; }
     public AsyncRelayCommand KeepAwakeCommand { get; }
     public AsyncRelayCommand RestoreProximityCommand { get; }
     public AsyncRelayCommand ReadProximityCommand { get; }
     public AsyncRelayCommand WakeHeadsetCommand { get; }
     public AsyncRelayCommand DiagnosticsCommand { get; }
+
+    public string MediaPort
+    {
+        get => _mediaPort;
+        set => SetProperty(ref _mediaPort, value);
+    }
+
+    public string MediaOutputRoot
+    {
+        get => _mediaOutputRoot;
+        set => SetProperty(ref _mediaOutputRoot, value);
+    }
 
     public async Task InitializeAsync()
     {
@@ -515,10 +536,10 @@ public sealed class MainViewModel : ObservableObject
                 }
             }
 
-            if (!string.IsNullOrWhiteSpace(RuntimeProfileId) &&
-                !_catalog.RuntimeProfiles.Any(profile => string.Equals(profile.Id, RuntimeProfileId, StringComparison.OrdinalIgnoreCase)))
+            var runtimeProfile = ResolveRuntimeProfile(_catalog, RuntimeProfileId);
+            if (runtimeProfile is not null)
             {
-                throw new InvalidOperationException($"Runtime profile '{RuntimeProfileId}' was not found.");
+                AddLog($"Using runtime profile: {runtimeProfile.Label}");
             }
 
             if (!string.IsNullOrWhiteSpace(ApkPath) && File.Exists(ApkPath))
@@ -531,7 +552,11 @@ public sealed class MainViewModel : ObservableObject
                 AddLog("Catalog APK path is missing; skipping install and verifying the installed package.");
             }
 
-            var launch = await _adbService.LaunchAsync(SelectedSerial, PackageName, string.IsNullOrWhiteSpace(ActivityName) ? null : ActivityName).ConfigureAwait(true);
+            var launch = await _adbService.LaunchAsync(
+                SelectedSerial,
+                PackageName,
+                string.IsNullOrWhiteSpace(ActivityName) ? null : ActivityName,
+                runtimeProfile?.Values).ConfigureAwait(true);
             AddLog(launch.CondensedOutput);
 
             var settleMs = int.TryParse(SettleMilliseconds, out var parsedSettle) ? parsedSettle : 2500;
@@ -562,6 +587,36 @@ public sealed class MainViewModel : ObservableObject
             AddLog($"Started scrcpy process {session.ProcessId}.");
             return Task.CompletedTask;
         });
+    }
+
+    private async Task ReverseMediaPortAsync()
+    {
+        await RunUiActionAsync("Configuring MediaProjection adb reverse...", async () =>
+        {
+            var port = int.TryParse(MediaPort, out var parsedPort) ? parsedPort : MediaFrameReceiverService.DefaultPort;
+            var result = await _adbService.ReverseTcpAsync(SelectedSerial, port, port).ConfigureAwait(true);
+            AddLog(result.CondensedOutput.Length > 0
+                ? result.CondensedOutput
+                : $"ADB reverse configured for tcp:{port}.");
+        }).ConfigureAwait(true);
+    }
+
+    private async Task ReceiveMediaOnceAsync()
+    {
+        await RunUiActionAsync("Waiting for one media frame...", async () =>
+        {
+            var port = int.TryParse(MediaPort, out var parsedPort) ? parsedPort : MediaFrameReceiverService.DefaultPort;
+            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+            var result = await new MediaFrameReceiverService()
+                .ReceiveAsync("127.0.0.1", port, MediaOutputRoot, once: true, timeout.Token)
+                .ConfigureAwait(true);
+            AddLog($"Media receiver captured {result.FrameCount} frame(s) under {result.OutputDirectory}.");
+            LastVisualProof =
+                $"Media receiver: {result.FrameCount} frame(s){Environment.NewLine}" +
+                $"Port: {result.Port}{Environment.NewLine}" +
+                $"Output: {result.OutputDirectory}{Environment.NewLine}" +
+                $"Latest: {result.Frames.LastOrDefault()?.PayloadPath ?? "none"}";
+        }).ConfigureAwait(true);
     }
 
     private async Task CaptureScreenshotAsync()
@@ -675,6 +730,23 @@ public sealed class MainViewModel : ObservableObject
     private bool HasCatalogApp() => SelectedCatalogApp is not null;
     private bool HasSerialAndCatalogApp() => HasSerial() && HasCatalogApp();
 
+    private static RuntimeProfile? ResolveRuntimeProfile(QuestSessionCatalog catalog, string? runtimeProfileId)
+    {
+        if (string.IsNullOrWhiteSpace(runtimeProfileId))
+        {
+            return null;
+        }
+
+        var profile = catalog.RuntimeProfiles.FirstOrDefault(profile =>
+            string.Equals(profile.Id, runtimeProfileId, StringComparison.OrdinalIgnoreCase));
+        if (profile is null)
+        {
+            throw new InvalidOperationException($"Runtime profile '{runtimeProfileId}' was not found.");
+        }
+
+        return profile;
+    }
+
     private void RaiseCommandStates()
     {
         EnableWifiAdbCommand.RaiseCanExecuteChanged();
@@ -685,6 +757,7 @@ public sealed class MainViewModel : ObservableObject
         StopCommand.RaiseCanExecuteChanged();
         ApplyProfileCommand.RaiseCanExecuteChanged();
         StartCastCommand.RaiseCanExecuteChanged();
+        ReverseMediaPortCommand.RaiseCanExecuteChanged();
         CaptureScreenshotCommand.RaiseCanExecuteChanged();
         KeepAwakeCommand.RaiseCanExecuteChanged();
         RestoreProximityCommand.RaiseCanExecuteChanged();

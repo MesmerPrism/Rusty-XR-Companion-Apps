@@ -5,7 +5,9 @@ nav_order: 9
 
 # Release Workflow
 
-The first release lane is portable and does not require an APK payload.
+The release lane is portable and does not commit APK payloads. Catalog entries
+can still point at GitHub Release APK assets, which the CLI downloads to its
+managed LocalAppData cache before install.
 Published release installs and local dev installs are intentionally separate.
 
 The GitHub workflow:
