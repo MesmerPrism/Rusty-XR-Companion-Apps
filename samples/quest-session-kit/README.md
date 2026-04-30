@@ -27,7 +27,9 @@ Build the APKs in Rusty-XR first, then install or verify them through the
 Companion catalog commands. The composite-layer example uses runtime profiles
 for `synthetic-composite-layer`, `camera-source-diagnostics`,
 `camera-diagnostic-cpu-copy`, `camera-gpu-buffer-probe`,
-`camera-stereo-gpu-composite`, and optional `media-projection-stream`.
+`camera-stereo-gpu-composite`,
+`camera-stereo-gpu-composite-quad-surface`, and optional
+`media-projection-stream`.
 
 The Tier 1 CPU profile is a mono diagnostic flat camera copy with a throttled
 CPU upload cadence. The GPU-buffer probe requests Camera2 `PRIVATE` hardware
@@ -43,3 +45,13 @@ manual visual acceptance. For new headset firmware or device variants, rerun
 camera diagnostics and treat the manual visual gate as open until the feed is
 upright, the per-eye content is not swapped or divergent, and the public soft
 projection-feedback border is visible.
+The quad-surface profile is an A/B comparison path for projection geometry and
+color handling; it keeps the same stereo GPU-buffer source and manual visual
+gate while selecting `rustyxr.cameraProjectionMode=quad-surface` to reconstruct
+the content-surface UV a head-anchored quad would rasterize. It also selects
+`rustyxr.cameraColorMode=external-rgb` with a small public
+contrast/brightness lift so the projected camera feed and border feedback use
+the same normalized shader color domain. The profile is useful for
+collaboration, but it is not yet the final performance or color reference;
+keep the manual visual gate closed while investigating remaining performance
+and tone differences.

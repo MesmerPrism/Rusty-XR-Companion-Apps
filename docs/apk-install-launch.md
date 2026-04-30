@@ -118,6 +118,33 @@ head-motion projection, and a visible camera-driven border. New device/runtime
 variants should rerun diagnostics and keep that manual visual gate closed until
 the same conditions are inspected again.
 
+For projection A/B checks, use `camera-stereo-gpu-composite-quad-surface`.
+It keeps the same GPU-buffer stereo camera path and visual gate, but passes
+`rustyxr.cameraProjectionMode=quad-surface` so the renderer reconstructs the
+content-surface UV that a head-anchored quad would rasterize before camera
+projection. It also passes
+`rustyxr.cameraColorMode=external-rgb` plus a small public
+contrast/brightness lift. Compare it with the default
+`display-screen-homography` mode when investigating projection geometry,
+sampler, tone, or color differences. This profile is intentionally not marked
+as the final performance or color reference; keep
+`visualReleaseAccepted=false` until a headset/cast inspection confirms the
+remaining mode-specific differences are acceptable.
+
+Camera delivery cadence is controlled through ordinary catalog launch extras.
+The public Quest composite sample accepts `rustyxr.cameraTargetFps` or
+`rustyxr.cameraFpsMin` / `rustyxr.cameraFpsMax` and forwards the nearest
+supported value to Camera2 `CONTROL_AE_TARGET_FPS_RANGE`. The companion does
+not treat that as a hard frame-rate guarantee; inspect logcat lines beginning
+with `Camera2 AE FPS range` and `Camera2 delivery stats` to compare requested,
+applied, and observed camera-buffer cadence. The current Quest 3S stereo
+Camera2 validation found that `30-30` delivered about `29.85 FPS`, while
+`60-60` was accepted by Camera2 but delivered about `49.9 FPS` in the paired
+`1280x1280` GPU-buffer profile. This matches Android's
+[`CONTROL_AE_TARGET_FPS_RANGE`](https://developer.android.com/reference/android/hardware/camera2/CaptureRequest#CONTROL_AE_TARGET_FPS_RANGE)
+warning that actual max frame rate can still be capped by stream
+min-frame-duration and runtime constraints.
+
 If the headset shows `Select view you want to share`, select `Entire view` and
 press `Share` in the headset. The companion intentionally treats that panel as
 manual because current Quest system UI does not reliably accept shell-driven
