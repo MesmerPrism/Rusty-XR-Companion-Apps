@@ -708,7 +708,7 @@ internal static class CliProgram
     }
 
     private static string CatalogPath(ArgOptions options) =>
-        options.ValueOrNull("--path") ?? Path.Combine("samples", "quest-session-kit", "apk-catalog.example.json");
+        options.ValueOrNull("--path") ?? CompanionContentLayout.DefaultOrFallbackCatalogPath();
 
     private static Task<CatalogAppSelection> CatalogSelectionAsync(ArgOptions options) =>
         new CatalogLoader().SelectAppAsync(CatalogPath(options), Required(options, "--app"));

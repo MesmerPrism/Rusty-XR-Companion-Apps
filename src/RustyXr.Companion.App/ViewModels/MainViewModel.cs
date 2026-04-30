@@ -3,6 +3,7 @@ using System.IO;
 using Microsoft.Win32;
 using RustyXr.Companion.Core;
 using RustyXr.Companion.Diagnostics;
+using RustyXr.Companion.Windows;
 
 namespace RustyXr.Companion.App.ViewModels;
 
@@ -22,7 +23,7 @@ public sealed class MainViewModel : ObservableObject
     private string _updateStatus;
     private string _selectedSerial = string.Empty;
     private string _endpoint = "192.168.1.2:5555";
-    private string _catalogPath = Path.Combine("samples", "quest-session-kit", "apk-catalog.example.json");
+    private string _catalogPath = CompanionContentLayout.DefaultOrFallbackCatalogPath();
     private string _apkPath = string.Empty;
     private string _packageName = "com.example.questapp";
     private string _activityName = string.Empty;
@@ -251,9 +252,31 @@ public sealed class MainViewModel : ObservableObject
 
     public async Task InitializeAsync()
     {
+        RepairReleaseInstallRegistration();
         await CheckForReleaseUpdateAsync().ConfigureAwait(true);
+        await LoadDefaultCatalogIfAvailableAsync().ConfigureAwait(true);
         await RefreshToolsAsync().ConfigureAwait(true);
         await RefreshDevicesAsync().ConfigureAwait(true);
+    }
+
+    private void RepairReleaseInstallRegistration()
+    {
+        if (_buildIdentity.Channel != AppInstallChannel.Release ||
+            string.IsNullOrWhiteSpace(_buildIdentity.InstallRoot))
+        {
+            return;
+        }
+
+        try
+        {
+            PortableInstallRegistration.CreateReleaseShortcut(_buildIdentity.InstallRoot);
+            PortableInstallRegistration.RegisterReleaseInstall(_buildIdentity.InstallRoot, _buildIdentity.CurrentVersion);
+            AddLog("Release uninstall registration checked.");
+        }
+        catch (Exception exception)
+        {
+            AddLog($"Release uninstall registration skipped: {exception.Message}");
+        }
     }
 
     private async Task CheckForReleaseUpdateAsync()
@@ -411,20 +434,50 @@ public sealed class MainViewModel : ObservableObject
     {
         await RunUiActionAsync("Loading catalog...", async () =>
         {
-            _catalog = await _catalogLoader.LoadAsync(CatalogPath).ConfigureAwait(true);
-            CatalogApps.Clear();
-            foreach (var app in _catalog.Apps)
-            {
-                CatalogApps.Add(app);
-            }
-
-            SelectedCatalogApp = CatalogApps.FirstOrDefault();
-            AddLog($"Loaded {CatalogApps.Count} catalog app(s).");
-            if (SelectedCatalogApp is not null)
-            {
-                await UseCatalogAppAsync().ConfigureAwait(true);
-            }
+            await LoadCatalogCoreAsync().ConfigureAwait(true);
         }).ConfigureAwait(true);
+    }
+
+    private async Task LoadDefaultCatalogIfAvailableAsync()
+    {
+        if (!CompanionContentLayout.BundledCompositeCatalogIsComplete())
+        {
+            AddLog("Bundled release catalog/APK pair not found; use Browse or Load for a local catalog.");
+            return;
+        }
+
+        try
+        {
+            CatalogPath = CompanionContentLayout.DefaultCatalogPath();
+            DeviceProfileId = CompanionContentLayout.DefaultDeviceProfileId;
+            RuntimeProfileId = CompanionContentLayout.DefaultRuntimeProfileId;
+            await LoadCatalogCoreAsync(CompanionContentLayout.DefaultCatalogAppId).ConfigureAwait(true);
+            AddLog("Bundled Rusty XR composite-layer catalog loaded.");
+        }
+        catch (Exception exception)
+        {
+            AddLog($"Bundled release catalog could not be loaded: {exception.Message}");
+        }
+    }
+
+    private async Task LoadCatalogCoreAsync(string? preferredAppId = null)
+    {
+        _catalog = await _catalogLoader.LoadAsync(CatalogPath).ConfigureAwait(true);
+        CatalogApps.Clear();
+        foreach (var app in _catalog.Apps)
+        {
+            CatalogApps.Add(app);
+        }
+
+        SelectedCatalogApp = string.IsNullOrWhiteSpace(preferredAppId)
+            ? CatalogApps.FirstOrDefault()
+            : CatalogApps.FirstOrDefault(app => string.Equals(app.Id, preferredAppId, StringComparison.OrdinalIgnoreCase))
+              ?? CatalogApps.FirstOrDefault();
+        AddLog($"Loaded {CatalogApps.Count} catalog app(s).");
+        if (SelectedCatalogApp is not null)
+        {
+            await UseCatalogAppAsync().ConfigureAwait(true);
+        }
     }
 
     private Task UseCatalogAppAsync()

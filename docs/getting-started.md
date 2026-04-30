@@ -61,14 +61,18 @@ dotnet run --project src/RustyXr.Companion.Cli -- snapshot --serial <serial>
 dotnet run --project src/RustyXr.Companion.Cli -- wifi enable --serial <usb-serial>
 ```
 
-## No Bundled APK
+## APKs
 
-This first release does not bundle an APK. Install a local APK file from the
-WPF app or CLI:
+Published Windows installs include the public Rusty XR Quest camera
+composite-layer APK and auto-load its catalog on startup, so the target is
+already listed in **Catalog Verify** after setup.
+
+Source builds do not commit APK bytes. Install a local APK file from the WPF
+app or CLI:
 
 ```powershell
 dotnet run --project src/RustyXr.Companion.Cli -- install --serial <serial> --apk C:\path\your-app.apk
 ```
 
-See [Git LFS and assets](lfs-and-assets.md) for why this repo includes LFS
-patterns but avoids committing APK bytes by default.
+See [Git LFS and assets](lfs-and-assets.md) for why release packaging can
+bundle generated public APK assets without committing APK bytes to the repo.

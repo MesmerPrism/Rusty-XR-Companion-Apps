@@ -21,9 +21,9 @@ Use it when you need to:
 - capture headset screenshots and read proximity keep-awake state
 - export diagnostics that another developer can inspect
 
-The app is intentionally generic. It does not bundle a private runtime or assume
-one target package. You can use a local APK path, a public catalog file, or the
-CLI.
+The app is intentionally generic. It does not bundle a private runtime. The
+published Windows install includes the public Rusty XR camera composite-layer
+example and still supports local APK paths, public catalog files, and the CLI.
 
 ## Start Here
 

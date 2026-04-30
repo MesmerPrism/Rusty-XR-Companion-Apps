@@ -12,9 +12,11 @@ TestResults/
 *.nupkg
 *.snupkg
 
-# The first public release is designed for user-supplied APKs and local catalogs.
+# Release packaging may bundle approved generated APKs from release assets.
 # Do not commit APK bytes unless a future release deliberately enables LFS for
 # an approved public sample.
+catalogs/apks/*.apk
+catalogs/apks/*.aab
 samples/quest-session-kit/APKs/*.apk
 samples/quest-session-kit/APKs/*.aab
 

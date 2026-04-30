@@ -6,6 +6,11 @@ nav_order: 4
 # APK Install And Launch
 
 The companion installs local APKs and launches package targets through ADB.
+Published Windows installs also include the public Rusty XR Quest camera
+composite-layer APK. On first launch, the WPF app auto-loads the bundled
+catalog from `catalogs/rusty-xr-quest-composite-layer.catalog.json`, selects
+the `rusty-xr-quest-composite-layer` app, and resolves the bundled APK under
+`catalogs/apks/`.
 
 ## Install
 
@@ -38,8 +43,10 @@ dotnet run --project src/RustyXr.Companion.Cli -- stop --serial <serial> --packa
 ## Catalogs
 
 Catalogs are public JSON metadata, not a requirement to commit APK bytes. The
-example catalog under `samples/quest-session-kit/` uses placeholder package
-data so downstream projects can adapt the format safely.
+published app payload has a default release catalog for the bundled composite
+APK. The example catalog under `samples/quest-session-kit/` still uses local
+build-output paths so downstream projects can adapt the format safely from
+source.
 
 The catalog shape is aligned with Rusty XR core's `quest-app-catalog` schema.
 Use `schemaVersion: "rusty.xr.quest-app-catalog.v1"` for new public catalogs.

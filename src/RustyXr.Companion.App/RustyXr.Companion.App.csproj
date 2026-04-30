@@ -3,6 +3,17 @@
   <ItemGroup>
     <ProjectReference Include="..\RustyXr.Companion.Core\RustyXr.Companion.Core.csproj" />
     <ProjectReference Include="..\RustyXr.Companion.Diagnostics\RustyXr.Companion.Diagnostics.csproj" />
+    <ProjectReference Include="..\RustyXr.Companion.Windows\RustyXr.Companion.Windows.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="Assets\RustyXrCompanion.ico" />
+    <Resource Include="Assets\RustyXrCompanion.png" />
+    <Content Include="..\..\catalogs\**\*">
+      <Link>catalogs\%(RecursiveDir)%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
   </ItemGroup>
 
   <PropertyGroup>
@@ -11,6 +22,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
+    <ApplicationIcon>Assets\RustyXrCompanion.ico</ApplicationIcon>
   </PropertyGroup>
 
 </Project>

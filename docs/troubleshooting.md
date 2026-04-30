@@ -104,3 +104,15 @@ not by itself mean capture failed.
 The setup helper may be self-signed in preview releases. Some Windows security
 policies can block a downloaded helper even when the binary is signed. Use the
 portable zip or source build path if that happens.
+
+## Uninstall Entry Is Missing
+
+Release builds repair the per-user uninstall entry on startup. Launch the
+installed app once, then check Windows Settings again.
+
+If the app cannot launch, download `RustyXrCompanion-Setup.exe` from the
+release page and choose **Uninstall**. As a manual fallback, remove
+`%LOCALAPPDATA%\Programs\RustyXrCompanion` and the `Rusty XR Companion`
+release shortcut from the Start Menu. Remove `%LOCALAPPDATA%\RustyXrCompanion`
+only if you also want to delete managed Quest tooling, diagnostics, APK cache,
+screenshots, and media captures.

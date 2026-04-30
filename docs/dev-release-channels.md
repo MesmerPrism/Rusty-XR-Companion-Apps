@@ -20,6 +20,23 @@ Releases. The app checks the latest public release on startup and, when a newer
 portable app zip is available, launches a small updater that replaces this
 install root and restarts the app.
 
+The release launcher with the Companion icon is created at:
+
+```text
+%APPDATA%\Microsoft\Windows\Start Menu\Programs\Rusty XR Companion\Rusty XR Companion.url
+```
+
+The release app zip also carries the bundled public Rusty XR Quest camera
+composite-layer catalog and APK under the install root's `catalogs\` folder.
+Because auto-update replaces the install root from the latest app zip, updated
+catalog/APK payloads arrive through the same release update path.
+
+The release install registers a per-user Windows uninstall entry. Uninstalling
+the release channel removes `%LOCALAPPDATA%\Programs\RustyXrCompanion` and the
+release Start Menu shortcut. Managed tooling, diagnostics, and APK caches under
+`%LOCALAPPDATA%\RustyXrCompanion` are kept unless the setup helper's purge
+option is selected.
+
 The setup helper and docs always use `releases/latest/download/...` URLs, so a
 new GitHub release becomes the source of truth for both new installs and
 existing release installs.
@@ -42,6 +59,9 @@ The dev install lives under:
 It creates a separate `Rusty XR Companion Dev` Start Menu shortcut and does not
 auto-update from GitHub Releases. Re-run the script whenever you want the local
 dev install to reflect the current source tree.
+
+Release uninstall does not remove this dev install or the `Rusty XR Companion
+Dev` shortcut.
 
 ## Source Run
 

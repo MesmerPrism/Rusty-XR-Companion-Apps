@@ -6,6 +6,7 @@
         Height="760"
         MinWidth="940"
         MinHeight="620"
+        Icon="Assets/RustyXrCompanion.ico"
         Background="#F7F7F4"
         Foreground="#1E2328">
     <Window.Resources>
@@ -34,19 +35,26 @@
     <DockPanel>
         <Border DockPanel.Dock="Top" Background="#20242A" Padding="18,14">
             <DockPanel>
-                <StackPanel DockPanel.Dock="Left">
-                    <TextBlock Text="Rusty XR Companion"
-                               Foreground="#FFFFFF"
-                               FontSize="22"
-                               FontWeight="SemiBold" />
-                    <TextBlock Text="Public Windows utility for Quest install, launch, device checks, casting, and diagnostics."
-                               Foreground="#D9E2EA"
-                               Margin="0,3,0,0" />
-                    <TextBlock Foreground="#AFC1D0" Margin="0,3,0,0">
-                        <Run Text="{Binding BuildLabel}" />
-                        <Run Text=" | " />
-                        <Run Text="{Binding UpdateStatus}" />
-                    </TextBlock>
+                <StackPanel DockPanel.Dock="Left" Orientation="Horizontal">
+                    <Image Source="Assets/RustyXrCompanion.png"
+                           Width="52"
+                           Height="52"
+                           Margin="0,0,14,0"
+                           VerticalAlignment="Center" />
+                    <StackPanel>
+                        <TextBlock Text="Rusty XR Companion"
+                                   Foreground="#FFFFFF"
+                                   FontSize="22"
+                                   FontWeight="SemiBold" />
+                        <TextBlock Text="Public Windows utility for Quest install, launch, device checks, casting, and diagnostics."
+                                   Foreground="#D9E2EA"
+                                   Margin="0,3,0,0" />
+                        <TextBlock Foreground="#AFC1D0" Margin="0,3,0,0">
+                            <Run Text="{Binding BuildLabel}" />
+                            <Run Text=" | " />
+                            <Run Text="{Binding UpdateStatus}" />
+                        </TextBlock>
+                    </StackPanel>
                 </StackPanel>
                 <TextBlock DockPanel.Dock="Right"
                            Text="{Binding Status}"
@@ -147,7 +155,7 @@
                             <StackPanel>
                                 <TextBlock Text="Verifier Steps" FontWeight="SemiBold" />
                                 <TextBlock Margin="0,10,0,0"
-                                           Text="1. Resolve the APK path from the catalog.&#x0a;2. Install if the local APK exists.&#x0a;3. Apply the device profile.&#x0a;4. Launch the package/activity with runtime-profile extras.&#x0a;5. Capture snapshot, process, gfxinfo, and meminfo signals." />
+                                           Text="1. Resolve the APK path from the catalog.&#x0a;2. Install if the resolved APK exists.&#x0a;3. Apply the device profile.&#x0a;4. Launch the package/activity with runtime-profile extras.&#x0a;5. Capture snapshot, process, gfxinfo, and meminfo signals." />
                             </StackPanel>
                         </Border>
                     </Grid>

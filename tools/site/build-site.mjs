@@ -69,12 +69,18 @@ function renderPage(page, pages) {
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>${escapeHtml(page.title)} - Rusty XR Companion</title>
+  <link rel="icon" href="assets/favicon.ico">
   <link rel="stylesheet" href="assets/site.css">
 </head>
 <body>
   <header>
-    <h1>Rusty XR Companion</h1>
-    <p>Windows and Android companion utilities for public Quest development workflows.</p>
+    <div class="brand">
+      <img src="assets/rusty-xr-companion-icon.png" alt="" width="64" height="64">
+      <div>
+        <h1>Rusty XR Companion</h1>
+        <p>Windows and Android companion utilities for public Quest development workflows.</p>
+      </div>
+    </div>
   </header>
   <div class="layout">
     <nav>${nav}</nav>

@@ -136,6 +136,58 @@ public sealed class CoreModelTests
     }
 
     [Fact]
+    public void CompanionContentLayoutPrefersBundledCatalogWhenPresent()
+    {
+        var root = Path.Combine(Path.GetTempPath(), $"rusty-xr-content-{Guid.NewGuid():N}");
+        try
+        {
+            var catalogPath = CompanionContentLayout.DefaultCatalogPath(root);
+            var apkPath = CompanionContentLayout.BundledCompositeApkPath(root);
+            Directory.CreateDirectory(Path.GetDirectoryName(catalogPath)!);
+            Directory.CreateDirectory(Path.GetDirectoryName(apkPath)!);
+            File.WriteAllText(catalogPath, "{}");
+            File.WriteAllText(apkPath, "apk");
+
+            Assert.True(CompanionContentLayout.BundledCompositeCatalogIsComplete(root));
+            Assert.Equal(catalogPath, CompanionContentLayout.DefaultOrFallbackCatalogPath(root));
+            Assert.EndsWith(
+                Path.Combine("catalogs", "apks", CompanionContentLayout.CompositeQuestApkFileName),
+                apkPath,
+                StringComparison.OrdinalIgnoreCase);
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public void CompanionContentLayoutFallsBackToSampleCatalog()
+    {
+        var root = Path.Combine(Path.GetTempPath(), $"rusty-xr-content-{Guid.NewGuid():N}");
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(CompanionContentLayout.DefaultCatalogPath(root))!);
+            File.WriteAllText(CompanionContentLayout.DefaultCatalogPath(root), "{}");
+
+            Assert.False(CompanionContentLayout.BundledCompositeCatalogIsComplete(root));
+            Assert.Equal(
+                CompanionContentLayout.FallbackSampleCatalogPath(),
+                CompanionContentLayout.DefaultOrFallbackCatalogPath(root));
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
     public void AppBuildIdentityDetectsReleaseAndDevInstallRoots()
     {
         var localAppData = Path.Combine(Path.GetTempPath(), $"rusty-xr-appdata-{Guid.NewGuid():N}");

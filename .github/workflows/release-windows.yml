@@ -10,6 +10,10 @@ on:
         description: "Semantic version without the leading v, for example 0.1.0"
         required: true
         type: string
+      composite_apk_url:
+        description: "Optional Rusty XR composite-layer APK URL override"
+        required: false
+        type: string
 
 permissions:
   contents: write
@@ -24,6 +28,7 @@ jobs:
       SETUP_FILE_NAME: RustyXrCompanion-Setup.exe
       APP_ZIP_FILE_NAME: RustyXrCompanion-win-x64.zip
       CLI_ZIP_FILE_NAME: rusty-xr-companion-cli-win-x64.zip
+      COMPOSITE_APK_FILE_NAME: rusty-xr-quest-composite-layer-debug.apk
 
     steps:
       - uses: actions/checkout@v4
@@ -105,6 +110,30 @@ jobs:
           "/p:InformationalVersion=${{ steps.version.outputs.package_version }}"
           --output artifacts/cli-win-x64
 
+      - name: Include bundled Rusty XR Quest APK
+        shell: pwsh
+        env:
+          INPUT_COMPOSITE_APK_URL: ${{ github.event_name == 'workflow_dispatch' && inputs.composite_apk_url || '' }}
+          CONFIGURED_COMPOSITE_APK_URL: ${{ vars.RUSTY_XR_COMPOSITE_APK_URL || '' }}
+        run: |
+          $defaultUrl = "https://github.com/MesmerPrism/Rusty-XR/releases/latest/download/$env:COMPOSITE_APK_FILE_NAME"
+          $apkUrl = @(
+            $env:INPUT_COMPOSITE_APK_URL,
+            $env:CONFIGURED_COMPOSITE_APK_URL,
+            $defaultUrl
+          ) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -First 1
+
+          if ([string]::IsNullOrWhiteSpace($apkUrl)) {
+            throw "No Rusty XR composite-layer APK URL was configured."
+          }
+
+          New-Item -ItemType Directory -Force -Path artifacts\bundled-apks | Out-Null
+          $apkPath = Join-Path 'artifacts\bundled-apks' $env:COMPOSITE_APK_FILE_NAME
+          Invoke-WebRequest -Uri $apkUrl -OutFile $apkPath
+          powershell -ExecutionPolicy Bypass -File .\tools\app\Include-ReleaseCatalogApk.ps1 `
+            -AppPublishRoot artifacts\app-win-x64 `
+            -ApkPath $apkPath
+
       - name: Decode setup signing certificate
         id: setup_certificate
         shell: pwsh
@@ -151,6 +180,23 @@ jobs:
         run: >
           powershell -ExecutionPolicy Bypass -File .\tools\app\Test-ReleaseAssetSigning.ps1
           -SetupPath artifacts\windows-installer\${{ env.SETUP_FILE_NAME }}
+          -RequireSignature
+          -AllowSelfSigned
+
+      - name: Include uninstall helper in app payload
+        shell: pwsh
+        run: |
+          Copy-Item `
+            -LiteralPath "artifacts\windows-installer\$env:SETUP_FILE_NAME" `
+            -Destination "artifacts\app-win-x64\RustyXrCompanion-Uninstall.exe" `
+            -Force
+
+      - name: Validate signed uninstall helper when certificate configured
+        if: ${{ steps.setup_certificate.outputs.path != '' }}
+        shell: pwsh
+        run: >
+          powershell -ExecutionPolicy Bypass -File .\tools\app\Test-ReleaseAssetSigning.ps1
+          -SetupPath artifacts\app-win-x64\RustyXrCompanion-Uninstall.exe
           -RequireSignature
           -AllowSelfSigned
 

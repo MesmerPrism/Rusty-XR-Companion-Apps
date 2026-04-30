@@ -11,6 +11,18 @@ header {
   padding: 24px 32px;
 }
 
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.brand img {
+  flex: 0 0 auto;
+  width: 64px;
+  height: 64px;
+}
+
 header h1 {
   margin: 0;
   font-size: 30px;
@@ -85,5 +97,9 @@ td, th {
     border-right: 0;
     border-bottom: 1px solid #d5dadd;
     padding-bottom: 16px;
+  }
+
+  .brand {
+    align-items: flex-start;
   }
 }

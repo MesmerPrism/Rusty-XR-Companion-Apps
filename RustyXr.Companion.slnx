@@ -5,9 +5,11 @@
     <Project Path="src/RustyXr.Companion.Core/RustyXr.Companion.Core.csproj" />
     <Project Path="src/RustyXr.Companion.Diagnostics/RustyXr.Companion.Diagnostics.csproj" />
     <Project Path="src/RustyXr.Companion.PreviewInstaller/RustyXr.Companion.PreviewInstaller.csproj" />
+    <Project Path="src/RustyXr.Companion.Windows/RustyXr.Companion.Windows.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/RustyXr.Companion.Core.Tests/RustyXr.Companion.Core.Tests.csproj" />
     <Project Path="tests/RustyXr.Companion.Diagnostics.Tests/RustyXr.Companion.Diagnostics.Tests.csproj" />
+    <Project Path="tests/RustyXr.Companion.Windows.Tests/RustyXr.Companion.Windows.Tests.csproj" />
   </Folder>
 </Solution>

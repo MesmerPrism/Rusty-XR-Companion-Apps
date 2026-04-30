@@ -14,14 +14,36 @@ Use the guided setup helper when a release is available:
 
 [Download RustyXrCompanion-Setup.exe](https://github.com/MesmerPrism/Rusty-XR-Companion-Apps/releases/latest/download/RustyXrCompanion-Setup.exe)
 
-The helper downloads the latest portable app zip, installs it under the user's
-LocalAppData programs folder, refreshes the managed Quest tooling cache, creates
-a Start Menu shortcut, and launches the app. Installed release-channel apps
-check GitHub Releases on startup and replace the local release install when a
-newer portable app zip is published.
+The helper downloads the latest portable app zip, installs it under
+`%LOCALAPPDATA%\Programs\RustyXrCompanion`, refreshes the managed Quest tooling
+cache, creates the Start Menu launcher at
+`%APPDATA%\Microsoft\Windows\Start Menu\Programs\Rusty XR Companion\Rusty XR Companion.url`,
+registers a per-user Windows uninstall entry, and launches the app. The setup
+window shows both paths before installation starts.
+
+The portable app zip includes a bundled public Rusty XR Quest camera
+composite-layer APK and catalog. On first launch, the app auto-loads that
+catalog so the APK target is already present for install and launch on a
+connected Quest.
+
+Installed release-channel apps check GitHub Releases on startup and replace
+the local release install when a newer portable app zip is published.
 
 If the helper cannot reach an upstream tooling source, the app install still
 completes and the **Install / Update Managed Tooling** button can retry later.
+
+## Uninstall
+
+Use **Windows Settings > Apps > Installed apps > Rusty XR Companion >
+Uninstall** for the normal uninstall path. This removes the published release
+install under `%LOCALAPPDATA%\Programs\RustyXrCompanion`, the Start Menu
+shortcut, and the Windows uninstall entry.
+
+The setup helper can also uninstall the app. Download
+`RustyXrCompanion-Setup.exe`, open it, and choose **Uninstall**. By default,
+uninstall keeps managed Quest tooling, APK caches, diagnostics, screenshots,
+and media captures under `%LOCALAPPDATA%\RustyXrCompanion`. Select the purge
+checkbox only when you also want to remove that local cache.
 
 ## Direct Assets
 

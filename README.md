@@ -32,11 +32,15 @@ worked out upstream.
   `scrcpy`
 - GitHub Pages docs and onboarding
 - portable Windows release workflow with a guided setup helper
+- release app zip bundling for the public Rusty XR Quest camera composite-layer
+  APK, with the APK generated from a release asset rather than committed
+  source bytes
 - catalog install/verify support for local APK paths and GitHub Release asset
-  URLs, with APK bytes intentionally ignored in the repo
+  URLs
 
-The repo does **not** commit APK bytes. Use a local APK path or a public
-catalog entry that points at a GitHub Release asset URL.
+The repo does **not** commit APK bytes. Release packaging downloads the public
+Rusty XR composite-layer APK from a configured release asset, places it beside
+the bundled catalog in the portable app zip, and leaves source checkouts small.
 
 ## Quick Start
 
@@ -116,15 +120,27 @@ The current release workflow publishes:
 - `SHA256SUMS.txt`
 
 The setup helper installs the portable app under the user's LocalAppData
-programs folder and creates a Start Menu shortcut. Published installs check
-GitHub Releases on startup and update themselves from the latest portable app
-zip when a newer release exists. It can be signed by the release workflow when
-a signing certificate is configured in GitHub secrets.
+programs folder, creates a Start Menu launcher with the Companion icon, and
+registers a per-user Windows uninstall entry. The installer displays both the
+install folder and launcher location before it starts:
+
+- `%LOCALAPPDATA%\Programs\RustyXrCompanion`
+- `%APPDATA%\Microsoft\Windows\Start Menu\Programs\Rusty XR Companion\Rusty XR Companion.url`
+
+The app zip includes a bundled `catalogs\` catalog and the public Rusty XR
+Quest camera composite-layer APK under `catalogs\apks\`. On first launch the
+WPF app auto-loads that catalog so the composite-layer example is already in
+the APK list for install and launch on a connected Quest.
+
+Published installs check GitHub Releases on startup and update themselves from
+the latest portable app zip when a newer release exists. It can be signed by
+the release workflow when a signing certificate is configured in GitHub
+secrets; the app zip also carries the same signed helper as
+`RustyXrCompanion-Uninstall.exe` for Windows Settings uninstall.
 
 MSIX and `.appinstaller` support are intentionally documented as the next
 packaging lane. The portable installer is the low-friction first release path
-because this first version does not need Windows package identity and does not
-ship APK payloads.
+because this version does not need Windows package identity.
 
 ## License
 
