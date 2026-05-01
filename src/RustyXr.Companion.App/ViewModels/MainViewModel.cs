@@ -797,6 +797,10 @@ public sealed class MainViewModel : ObservableObject
             if (runtimeProfile is not null)
             {
                 AddLog($"Launching mode: {runtimeProfile.Label}");
+                if (RuntimeProfileSafety.UsesIntentionalStrobe(runtimeProfile))
+                {
+                    AddLog(RuntimeProfileSafety.StrobeWarning);
+                }
             }
 
             var result = await _adbService.LaunchAsync(
@@ -869,6 +873,10 @@ public sealed class MainViewModel : ObservableObject
             if (runtimeProfile is not null)
             {
                 AddLog($"Using runtime profile: {runtimeProfile.Label}");
+                if (RuntimeProfileSafety.UsesIntentionalStrobe(runtimeProfile))
+                {
+                    AddLog(RuntimeProfileSafety.StrobeWarning);
+                }
             }
 
             var install = await _adbService.InstallAsync(SelectedSerial, ResolveSelectedApkPathForInstall()).ConfigureAwait(true);

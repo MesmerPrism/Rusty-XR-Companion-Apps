@@ -601,6 +601,31 @@ public sealed class CoreModelTests
     }
 
     [Fact]
+    public void RuntimeProfileSafetyDetectsIntentionalStrobeProfiles()
+    {
+        var strobeProfile = new RuntimeProfile(
+            "full-field-red-black-flicker-40hz",
+            "Full-field red black",
+            new Dictionary<string, string>
+            {
+                ["rustyxr.fullFieldFlickerHz"] = "40.0",
+                ["rustyxr.xrDisplayRefreshHz"] = "120.0"
+            },
+            "WARNING: intentional full-field strobing profile.");
+        var neutralProfile = new RuntimeProfile(
+            "passthrough-underlay-hotload-neutral",
+            "Neutral passthrough",
+            new Dictionary<string, string>
+            {
+                ["rustyxr.passthroughLutFlickerHz"] = "0.0"
+            },
+            "Neutral profile.");
+
+        Assert.True(RuntimeProfileSafety.UsesIntentionalStrobe(strobeProfile));
+        Assert.False(RuntimeProfileSafety.UsesIntentionalStrobe(neutralProfile));
+    }
+
+    [Fact]
     public void CameraSourceDiagnosticsLogExtractorReadsJsonPayload()
     {
         var logcat = "04-29 I/RustyXrHeadsetCamera: Rusty XR camera source diagnostics JSON: {\"schemaVersion\":\"rusty.xr.camera-source-diagnostics.v1\",\"selectedStereoPairScore\":42,\"selectedStereoPairReason\":\"selected concurrent-separate 50/51\",\"sources\":[{\"cameraId\":\"50\",\"intrinsicCalibration\":[1,2,3,4,0],\"lensPoseTranslation\":[0.01,0.0,0.02],\"lensPoseRotation\":[0,0,0,1],\"lensPoseReference\":1}],\"stereoCandidates\":[{\"providerKind\":\"concurrent-separate\",\"leftCameraId\":\"50\",\"rightCameraId\":\"51\",\"accepted\":true,\"score\":42,\"reason\":\"accepted\"}]}";

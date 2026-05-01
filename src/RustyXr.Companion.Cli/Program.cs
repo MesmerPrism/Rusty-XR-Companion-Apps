@@ -473,6 +473,7 @@ internal static class CliProgram
     {
         var selection = await CatalogSelectionAsync(options).ConfigureAwait(false);
         var runtimeProfile = ResolveRuntimeProfile(selection.Catalog, options.ValueOrNull("--runtime-profile"));
+        WriteRuntimeProfileSafetyWarning(runtimeProfile);
         var result = await new QuestAdbService()
             .LaunchAsync(Required(options, "--serial"), selection.App.PackageName, selection.App.ActivityName, runtimeProfile?.Values)
             .ConfigureAwait(false);
@@ -500,6 +501,7 @@ internal static class CliProgram
         var deviceProfileId = options.ValueOrNull("--device-profile");
         var runtimeProfileId = options.ValueOrNull("--runtime-profile");
         var runtimeProfile = ResolveRuntimeProfile(selection.Catalog, runtimeProfileId);
+        WriteRuntimeProfileSafetyWarning(runtimeProfile);
         var hasOutputRoot = options.TryGet("--out", out var outputRoot);
         var logcatLines = options.TryGet("--logcat-lines", out var logcatLinesText)
             ? int.Parse(logcatLinesText)
@@ -597,6 +599,10 @@ internal static class CliProgram
                 selection.App.PackageName,
                 selection.App.ActivityName,
                 runtimeProfile?.Values).ConfigureAwait(false));
+            if (RuntimeProfileSafety.UsesIntentionalStrobe(runtimeProfile))
+            {
+                notes.Add(RuntimeProfileSafety.StrobeWarning);
+            }
         }
 
         var settleMs = options.TryGet("--settle-ms", out var settleText) && int.TryParse(settleText, out var parsedSettle)
@@ -759,6 +765,14 @@ internal static class CliProgram
         }
 
         return profile;
+    }
+
+    private static void WriteRuntimeProfileSafetyWarning(RuntimeProfile? profile)
+    {
+        if (RuntimeProfileSafety.UsesIntentionalStrobe(profile))
+        {
+            Console.Error.WriteLine(RuntimeProfileSafety.StrobeWarning);
+        }
     }
 
     private static async Task<string> ResolveApkSourceAsync(string apkSource, ArgOptions options)

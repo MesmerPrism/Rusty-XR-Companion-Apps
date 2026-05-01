@@ -310,6 +310,150 @@ public sealed class CatalogLoader
                     },
                     "A/B projection profile. It keeps the same paired Camera2 GPU-buffer path and public border, reconstructs the content-surface UV that a head-anchored quad would rasterize, and leaves the visual release gate closed while operator testing compares projection geometry and color behavior against the default display-screen homography. This profile is not yet the final performance or color reference."),
                 new RuntimeProfile(
+                    "passthrough-underlay-hotload-neutral",
+                    "Passthrough underlay hotload, neutral",
+                    new Dictionary<string, string>
+                    {
+                        ["rustyxr.example"] = "quest-composite-layer-apk",
+                        ["rustyxr.cameraTier"] = "synthetic",
+                        ["rustyxr.camera"] = "false",
+                        ["rustyxr.mediaProjection"] = "false",
+                        ["rustyxr.openxrPassthroughProbe"] = "underlay",
+                        ["rustyxr.passthroughStyleMode"] = "none",
+                        ["rustyxr.passthroughOpacity"] = "1.0",
+                        ["rustyxr.source"] = "platform-passthrough",
+                        ["rustyxr.depth"] = "off"
+                    },
+                    "Launches a transparent OpenXR projection layer over native compositor passthrough so later catalog launches can hotload style values."),
+                new RuntimeProfile(
+                    "passthrough-underlay-hotload-lut-opponent",
+                    "Passthrough underlay hotload, RGB LUT opponent",
+                    new Dictionary<string, string>
+                    {
+                        ["rustyxr.example"] = "quest-composite-layer-apk",
+                        ["rustyxr.cameraTier"] = "synthetic",
+                        ["rustyxr.camera"] = "false",
+                        ["rustyxr.mediaProjection"] = "false",
+                        ["rustyxr.openxrPassthroughProbe"] = "underlay",
+                        ["rustyxr.xrDisplayRefreshHz"] = "120.0",
+                        ["rustyxr.passthroughStyleMode"] = "color-lut",
+                        ["rustyxr.passthroughOpacity"] = "1.0",
+                        ["rustyxr.passthroughLutResolution"] = "32",
+                        ["rustyxr.passthroughLutWeight"] = "1.0",
+                        ["rustyxr.passthroughLutFlickerHz"] = "0.0",
+                        ["rustyxr.source"] = "platform-passthrough",
+                        ["rustyxr.depth"] = "off"
+                    },
+                    "Live native compositor passthrough profile using XR_META_passthrough_color_lut with a smooth RGB opponent palette."),
+                new RuntimeProfile(
+                    "passthrough-underlay-hotload-lut-flicker-10hz",
+                    "Passthrough underlay hotload, RGB LUT flicker 10 Hz",
+                    new Dictionary<string, string>
+                    {
+                        ["rustyxr.example"] = "quest-composite-layer-apk",
+                        ["rustyxr.cameraTier"] = "synthetic",
+                        ["rustyxr.camera"] = "false",
+                        ["rustyxr.mediaProjection"] = "false",
+                        ["rustyxr.openxrPassthroughProbe"] = "underlay",
+                        ["rustyxr.xrDisplayRefreshHz"] = "120.0",
+                        ["rustyxr.passthroughStyleMode"] = "color-lut",
+                        ["rustyxr.passthroughOpacity"] = "1.0",
+                        ["rustyxr.passthroughLutResolution"] = "32",
+                        ["rustyxr.passthroughLutWeight"] = "1.0",
+                        ["rustyxr.passthroughLutFlickerHz"] = "10.0",
+                        ["rustyxr.source"] = "platform-passthrough",
+                        ["rustyxr.depth"] = "off"
+                    },
+                    "WARNING: intentional strobing profile. Device-side square-wave switch between an RGB LUT and its half-phase inverse at 10 full cycles per second, with a 120 Hz display-refresh request."),
+                new RuntimeProfile(
+                    "passthrough-underlay-hotload-lut-flicker-40hz",
+                    "Passthrough underlay hotload, RGB LUT flicker 40 Hz",
+                    new Dictionary<string, string>
+                    {
+                        ["rustyxr.example"] = "quest-composite-layer-apk",
+                        ["rustyxr.cameraTier"] = "synthetic",
+                        ["rustyxr.camera"] = "false",
+                        ["rustyxr.mediaProjection"] = "false",
+                        ["rustyxr.openxrPassthroughProbe"] = "underlay",
+                        ["rustyxr.xrDisplayRefreshHz"] = "120.0",
+                        ["rustyxr.passthroughStyleMode"] = "color-lut",
+                        ["rustyxr.passthroughOpacity"] = "1.0",
+                        ["rustyxr.passthroughLutResolution"] = "32",
+                        ["rustyxr.passthroughLutWeight"] = "1.0",
+                        ["rustyxr.passthroughLutFlickerHz"] = "40.0",
+                        ["rustyxr.source"] = "platform-passthrough",
+                        ["rustyxr.depth"] = "off"
+                    },
+                    "WARNING: intentional strobing profile. Device-side square-wave switch between an RGB LUT and its half-phase inverse at 40 full cycles per second. At 120 Hz this is frame-quantized because each half-cycle averages 1.5 display frames."),
+                new RuntimeProfile(
+                    "passthrough-underlay-hotload-lut-flicker-60hz",
+                    "Passthrough underlay hotload, RGB LUT flicker 60 Hz",
+                    new Dictionary<string, string>
+                    {
+                        ["rustyxr.example"] = "quest-composite-layer-apk",
+                        ["rustyxr.cameraTier"] = "synthetic",
+                        ["rustyxr.camera"] = "false",
+                        ["rustyxr.mediaProjection"] = "false",
+                        ["rustyxr.openxrPassthroughProbe"] = "underlay",
+                        ["rustyxr.xrDisplayRefreshHz"] = "120.0",
+                        ["rustyxr.passthroughStyleMode"] = "color-lut",
+                        ["rustyxr.passthroughOpacity"] = "1.0",
+                        ["rustyxr.passthroughLutResolution"] = "32",
+                        ["rustyxr.passthroughLutWeight"] = "1.0",
+                        ["rustyxr.passthroughLutFlickerHz"] = "60.0",
+                        ["rustyxr.source"] = "platform-passthrough",
+                        ["rustyxr.depth"] = "off"
+                    },
+                    "WARNING: intentional strobing profile. Device-side square-wave switch between an RGB LUT and its half-phase inverse at 60 full cycles per second. This requires 120 state transitions per second, so it aliases unless the runtime presents at 120 Hz and accepts per-frame style updates."),
+                new RuntimeProfile(
+                    "full-field-red-black-flicker-10hz",
+                    "Full-field red/black flicker 10 Hz",
+                    new Dictionary<string, string>
+                    {
+                        ["rustyxr.example"] = "quest-composite-layer-apk",
+                        ["rustyxr.cameraTier"] = "synthetic",
+                        ["rustyxr.camera"] = "false",
+                        ["rustyxr.mediaProjection"] = "false",
+                        ["rustyxr.openxrPassthroughProbe"] = "off",
+                        ["rustyxr.xrDisplayRefreshHz"] = "120.0",
+                        ["rustyxr.fullFieldFlickerHz"] = "10.0",
+                        ["rustyxr.source"] = "rendered-full-field",
+                        ["rustyxr.depth"] = "off"
+                    },
+                    "WARNING: intentional full-field strobing profile. OpenXR projection-layer clear-color flicker between bright red and black at 10 full cycles per second with a 120 Hz display-refresh request."),
+                new RuntimeProfile(
+                    "full-field-red-black-flicker-40hz",
+                    "Full-field red/black flicker 40 Hz",
+                    new Dictionary<string, string>
+                    {
+                        ["rustyxr.example"] = "quest-composite-layer-apk",
+                        ["rustyxr.cameraTier"] = "synthetic",
+                        ["rustyxr.camera"] = "false",
+                        ["rustyxr.mediaProjection"] = "false",
+                        ["rustyxr.openxrPassthroughProbe"] = "off",
+                        ["rustyxr.xrDisplayRefreshHz"] = "120.0",
+                        ["rustyxr.fullFieldFlickerHz"] = "40.0",
+                        ["rustyxr.source"] = "rendered-full-field",
+                        ["rustyxr.depth"] = "off"
+                    },
+                    "WARNING: intentional full-field strobing profile. OpenXR projection-layer clear-color flicker between bright red and black at 40 full cycles per second with a 120 Hz display-refresh request; half-cycles are frame-quantized."),
+                new RuntimeProfile(
+                    "full-field-red-black-flicker-60hz",
+                    "Full-field red/black flicker 60 Hz",
+                    new Dictionary<string, string>
+                    {
+                        ["rustyxr.example"] = "quest-composite-layer-apk",
+                        ["rustyxr.cameraTier"] = "synthetic",
+                        ["rustyxr.camera"] = "false",
+                        ["rustyxr.mediaProjection"] = "false",
+                        ["rustyxr.openxrPassthroughProbe"] = "off",
+                        ["rustyxr.xrDisplayRefreshHz"] = "120.0",
+                        ["rustyxr.fullFieldFlickerHz"] = "60.0",
+                        ["rustyxr.source"] = "rendered-full-field",
+                        ["rustyxr.depth"] = "off"
+                    },
+                    "WARNING: intentional full-field strobing profile. OpenXR projection-layer clear-color flicker between bright red and black at 60 full cycles per second; this requires 120 rendered frames per second and one state change per displayed frame."),
+                new RuntimeProfile(
                     "media-projection-stream",
                     "MediaProjection stream",
                     new Dictionary<string, string>

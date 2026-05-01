@@ -16,10 +16,10 @@ This repo is designed to work alongside the public
 [Rusty XR](https://github.com/MesmerPrism/Rusty-XR) core workspace. Rusty XR
 owns reusable Rust contracts and schemas. This repo owns app UX, Windows
 release tooling, Quest device operations, and contributor-facing docs.
-The sample catalog includes both the accepted fullscreen raw-camera composite
-profile and a `quad-surface` A/B profile; the latter is intentionally kept
-visually gated while performance and final color behavior are still being
-worked out upstream.
+The sample catalog includes the accepted fullscreen raw-camera composite
+profile, a `quad-surface` A/B profile, native passthrough hotload profiles, and
+safety-gated strobe profiles. Strobing profiles are hazardous and should only
+be launched with explicit informed opt-in.
 
 ## Current Scope
 
@@ -41,6 +41,8 @@ worked out upstream.
   source bytes
 - catalog install/verify support for local APK paths and GitHub Release asset
   URLs
+- runtime-profile launch support for native passthrough style hotload and
+  strobe timing experiments published by Rusty XR core
 
 The repo does **not** commit APK bytes. Release packaging downloads the public
 Rusty XR composite-layer APK from a configured release asset, places it beside

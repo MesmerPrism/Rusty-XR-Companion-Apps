@@ -16,7 +16,7 @@ Use it when you need to:
 - connect to a Quest over Wi-Fi ADB
 - read headset battery, controller batteries, wake state, and proximity state
 - install a local APK
-- launch or stop a target app
+- launch or stop a target app, including catalog runtime profiles
 - apply simple headset development settings
 - start a display cast through `scrcpy`
 - capture headset screenshots and toggle proximity keep-awake state
@@ -24,7 +24,8 @@ Use it when you need to:
 
 The app is intentionally generic. It does not bundle a private runtime. The
 published Windows install includes the public Rusty XR camera composite-layer
-example and still supports local APK paths, public catalog files, and the CLI.
+example, including passthrough hotload and safety-gated strobe profiles, and
+still supports local APK paths, public catalog files, and the CLI.
 
 ## Start Here
 

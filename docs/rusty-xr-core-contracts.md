@@ -19,15 +19,22 @@ Future public example APKs should publish catalog metadata in this shape so the
 Companion app can install, launch, and profile them without taking a build-time
 dependency on the Rust workspace.
 
-The current sample catalog includes the Rusty XR minimal Quest APK entry:
+The current bundled catalog includes the Rusty XR Quest composite-layer APK
+entry:
 
-- app id: `rusty-xr-quest-minimal`
-- package: `com.example.rustyxr.minimal`
-- activity: `.MainActivity`
-- APK path: sibling Rusty-XR checkout build output, if built locally
+- app id: `rusty-xr-quest-composite-layer`
+- package: `com.example.rustyxr.composite`
+- activity: `.CompositeLayerActivity`
+- APK path in releases: `catalogs/apks/rusty-xr-quest-composite-layer-debug.apk`
 
 The APK bytes are not committed. Build the APK from Rusty XR, then use
 Companion's catalog install, launch, and verify commands.
+
+Recent Rusty XR catalog profiles include native passthrough hotload modes,
+`XR_META_passthrough_color_lut` color-LUT flicker modes, and pure full-field
+red/black strobe modes that request 120 Hz display refresh. The strobe modes
+are intentional high-frequency visual stimuli and require explicit informed
+opt-in before launch.
 
 For a local source workspace, keep both repos as siblings:
 

@@ -79,6 +79,14 @@ dotnet run --project src/RustyXr.Companion.Cli -- catalog launch --path samples\
 Catalog runtime profile `values` are passed as Activity extras on launch. Use
 them for public example toggles such as camera enabled/disabled, requested
 camera size, or whether the app should request MediaProjection streaming.
+The bundled Rusty XR composite-layer catalog also includes native passthrough
+hotload profiles and intentional strobe profiles. Strobing profiles can trigger
+seizures or other adverse reactions in people with photosensitive epilepsy or
+light-sensitive conditions; launch them only with explicit informed opt-in.
+For public background on why safety-gated rhythmic light tools exist as a
+design space, see [Brain Candy](https://braincandyapp.com/), a Meta Quest VR
+experience that presents its own strobing-lights warning and frames rhythmic
+audio-visual stimulation as non-clinical perception exploration.
 
 Run a launch verification pass with a device profile and a diagnostics bundle:
 
@@ -114,6 +122,23 @@ dotnet run --project src\RustyXr.Companion.Cli -- catalog verify --path samples\
 The verifier configures `adb reverse`, starts a local receiver, and records how
 many media frames arrived. It cannot accept the headset MediaProjection consent
 popup for the user.
+
+For passthrough style hotload, launch a passthrough profile once and then send
+another catalog profile to the running activity:
+
+```powershell
+dotnet run --project src\RustyXr.Companion.Cli -- catalog launch --path catalogs\rusty-xr-quest-composite-layer.catalog.json --app rusty-xr-quest-composite-layer --serial <serial> --runtime-profile passthrough-underlay-hotload-neutral
+dotnet run --project src\RustyXr.Companion.Cli -- catalog launch --path catalogs\rusty-xr-quest-composite-layer.catalog.json --app rusty-xr-quest-composite-layer --serial <serial> --runtime-profile passthrough-underlay-hotload-lut-opponent
+```
+
+The full-field strobe profiles are `full-field-red-black-flicker-10hz`,
+`full-field-red-black-flicker-40hz`, and
+`full-field-red-black-flicker-60hz`. They request `120 Hz` through the app's
+OpenXR refresh-rate path. Treat the request as advisory until logcat confirms
+`activeDisplayRefreshHz`, `observedOpenXrFps`, and `full-field flicker stats`.
+The passthrough LUT strobe profiles use the same frequency suffixes under
+`passthrough-underlay-hotload-lut-flicker-*` and should be treated with the
+same warning.
 
 The `camera-gpu-buffer-probe` runtime profile requests the public GPU-buffer
 path with CPU fallback disabled. In the current public example that path

@@ -186,6 +186,41 @@ public sealed record RuntimeProfile(
     IReadOnlyDictionary<string, string> Values,
     string Description);
 
+public static class RuntimeProfileSafety
+{
+    public const string StrobeWarning =
+        "WARNING: This runtime profile intentionally uses strobing light. It can trigger seizures or other adverse reactions in people with photosensitive epilepsy or light-sensitive conditions. Use only with explicit informed opt-in.";
+
+    public static bool UsesIntentionalStrobe(RuntimeProfile? profile)
+    {
+        if (profile is null)
+        {
+            return false;
+        }
+
+        return NumericValue(profile, "rustyxr.fullFieldFlickerHz") > 0.0 ||
+               NumericValue(profile, "rustyxr.passthroughLutFlickerHz") > 0.0 ||
+               profile.Id.Contains("flicker", StringComparison.OrdinalIgnoreCase) ||
+               profile.Description.Contains("strob", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static double NumericValue(RuntimeProfile profile, string key)
+    {
+        if (!profile.Values.TryGetValue(key, out var raw))
+        {
+            return 0.0;
+        }
+
+        return double.TryParse(
+            raw,
+            System.Globalization.NumberStyles.Float,
+            System.Globalization.CultureInfo.InvariantCulture,
+            out var value)
+            ? value
+            : 0.0;
+    }
+}
+
 public sealed record RuntimeProfileLogValidation(bool Succeeded, string Detail);
 
 public static class RuntimeProfileLogValidator
