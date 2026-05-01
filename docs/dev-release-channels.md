@@ -23,7 +23,7 @@ install root and restarts the app.
 The release launcher with the Companion icon is created at:
 
 ```text
-%APPDATA%\Microsoft\Windows\Start Menu\Programs\Rusty XR Companion\Rusty XR Companion.url
+%APPDATA%\Microsoft\Windows\Start Menu\Programs\Rusty XR Companion\Rusty XR Companion.lnk
 ```
 
 The release app zip also carries the bundled public Rusty XR Quest camera

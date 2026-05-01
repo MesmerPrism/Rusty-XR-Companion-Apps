@@ -18,7 +18,7 @@ The setup helper shows the install folder and Start Menu launcher location
 before it changes anything:
 
 - install folder: `%LOCALAPPDATA%\Programs\RustyXrCompanion`
-- launcher icon: `%APPDATA%\Microsoft\Windows\Start Menu\Programs\Rusty XR Companion\Rusty XR Companion.url`
+- launcher icon: `%APPDATA%\Microsoft\Windows\Start Menu\Programs\Rusty XR Companion\Rusty XR Companion.lnk`
 
 ![Setup helper showing install and launcher locations](assets/setup-helper-render.png)
 

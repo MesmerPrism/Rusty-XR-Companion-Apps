@@ -71,6 +71,8 @@ public sealed class QuestAdbService
         var powerOutput = await ShellTextAsync(serial, "dumpsys power", cancellationToken).ConfigureAwait(false);
         var trackingResult = await ShellAsync(serial, "dumpsys tracking", cancellationToken).ConfigureAwait(false);
         var proximityResult = await ShellAsync(serial, "dumpsys vrpowermanager", cancellationToken).ConfigureAwait(false);
+        var activityOutput = await ShellTextAsync(serial, "dumpsys activity activities", cancellationToken).ConfigureAwait(false);
+        var windowResult = await ShellAsync(serial, "dumpsys window", cancellationToken).ConfigureAwait(false);
         var capturedAt = DateTimeOffset.Now;
         var powerStatus = ParseQuestPowerStatus(powerOutput);
         var controllers = trackingResult.Succeeded
@@ -80,14 +82,16 @@ public sealed class QuestAdbService
                         HzdbService.TryParseQuestProximityStatus(proximityResult.StandardOutput, capturedAt, out var proximityStatus)
             ? proximityStatus
             : null;
-        var foreground = ParseForeground(await ShellTextAsync(serial, "dumpsys activity activities", cancellationToken).ConfigureAwait(false));
+        var foregroundStatus = ParseQuestForegroundStatus(
+            activityOutput,
+            windowResult.Succeeded ? windowResult.StandardOutput : string.Empty);
 
         return new QuestSnapshot(
             serial,
             string.IsNullOrWhiteSpace(model) ? "unknown Quest device" : model.Trim(),
             ParseBattery(batteryOutput),
             powerStatus.Wakefulness.Length > 0 ? powerStatus.Wakefulness : ParseWakefulness(powerOutput),
-            foreground,
+            foregroundStatus.ResumedActivity,
             capturedAt,
             ParseBatteryLevel(batteryOutput),
             ParseBatteryStatusLabel(batteryOutput),
@@ -95,7 +99,8 @@ public sealed class QuestAdbService
             powerStatus.IsInteractive,
             powerStatus.DisplayPowerState,
             controllers,
-            proximity);
+            proximity,
+            foregroundStatus);
     }
 
     public Task<CommandResult> InstallAsync(string serial, string apkPath, CancellationToken cancellationToken = default)
@@ -138,6 +143,16 @@ public sealed class QuestAdbService
         }
 
         return RunAdbAsync(serial, $"shell am force-stop {ShellQuote(packageName)}", TimeSpan.FromSeconds(20), cancellationToken);
+    }
+
+    public Task<CommandResult> SleepDeviceAsync(string serial, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(serial))
+        {
+            throw new ArgumentException("Device serial is required.", nameof(serial));
+        }
+
+        return ShellAsync(serial, "input keyevent SLEEP", cancellationToken);
     }
 
     public Task<CommandResult> ClearLogcatAsync(string serial, CancellationToken cancellationToken = default) =>
@@ -508,6 +523,42 @@ public sealed class QuestAdbService
             .ToArray();
     }
 
+    public static QuestForegroundStatus ParseQuestForegroundStatus(string activityOutput, string windowOutput)
+    {
+        var resumedActivity = ParseForeground(activityOutput);
+        var focusedWindow = ParseFocusedComponent(windowOutput, @"(?m)mCurrentFocus=Window\{.*?\s(?<component>[A-Za-z0-9_.]+/[A-Za-z0-9_.$]+)");
+        var focusedApp = ParseFocusedComponent(windowOutput, @"(?m)mFocusedApp=ActivityRecord\{.*?\s(?<component>[A-Za-z0-9_.]+/[A-Za-z0-9_.$]+)");
+        if (string.Equals(focusedApp, "unknown", StringComparison.OrdinalIgnoreCase))
+        {
+            focusedApp = ParseFocusedComponent(windowOutput, @"(?m)mFocusedApp=.*?\s(?<component>[A-Za-z0-9_.]+/[A-Za-z0-9_.$]+)");
+        }
+
+        var blockerLabel = FindKnownForegroundBlocker(focusedWindow) ??
+                           FindKnownForegroundBlocker(focusedApp) ??
+                           FindKnownForegroundBlocker(resumedActivity);
+        var focusDiffersFromResumed =
+            !string.Equals(focusedWindow, "unknown", StringComparison.OrdinalIgnoreCase) &&
+            !string.Equals(resumedActivity, "unknown", StringComparison.OrdinalIgnoreCase) &&
+            !ComponentsSharePackage(focusedWindow, resumedActivity);
+        var detailParts = new[]
+        {
+            string.Equals(resumedActivity, "unknown", StringComparison.OrdinalIgnoreCase) ? null : $"resumed {resumedActivity}",
+            string.Equals(focusedWindow, "unknown", StringComparison.OrdinalIgnoreCase) ? null : $"focused window {focusedWindow}",
+            string.Equals(focusedApp, "unknown", StringComparison.OrdinalIgnoreCase) ? null : $"focused app {focusedApp}",
+            blockerLabel is null ? null : $"blocker {blockerLabel}"
+        };
+        var detail = string.Join("; ", detailParts.Where(static part => !string.IsNullOrWhiteSpace(part)));
+
+        return new QuestForegroundStatus(
+            resumedActivity,
+            focusedWindow,
+            focusedApp,
+            blockerLabel is not null,
+            focusDiffersFromResumed,
+            blockerLabel ?? string.Empty,
+            detail.Length == 0 ? "Foreground shell focus unavailable." : detail);
+    }
+
     private static string ParseWakefulness(string output)
     {
         var wakefulness = Regex.Match(output, @"mWakefulness=(?<value>\w+)").Groups["value"].Value;
@@ -524,6 +575,83 @@ public sealed class QuestAdbService
     {
         var match = Regex.Match(output, @"(?m)(mResumedActivity|topResumedActivity).*?\s(?<component>[A-Za-z0-9_.]+/[A-Za-z0-9_.$]+)");
         return match.Success ? match.Groups["component"].Value : "unknown";
+    }
+
+    private static string ParseFocusedComponent(string output, string pattern)
+    {
+        if (string.IsNullOrWhiteSpace(output))
+        {
+            return "unknown";
+        }
+
+        var match = Regex.Match(output, pattern, RegexOptions.CultureInvariant);
+        return match.Success ? match.Groups["component"].Value : "unknown";
+    }
+
+    private static string? FindKnownForegroundBlocker(string component)
+    {
+        if (string.IsNullOrWhiteSpace(component) ||
+            string.Equals(component, "unknown", StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        var normalized = component.ToLowerInvariant();
+        if (normalized.Contains("guardiandialogactivity", StringComparison.Ordinal) ||
+            normalized.Contains("guardian", StringComparison.Ordinal))
+        {
+            return "Guardian";
+        }
+
+        if (normalized.Contains("sensorlockactivity", StringComparison.Ordinal))
+        {
+            return "Sensor lock";
+        }
+
+        if (normalized.Contains("permissioncontroller", StringComparison.Ordinal) ||
+            normalized.Contains("grantpermissionsactivity", StringComparison.Ordinal))
+        {
+            return "Permission request";
+        }
+
+        if (normalized.Contains("mediaprojection", StringComparison.Ordinal))
+        {
+            return "MediaProjection prompt";
+        }
+
+        if (normalized.Contains("focusplaceholderactivity", StringComparison.Ordinal))
+        {
+            return "Focus placeholder";
+        }
+
+        if (normalized.Contains("controlbaractivity", StringComparison.Ordinal))
+        {
+            return "Meta control bar";
+        }
+
+        if (normalized.Contains("packageinstaller", StringComparison.Ordinal) ||
+            normalized.Contains("resolveractivity", StringComparison.Ordinal) ||
+            normalized.Contains("chooseractivity", StringComparison.Ordinal))
+        {
+            return "System dialog";
+        }
+
+        return null;
+    }
+
+    private static bool ComponentsSharePackage(string left, string right)
+    {
+        var leftPackage = ExtractPackageName(left);
+        var rightPackage = ExtractPackageName(right);
+        return leftPackage.Length > 0 &&
+               rightPackage.Length > 0 &&
+               string.Equals(leftPackage, rightPackage, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string ExtractPackageName(string component)
+    {
+        var slashIndex = component.IndexOf('/', StringComparison.Ordinal);
+        return slashIndex > 0 ? component[..slashIndex] : string.Empty;
     }
 
     private static string DetectControllerHand(string line)

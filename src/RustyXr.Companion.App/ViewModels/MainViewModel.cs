@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.IO;
+using System.Windows.Threading;
 using Microsoft.Win32;
 using RustyXr.Companion.Core;
 using RustyXr.Companion.Diagnostics;
@@ -17,6 +18,14 @@ public sealed class MainViewModel : ObservableObject
     private readonly CatalogLoader _catalogLoader = new();
     private readonly PortableReleaseUpdateService _updateService = new();
     private readonly AppBuildIdentity _buildIdentity = AppBuildIdentity.Detect();
+    private readonly DispatcherTimer _snapshotTimer = new() { Interval = TimeSpan.FromSeconds(5) };
+
+    private const string StatusOkColor = "#3DDC84";
+    private const string StatusWarningColor = "#FBBF24";
+    private const string StatusErrorColor = "#EF4444";
+
+    private static readonly TimeSpan SnapshotFreshDuration = TimeSpan.FromSeconds(30);
+    private static readonly TimeSpan AutoSnapshotInterval = TimeSpan.FromSeconds(30);
 
     private string _status = "Ready.";
     private string _buildLabel;
@@ -27,6 +36,23 @@ public sealed class MainViewModel : ObservableObject
     private string _headerControllerStatus = "Controllers --";
     private string _headerProximityStatus = "Proximity --";
     private string _headerForegroundStatus = "Foreground --";
+    private string _headerDeviceStatusColor = StatusErrorColor;
+    private string _headerHeadsetBatteryStatusColor = StatusWarningColor;
+    private string _headerPowerStatusColor = StatusWarningColor;
+    private string _headerControllerStatusColor = StatusWarningColor;
+    private string _headerProximityStatusColor = StatusWarningColor;
+    private string _headerForegroundStatusColor = StatusWarningColor;
+    private string _snapshotFreshnessText = "No snapshot";
+    private string _snapshotFreshnessDetail = "No headset snapshot captured yet.";
+    private string _snapshotFreshnessColor = StatusWarningColor;
+    private bool _snapshotAutoRefreshEnabled = true;
+    private bool _snapshotRefreshInFlight;
+    private bool _lastSnapshotRefreshFailed;
+    private string _lastSnapshotRefreshFailure = string.Empty;
+    private DateTimeOffset? _lastSnapshotAt;
+    private DateTimeOffset? _lastSnapshotAttemptAt;
+    private QuestSnapshot? _currentSnapshot;
+    private QuestProximityStatus? _currentProximityStatus;
     private string _selectedSerial = string.Empty;
     private string _endpoint = "192.168.1.2:5555";
     private string _catalogPath = CompanionContentLayout.DefaultOrFallbackCatalogPath();
@@ -69,6 +95,7 @@ public sealed class MainViewModel : ObservableObject
         ConnectCommand = new AsyncRelayCommand(ConnectAsync);
         EnableWifiAdbCommand = new AsyncRelayCommand(EnableWifiAdbAsync, HasSerial);
         SnapshotCommand = new AsyncRelayCommand(SnapshotAsync, HasSerial);
+        SnapshotFreshnessCommand = new AsyncRelayCommand(SnapshotAsync, HasSerial);
         BrowseCatalogCommand = new AsyncRelayCommand(BrowseCatalogAsync);
         LoadCatalogCommand = new AsyncRelayCommand(LoadCatalogAsync);
         UseCatalogAppCommand = new AsyncRelayCommand(UseCatalogAppAsync, HasCatalogApp);
@@ -88,7 +115,12 @@ public sealed class MainViewModel : ObservableObject
         RestoreProximityCommand = new AsyncRelayCommand(RestoreProximityAsync, HasSerial);
         ReadProximityCommand = new AsyncRelayCommand(ReadProximityAsync, HasSerial);
         WakeHeadsetCommand = new AsyncRelayCommand(WakeHeadsetAsync, HasSerial);
+        ToggleProximityCommand = new AsyncRelayCommand(ToggleProximityAsync, HasSerial);
+        TogglePowerCommand = new AsyncRelayCommand(TogglePowerAsync, HasSerial);
         DiagnosticsCommand = new AsyncRelayCommand(WriteDiagnosticsAsync);
+
+        _snapshotTimer.Tick += async (_, _) => await OnSnapshotTimerTickAsync().ConfigureAwait(true);
+        _snapshotTimer.Start();
     }
 
     public ObservableCollection<ToolStatus> Tools { get; } = new();
@@ -97,6 +129,20 @@ public sealed class MainViewModel : ObservableObject
     public ObservableCollection<QuestAppTarget> CatalogApps { get; } = new();
     public ObservableCollection<RuntimeProfile> RuntimeProfiles { get; } = new();
     public ObservableCollection<string> Log { get; } = new();
+
+    public string AppDisplayName => _buildIdentity.AppDisplayName;
+
+    public string WindowTitle => AppDisplayName;
+
+    public string HeaderIconSource =>
+        _buildIdentity.Channel == AppInstallChannel.Dev
+            ? "pack://application:,,,/Assets/RustyXrCompanionDev.png"
+            : "pack://application:,,,/Assets/RustyXrCompanion.png";
+
+    public string WindowIconSource =>
+        _buildIdentity.Channel == AppInstallChannel.Dev
+            ? "pack://application:,,,/Assets/RustyXrCompanionDev.ico"
+            : "pack://application:,,,/Assets/RustyXrCompanion.ico";
 
     public string BuildLabel
     {
@@ -151,6 +197,86 @@ public sealed class MainViewModel : ObservableObject
         get => _headerForegroundStatus;
         set => SetProperty(ref _headerForegroundStatus, value);
     }
+
+    public string HeaderDeviceStatusColor
+    {
+        get => _headerDeviceStatusColor;
+        private set => SetProperty(ref _headerDeviceStatusColor, value);
+    }
+
+    public string HeaderHeadsetBatteryStatusColor
+    {
+        get => _headerHeadsetBatteryStatusColor;
+        private set => SetProperty(ref _headerHeadsetBatteryStatusColor, value);
+    }
+
+    public string HeaderPowerStatusColor
+    {
+        get => _headerPowerStatusColor;
+        private set => SetProperty(ref _headerPowerStatusColor, value);
+    }
+
+    public string HeaderControllerStatusColor
+    {
+        get => _headerControllerStatusColor;
+        private set => SetProperty(ref _headerControllerStatusColor, value);
+    }
+
+    public string HeaderProximityStatusColor
+    {
+        get => _headerProximityStatusColor;
+        private set => SetProperty(ref _headerProximityStatusColor, value);
+    }
+
+    public string HeaderForegroundStatusColor
+    {
+        get => _headerForegroundStatusColor;
+        private set => SetProperty(ref _headerForegroundStatusColor, value);
+    }
+
+    public string SnapshotFreshnessText
+    {
+        get => _snapshotFreshnessText;
+        private set => SetProperty(ref _snapshotFreshnessText, value);
+    }
+
+    public string SnapshotFreshnessDetail
+    {
+        get => _snapshotFreshnessDetail;
+        private set => SetProperty(ref _snapshotFreshnessDetail, value);
+    }
+
+    public string SnapshotFreshnessColor
+    {
+        get => _snapshotFreshnessColor;
+        private set => SetProperty(ref _snapshotFreshnessColor, value);
+    }
+
+    public bool SnapshotAutoRefreshEnabled
+    {
+        get => _snapshotAutoRefreshEnabled;
+        set
+        {
+            if (SetProperty(ref _snapshotAutoRefreshEnabled, value))
+            {
+                OnPropertyChanged(nameof(SnapshotRefreshModeLabel));
+                UpdateSnapshotFreshness();
+                AddLog(value ? "Snapshot auto-refresh enabled." : "Snapshot refresh set to manual.");
+            }
+        }
+    }
+
+    public string SnapshotRefreshModeLabel => SnapshotAutoRefreshEnabled ? "Auto refresh on" : "Auto refresh off";
+
+    public string HeaderPowerActionToolTip =>
+        _currentSnapshot?.IsAwake == true
+            ? "Request headset sleep"
+            : "Request headset wake";
+
+    public string HeaderProximityActionToolTip =>
+        _currentProximityStatus?.HoldActive == true
+            ? "Restore normal proximity behavior"
+            : "Request keep-awake proximity hold";
 
     public string SelectedSerial
     {
@@ -294,6 +420,7 @@ public sealed class MainViewModel : ObservableObject
     public AsyncRelayCommand ConnectCommand { get; }
     public AsyncRelayCommand EnableWifiAdbCommand { get; }
     public AsyncRelayCommand SnapshotCommand { get; }
+    public AsyncRelayCommand SnapshotFreshnessCommand { get; }
     public AsyncRelayCommand BrowseCatalogCommand { get; }
     public AsyncRelayCommand LoadCatalogCommand { get; }
     public AsyncRelayCommand UseCatalogAppCommand { get; }
@@ -313,6 +440,8 @@ public sealed class MainViewModel : ObservableObject
     public AsyncRelayCommand RestoreProximityCommand { get; }
     public AsyncRelayCommand ReadProximityCommand { get; }
     public AsyncRelayCommand WakeHeadsetCommand { get; }
+    public AsyncRelayCommand ToggleProximityCommand { get; }
+    public AsyncRelayCommand TogglePowerCommand { get; }
     public AsyncRelayCommand DiagnosticsCommand { get; }
 
     public string MediaPort
@@ -334,6 +463,10 @@ public sealed class MainViewModel : ObservableObject
         await LoadDefaultCatalogIfAvailableAsync().ConfigureAwait(true);
         await RefreshToolsAsync().ConfigureAwait(true);
         await RefreshDevicesAsync().ConfigureAwait(true);
+        if (SnapshotAutoRefreshEnabled && HasSerial())
+        {
+            await RefreshSnapshotFromHeaderAsync(autoTriggered: true).ConfigureAwait(true);
+        }
     }
 
     private void RepairReleaseInstallRegistration()
@@ -477,7 +610,7 @@ public sealed class MainViewModel : ObservableObject
 
     private async Task SnapshotAsync()
     {
-        await RunUiActionAsync("Refreshing headset status...", RefreshSnapshotCoreAsync).ConfigureAwait(true);
+        await RefreshSnapshotFromHeaderAsync(autoTriggered: false).ConfigureAwait(true);
     }
 
     private Task BrowseCatalogAsync()
@@ -827,46 +960,93 @@ public sealed class MainViewModel : ObservableObject
 
     private async Task KeepAwakeAsync()
     {
-        await RunUiActionAsync("Disabling wear sensor for keep-awake...", async () =>
-        {
-            var durationMs = int.TryParse(ProximityDurationMs, out var parsedDuration) ? parsedDuration : 28_800_000;
-            var result = await _hzdbService
-                .SetProximityAsync(SelectedSerial, enableNormalProximity: false, durationMs)
-                .ConfigureAwait(true);
-            AddLog(result.CondensedOutput.Length > 0
-                ? result.CondensedOutput
-                : $"Keep-awake proximity hold requested for {durationMs} ms.");
-            await ReadProximityCoreAsync().ConfigureAwait(true);
-        }).ConfigureAwait(true);
+        await SetProximityModeAsync(enableNormalProximity: false).ConfigureAwait(true);
     }
 
     private async Task RestoreProximityAsync()
     {
-        await RunUiActionAsync("Restoring normal proximity behavior...", async () =>
-        {
-            var result = await _hzdbService
-                .SetProximityAsync(SelectedSerial, enableNormalProximity: true)
-                .ConfigureAwait(true);
-            AddLog(result.CondensedOutput.Length > 0
-                ? result.CondensedOutput
-                : "Normal proximity behavior requested.");
-            await ReadProximityCoreAsync().ConfigureAwait(true);
-        }).ConfigureAwait(true);
+        await SetProximityModeAsync(enableNormalProximity: true).ConfigureAwait(true);
     }
 
     private async Task ReadProximityAsync()
     {
-        await RunUiActionAsync("Reading proximity status...", ReadProximityCoreAsync).ConfigureAwait(true);
+        HeaderProximityStatus = "Proximity requested";
+        HeaderProximityStatusColor = StatusWarningColor;
+        var succeeded = await RunUiActionAsync("Reading proximity status...", ReadProximityCoreAsync).ConfigureAwait(true);
+        if (!succeeded)
+        {
+            HeaderProximityStatusColor = StatusErrorColor;
+        }
     }
 
     private async Task WakeHeadsetAsync()
     {
-        await RunUiActionAsync("Sending hzdb wake request...", async () =>
+        await SetHeadsetPowerAsync(requestSleep: false).ConfigureAwait(true);
+    }
+
+    private async Task TogglePowerAsync()
+    {
+        await SetHeadsetPowerAsync(requestSleep: _currentSnapshot?.IsAwake == true).ConfigureAwait(true);
+    }
+
+    private async Task ToggleProximityAsync()
+    {
+        await SetProximityModeAsync(enableNormalProximity: _currentProximityStatus?.HoldActive == true).ConfigureAwait(true);
+    }
+
+    private async Task SetHeadsetPowerAsync(bool requestSleep)
+    {
+        HeaderPowerStatus = requestSleep ? "Sleep requested" : "Wake requested";
+        HeaderPowerStatusColor = StatusWarningColor;
+
+        var succeeded = await RunUiActionAsync(
+            requestSleep ? "Requesting headset sleep..." : "Sending hzdb wake request...",
+            async () =>
+            {
+                var result = requestSleep
+                    ? await _adbService.SleepDeviceAsync(SelectedSerial).ConfigureAwait(true)
+                    : await _hzdbService.WakeDeviceAsync(SelectedSerial).ConfigureAwait(true);
+                AddLog(result.CondensedOutput.Length > 0
+                    ? result.CondensedOutput
+                    : requestSleep
+                        ? "Sleep request sent."
+                        : "Wake request sent.");
+                await RefreshSnapshotCoreAsync().ConfigureAwait(true);
+            }).ConfigureAwait(true);
+
+        if (!succeeded)
         {
-            var result = await _hzdbService.WakeDeviceAsync(SelectedSerial).ConfigureAwait(true);
-            AddLog(result.CondensedOutput.Length > 0 ? result.CondensedOutput : "Wake request sent.");
-            await RefreshSnapshotCoreAsync().ConfigureAwait(true);
-        }).ConfigureAwait(true);
+            HeaderPowerStatusColor = StatusErrorColor;
+        }
+    }
+
+    private async Task SetProximityModeAsync(bool enableNormalProximity)
+    {
+        HeaderProximityStatus = enableNormalProximity ? "Normal requested" : "Keep-awake requested";
+        HeaderProximityStatusColor = StatusWarningColor;
+
+        var succeeded = await RunUiActionAsync(
+            enableNormalProximity
+                ? "Restoring normal proximity behavior..."
+                : "Disabling wear sensor for keep-awake...",
+            async () =>
+            {
+                var durationMs = int.TryParse(ProximityDurationMs, out var parsedDuration) ? parsedDuration : 28_800_000;
+                var result = await _hzdbService
+                    .SetProximityAsync(SelectedSerial, enableNormalProximity, enableNormalProximity ? null : durationMs)
+                    .ConfigureAwait(true);
+                AddLog(result.CondensedOutput.Length > 0
+                    ? result.CondensedOutput
+                    : enableNormalProximity
+                        ? "Normal proximity behavior requested."
+                        : $"Keep-awake proximity hold requested for {durationMs} ms.");
+                await ReadProximityCoreAsync().ConfigureAwait(true);
+            }).ConfigureAwait(true);
+
+        if (!succeeded)
+        {
+            HeaderProximityStatusColor = StatusErrorColor;
+        }
     }
 
     private async Task ReadProximityCoreAsync()
@@ -892,19 +1072,29 @@ public sealed class MainViewModel : ObservableObject
 
     private void ApplySnapshot(QuestSnapshot snapshot)
     {
+        _currentSnapshot = snapshot;
+        _lastSnapshotAt = snapshot.CapturedAt;
+        _lastSnapshotRefreshFailed = false;
+        _lastSnapshotRefreshFailure = string.Empty;
         LastSnapshot =
             $"Serial: {snapshot.Serial}{Environment.NewLine}" +
             $"Model: {snapshot.Model}{Environment.NewLine}" +
             $"Headset battery: {snapshot.Battery}{Environment.NewLine}" +
             $"Power: {FormatPower(snapshot)}{Environment.NewLine}" +
             $"Foreground: {snapshot.Foreground}{Environment.NewLine}" +
+            $"Shell focus: {snapshot.ForegroundStatus?.Detail ?? "not checked"}{Environment.NewLine}" +
             $"Captured: {snapshot.CapturedAt:t}";
 
         HeaderDeviceStatus = FormatHeaderDeviceStatus(snapshot.Serial, snapshot.Model);
         HeaderHeadsetBatteryStatus = FormatHeaderBattery(snapshot);
         HeaderPowerStatus = FormatHeaderPower(snapshot);
         HeaderControllerStatus = FormatHeaderControllers(snapshot.Controllers);
-        HeaderForegroundStatus = FormatHeaderForeground(snapshot.Foreground);
+        HeaderForegroundStatus = FormatHeaderForeground(snapshot);
+        HeaderDeviceStatusColor = StatusOkColor;
+        HeaderHeadsetBatteryStatusColor = FormatHeaderBatteryColor(snapshot);
+        HeaderPowerStatusColor = FormatHeaderPowerColor(snapshot);
+        HeaderControllerStatusColor = FormatHeaderControllersColor(snapshot.Controllers);
+        HeaderForegroundStatusColor = FormatHeaderForegroundColor(snapshot);
 
         ControllerStatuses.Clear();
         foreach (var controller in snapshot.Controllers ?? Array.Empty<QuestControllerStatus>())
@@ -927,7 +1117,13 @@ public sealed class MainViewModel : ObservableObject
         {
             LastProximityStatus = "Proximity status was not reported by this snapshot. Use Read Proximity Status for direct readback.";
             HeaderProximityStatus = "Proximity --";
+            HeaderProximityStatusColor = StatusWarningColor;
+            _currentProximityStatus = null;
         }
+
+        UpdateSnapshotFreshness();
+        OnPropertyChanged(nameof(HeaderPowerActionToolTip));
+        OnPropertyChanged(nameof(HeaderProximityActionToolTip));
     }
 
     private async Task WriteDiagnosticsAsync()
@@ -944,18 +1140,20 @@ public sealed class MainViewModel : ObservableObject
         }).ConfigureAwait(true);
     }
 
-    private async Task RunUiActionAsync(string runningStatus, Func<Task> action)
+    private async Task<bool> RunUiActionAsync(string runningStatus, Func<Task> action)
     {
         try
         {
             Status = runningStatus;
             await action().ConfigureAwait(true);
             Status = "Ready.";
+            return true;
         }
         catch (Exception exception)
         {
             Status = exception.Message;
             AddLog($"Error: {exception.Message}");
+            return false;
         }
     }
 
@@ -1005,13 +1203,27 @@ public sealed class MainViewModel : ObservableObject
 
     private void ResetHeaderSnapshotStatus()
     {
+        _currentSnapshot = null;
+        _currentProximityStatus = null;
+        _lastSnapshotAt = null;
+        _lastSnapshotAttemptAt = null;
+        _lastSnapshotRefreshFailed = false;
+        _lastSnapshotRefreshFailure = string.Empty;
         RefreshHeaderDeviceStatus();
         HeaderHeadsetBatteryStatus = "Battery --";
         HeaderPowerStatus = "Power --";
         HeaderControllerStatus = "Controllers --";
         HeaderProximityStatus = "Proximity --";
         HeaderForegroundStatus = "Foreground --";
+        HeaderHeadsetBatteryStatusColor = StatusWarningColor;
+        HeaderPowerStatusColor = StatusWarningColor;
+        HeaderControllerStatusColor = StatusWarningColor;
+        HeaderProximityStatusColor = StatusWarningColor;
+        HeaderForegroundStatusColor = StatusWarningColor;
         ControllerStatuses.Clear();
+        UpdateSnapshotFreshness();
+        OnPropertyChanged(nameof(HeaderPowerActionToolTip));
+        OnPropertyChanged(nameof(HeaderProximityActionToolTip));
     }
 
     private void RefreshHeaderDeviceStatus()
@@ -1019,31 +1231,134 @@ public sealed class MainViewModel : ObservableObject
         if (string.IsNullOrWhiteSpace(SelectedSerial))
         {
             HeaderDeviceStatus = "No Quest selected";
+            HeaderDeviceStatusColor = StatusErrorColor;
             return;
         }
 
         var selected = Devices.FirstOrDefault(device =>
             string.Equals(device.Serial, SelectedSerial, StringComparison.OrdinalIgnoreCase));
         HeaderDeviceStatus = FormatHeaderDeviceStatus(SelectedSerial, selected?.Model);
+        HeaderDeviceStatusColor = selected is null
+            ? StatusWarningColor
+            : selected.IsOnline
+                ? StatusOkColor
+                : StatusErrorColor;
     }
 
     private void ApplyHeaderProximityStatus(QuestProximityStatus status)
     {
+        _currentProximityStatus = status;
         if (!status.Available)
         {
             HeaderProximityStatus = "Proximity unavailable";
+            HeaderProximityStatusColor = StatusErrorColor;
+            OnPropertyChanged(nameof(HeaderProximityActionToolTip));
             return;
         }
 
         if (status.HoldActive)
         {
             HeaderProximityStatus = "Proximity keep-awake";
+            HeaderProximityStatusColor = StatusOkColor;
+            OnPropertyChanged(nameof(HeaderProximityActionToolTip));
             return;
         }
 
         HeaderProximityStatus = string.IsNullOrWhiteSpace(status.HeadsetState)
             ? "Proximity normal"
             : $"Proximity {FormatCompactState(status.HeadsetState)}";
+        HeaderProximityStatusColor = StatusOkColor;
+        OnPropertyChanged(nameof(HeaderProximityActionToolTip));
+    }
+
+    private async Task RefreshSnapshotFromHeaderAsync(bool autoTriggered)
+    {
+        if (!HasSerial() || _snapshotRefreshInFlight)
+        {
+            return;
+        }
+
+        _snapshotRefreshInFlight = true;
+        _lastSnapshotRefreshFailed = false;
+        _lastSnapshotRefreshFailure = string.Empty;
+        _lastSnapshotAttemptAt = DateTimeOffset.Now;
+        SnapshotFreshnessText = "requested";
+        SnapshotFreshnessDetail = "Snapshot refresh requested; waiting for ADB readback.";
+        SnapshotFreshnessColor = StatusWarningColor;
+        RaiseCommandStates();
+
+        try
+        {
+            var succeeded = await RunUiActionAsync(
+                autoTriggered ? "Auto-refreshing headset status..." : "Refreshing headset status...",
+                RefreshSnapshotCoreAsync).ConfigureAwait(true);
+            if (!succeeded)
+            {
+                _lastSnapshotRefreshFailed = true;
+                _lastSnapshotRefreshFailure = Status;
+            }
+        }
+        finally
+        {
+            _snapshotRefreshInFlight = false;
+            UpdateSnapshotFreshness();
+            RaiseCommandStates();
+        }
+    }
+
+    private async Task OnSnapshotTimerTickAsync()
+    {
+        UpdateSnapshotFreshness();
+        if (!SnapshotAutoRefreshEnabled || !HasSerial() || _snapshotRefreshInFlight)
+        {
+            return;
+        }
+
+        var now = DateTimeOffset.Now;
+        var lastActivity = _lastSnapshotAt ?? _lastSnapshotAttemptAt;
+        if (lastActivity is not null && now - lastActivity.Value < AutoSnapshotInterval)
+        {
+            return;
+        }
+
+        await RefreshSnapshotFromHeaderAsync(autoTriggered: true).ConfigureAwait(true);
+    }
+
+    private void UpdateSnapshotFreshness()
+    {
+        if (_snapshotRefreshInFlight)
+        {
+            SnapshotFreshnessColor = StatusWarningColor;
+            return;
+        }
+
+        if (_lastSnapshotRefreshFailed)
+        {
+            var ageDetail = _lastSnapshotAt is null
+                ? "No confirmed snapshot is available."
+                : $"Latest snapshot age {FormatAge(DateTimeOffset.Now - _lastSnapshotAt.Value)}.";
+            SnapshotFreshnessText = "refresh failed";
+            SnapshotFreshnessDetail = $"{_lastSnapshotRefreshFailure} {ageDetail}".Trim();
+            SnapshotFreshnessColor = StatusErrorColor;
+            return;
+        }
+
+        if (_lastSnapshotAt is null)
+        {
+            SnapshotFreshnessText = "never";
+            SnapshotFreshnessDetail = "No headset snapshot captured yet.";
+            SnapshotFreshnessColor = StatusWarningColor;
+            return;
+        }
+
+        var age = DateTimeOffset.Now - _lastSnapshotAt.Value;
+        var ageText = FormatAge(age);
+        SnapshotFreshnessText = ageText == "now" ? "now" : $"{ageText} ago";
+        SnapshotFreshnessDetail =
+            $"Latest snapshot captured at {_lastSnapshotAt.Value.LocalDateTime:G}; age {ageText}.";
+        SnapshotFreshnessColor = age <= SnapshotFreshDuration
+            ? StatusOkColor
+            : StatusErrorColor;
     }
 
     private static string FormatHeaderDeviceStatus(string serial, string? model)
@@ -1111,11 +1426,116 @@ public sealed class MainViewModel : ObservableObject
         }));
     }
 
-    private static string FormatHeaderForeground(string foreground)
+    private static string FormatHeaderForeground(QuestSnapshot snapshot)
     {
+        if (snapshot.ForegroundStatus?.HasKnownBlocker == true)
+        {
+            return $"Blocked: {snapshot.ForegroundStatus.BlockerLabel}";
+        }
+
+        if (snapshot.ForegroundStatus?.FocusDiffersFromResumed == true)
+        {
+            return "Focus differs";
+        }
+
+        var foreground = snapshot.Foreground;
         return string.IsNullOrWhiteSpace(foreground) || string.Equals(foreground, "unknown", StringComparison.OrdinalIgnoreCase)
             ? "Foreground --"
             : $"Foreground: {foreground}";
+    }
+
+    private static string FormatHeaderBatteryColor(QuestSnapshot snapshot)
+    {
+        if (snapshot.HeadsetBatteryLevel is not int level)
+        {
+            return StatusWarningColor;
+        }
+
+        if (snapshot.HeadsetBatteryStatus.Contains("charging", StringComparison.OrdinalIgnoreCase) ||
+            snapshot.HeadsetBatteryStatus.Contains("full", StringComparison.OrdinalIgnoreCase))
+        {
+            return StatusOkColor;
+        }
+
+        return level <= 20 ? StatusErrorColor : StatusOkColor;
+    }
+
+    private static string FormatHeaderPowerColor(QuestSnapshot snapshot)
+    {
+        return snapshot.IsAwake switch
+        {
+            true => StatusOkColor,
+            false => StatusErrorColor,
+            _ => StatusWarningColor
+        };
+    }
+
+    private static string FormatHeaderControllersColor(IReadOnlyList<QuestControllerStatus>? controllers)
+    {
+        if (controllers is null || controllers.Count == 0)
+        {
+            return StatusWarningColor;
+        }
+
+        if (controllers.Any(static controller =>
+                controller.BatteryLevel is <= 10 ||
+                controller.ConnectionState.Contains("DISCONNECTED", StringComparison.OrdinalIgnoreCase) ||
+                controller.ConnectionState.Contains("OFF", StringComparison.OrdinalIgnoreCase)))
+        {
+            return StatusErrorColor;
+        }
+
+        if (controllers.Any(static controller =>
+                controller.BatteryLevel is null ||
+                string.IsNullOrWhiteSpace(controller.ConnectionState)))
+        {
+            return StatusWarningColor;
+        }
+
+        return StatusOkColor;
+    }
+
+    private static string FormatHeaderForegroundColor(QuestSnapshot snapshot)
+    {
+        if (snapshot.ForegroundStatus?.HasKnownBlocker == true)
+        {
+            return StatusErrorColor;
+        }
+
+        if (snapshot.ForegroundStatus?.FocusDiffersFromResumed == true)
+        {
+            return StatusWarningColor;
+        }
+
+        var foreground = snapshot.Foreground;
+        return string.IsNullOrWhiteSpace(foreground) || string.Equals(foreground, "unknown", StringComparison.OrdinalIgnoreCase)
+            ? StatusWarningColor
+            : StatusOkColor;
+    }
+
+    private static string FormatAge(TimeSpan age)
+    {
+        if (age < TimeSpan.Zero)
+        {
+            age = TimeSpan.Zero;
+        }
+
+        if (age.TotalSeconds < 1)
+        {
+            return "now";
+        }
+
+        if (age.TotalSeconds < 60)
+        {
+            return $"{Math.Round(age.TotalSeconds):0}s";
+        }
+
+        if (age.TotalMinutes < 60)
+        {
+            return $"{Math.Round(age.TotalMinutes):0}m";
+        }
+
+        return $"{Math.Round(age.TotalHours):0}h";
     }
 
     private static string FormatCompactState(string value)
@@ -1168,6 +1588,7 @@ public sealed class MainViewModel : ObservableObject
     {
         EnableWifiAdbCommand.RaiseCanExecuteChanged();
         SnapshotCommand.RaiseCanExecuteChanged();
+        SnapshotFreshnessCommand.RaiseCanExecuteChanged();
         InstallCatalogAppCommand.RaiseCanExecuteChanged();
         LaunchCatalogAppCommand.RaiseCanExecuteChanged();
         VerifyCatalogAppCommand.RaiseCanExecuteChanged();
@@ -1182,6 +1603,8 @@ public sealed class MainViewModel : ObservableObject
         RestoreProximityCommand.RaiseCanExecuteChanged();
         ReadProximityCommand.RaiseCanExecuteChanged();
         WakeHeadsetCommand.RaiseCanExecuteChanged();
+        ToggleProximityCommand.RaiseCanExecuteChanged();
+        TogglePowerCommand.RaiseCanExecuteChanged();
     }
 
     private void AddLog(string message)

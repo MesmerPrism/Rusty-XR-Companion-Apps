@@ -18,6 +18,19 @@ public sealed record AppBuildIdentity(
     bool AutoUpdatesEnabled)
 {
     public string DisplayLabel => $"{ChannelLabel} {CurrentVersion}";
+    public string AppDisplayName => Channel switch
+    {
+        AppInstallChannel.Dev => "Rusty XR Companion Dev",
+        AppInstallChannel.Source => "Rusty XR Companion Source",
+        _ => "Rusty XR Companion"
+    };
+
+    public string AppUserModelId => Channel switch
+    {
+        AppInstallChannel.Dev => "MesmerPrism.RustyXR.Companion.Dev",
+        AppInstallChannel.Source => "MesmerPrism.RustyXR.Companion.Source",
+        _ => "MesmerPrism.RustyXR.Companion"
+    };
 
     public static AppBuildIdentity Detect(
         string? baseDirectory = null,

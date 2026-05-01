@@ -133,7 +133,7 @@ registers a per-user Windows uninstall entry. The installer displays both the
 install folder and launcher location before it starts:
 
 - `%LOCALAPPDATA%\Programs\RustyXrCompanion`
-- `%APPDATA%\Microsoft\Windows\Start Menu\Programs\Rusty XR Companion\Rusty XR Companion.url`
+- `%APPDATA%\Microsoft\Windows\Start Menu\Programs\Rusty XR Companion\Rusty XR Companion.lnk`
 
 The app zip includes a bundled `catalogs\` catalog and the public Rusty XR
 Quest camera composite-layer APK under `catalogs\apks\`. On first launch the

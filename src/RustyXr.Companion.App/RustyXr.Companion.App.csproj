@@ -9,6 +9,8 @@
   <ItemGroup>
     <Resource Include="Assets\RustyXrCompanion.ico" />
     <Resource Include="Assets\RustyXrCompanion.png" />
+    <Resource Include="Assets\RustyXrCompanionDev.ico" />
+    <Resource Include="Assets\RustyXrCompanionDev.png" />
     <Content Include="..\..\catalogs\**\*">
       <Link>catalogs\%(RecursiveDir)%(Filename)%(Extension)</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
@@ -32,7 +34,11 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
-    <ApplicationIcon>Assets\RustyXrCompanion.ico</ApplicationIcon>
+    <AssemblyName Condition="'$(RustyXrCompanionAssemblyName)' != ''">$(RustyXrCompanionAssemblyName)</AssemblyName>
+    <Product Condition="'$(Product)' == ''">Rusty XR Companion</Product>
+    <AssemblyTitle Condition="'$(AssemblyTitle)' == ''">Rusty XR Companion</AssemblyTitle>
+    <ApplicationIcon Condition="'$(RustyXrCompanionApplicationIcon)' != ''">$(RustyXrCompanionApplicationIcon)</ApplicationIcon>
+    <ApplicationIcon Condition="'$(ApplicationIcon)' == '' And '$(RustyXrCompanionApplicationIcon)' == ''">Assets\RustyXrCompanion.ico</ApplicationIcon>
   </PropertyGroup>
 
 </Project>

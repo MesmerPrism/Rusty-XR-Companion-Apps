@@ -27,16 +27,106 @@ function Assert-SafeInstallRoot {
     }
 }
 
+function Set-ShellShortcut {
+    param(
+        [Parameter(Mandatory = $true)]
+        [object]$Shell,
+        [Parameter(Mandatory = $true)]
+        [string]$Path,
+        [Parameter(Mandatory = $true)]
+        [string]$TargetPath,
+        [Parameter(Mandatory = $true)]
+        [string]$WorkingDirectory,
+        [Parameter(Mandatory = $true)]
+        [string]$IconLocation,
+        [Parameter(Mandatory = $true)]
+        [string]$Description
+    )
+
+    $shortcut = $Shell.CreateShortcut($Path)
+    $shortcut.TargetPath = $TargetPath
+    $shortcut.WorkingDirectory = $WorkingDirectory
+    $shortcut.IconLocation = $IconLocation
+    $shortcut.Description = $Description
+    $shortcut.Save()
+}
+
+function Repair-DevTaskbarPin {
+    param(
+        [Parameter(Mandatory = $true)]
+        [object]$Shell,
+        [Parameter(Mandatory = $true)]
+        [string]$InstallRoot,
+        [Parameter(Mandatory = $true)]
+        [string]$ExePath,
+        [Parameter(Mandatory = $true)]
+        [string]$DisplayName
+    )
+
+    $taskbarDirectory = Join-Path $env:APPDATA 'Microsoft\Internet Explorer\Quick Launch\User Pinned\TaskBar'
+    if (-not (Test-Path -LiteralPath $taskbarDirectory)) {
+        return @()
+    }
+
+    $normalizedInstallRoot = [System.IO.Path]::GetFullPath($InstallRoot).TrimEnd('\')
+    $desiredShortcutPath = Join-Path $taskbarDirectory "$DisplayName.lnk"
+    $updated = @()
+
+    foreach ($shortcutFile in Get-ChildItem -LiteralPath $taskbarDirectory -Filter '*.lnk' -Force) {
+        try {
+            $shortcut = $Shell.CreateShortcut($shortcutFile.FullName)
+            if ([string]::IsNullOrWhiteSpace($shortcut.TargetPath)) {
+                continue
+            }
+
+            $normalizedTarget = [System.IO.Path]::GetFullPath($shortcut.TargetPath)
+            $isDevPin = $normalizedTarget.StartsWith(
+                $normalizedInstallRoot + [System.IO.Path]::DirectorySeparatorChar,
+                [System.StringComparison]::OrdinalIgnoreCase)
+            if (-not $isDevPin) {
+                continue
+            }
+
+            if (-not [string]::Equals($shortcutFile.FullName, $desiredShortcutPath, [System.StringComparison]::OrdinalIgnoreCase)) {
+                if (-not (Test-Path -LiteralPath $desiredShortcutPath)) {
+                    Move-Item -LiteralPath $shortcutFile.FullName -Destination $desiredShortcutPath -Force
+                }
+                else {
+                    Remove-Item -LiteralPath $shortcutFile.FullName -Force
+                }
+            }
+
+            Set-ShellShortcut `
+                -Shell $Shell `
+                -Path $desiredShortcutPath `
+                -TargetPath $ExePath `
+                -WorkingDirectory $InstallRoot `
+                -IconLocation "$ExePath,0" `
+                -Description $DisplayName
+            $updated += $shortcutFile.Name
+        }
+        catch {
+            Write-Warning "Could not repair taskbar pin $($shortcutFile.FullName): $($_.Exception.Message)"
+        }
+    }
+
+    return $updated
+}
+
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 $projectPath = Join-Path $repoRoot 'src\RustyXr.Companion.App\RustyXr.Companion.App.csproj'
 $installRoot = Join-Path $env:LOCALAPPDATA 'Programs\RustyXrCompanionDev'
 $shortcutDirectory = Join-Path ([Environment]::GetFolderPath([Environment+SpecialFolder]::StartMenu)) 'Programs\Rusty XR Companion'
-$shortcutPath = Join-Path $shortcutDirectory 'Rusty XR Companion Dev.url'
+$shortcutPath = Join-Path $shortcutDirectory 'Rusty XR Companion Dev.lnk'
+$legacyShortcutPath = Join-Path $shortcutDirectory 'Rusty XR Companion Dev.url'
+$devVersion = '0.1.7-dev'
+$devExeName = 'RustyXr.Companion.Dev.exe'
+$devDisplayName = 'Rusty XR Companion Dev'
 
 Assert-SafeInstallRoot -Path $installRoot
 
 if (Test-Path -LiteralPath $installRoot) {
-    Remove-Item -LiteralPath $installRoot -Recurse -Force
+    Get-ChildItem -LiteralPath $installRoot -Force | Remove-Item -Recurse -Force
 }
 
 New-Item -ItemType Directory -Force -Path $installRoot | Out-Null
@@ -50,27 +140,46 @@ dotnet publish $projectPath `
     --runtime $RuntimeIdentifier `
     -p:PublishSingleFile=true `
     -p:SelfContained=false `
-    -p:Version=0.1.1-dev `
-    -p:AssemblyVersion=0.1.1.0 `
-    -p:FileVersion=0.1.1.0 `
-    -p:InformationalVersion=0.1.1-dev `
+    "-p:RustyXrCompanionApplicationIcon=Assets\RustyXrCompanionDev.ico" `
+    "-p:RustyXrCompanionAssemblyName=RustyXr.Companion.Dev" `
+    "-p:Product=Rusty XR Companion Dev" `
+    "-p:AssemblyTitle=Rusty XR Companion Dev" `
+    "-p:Version=$devVersion" `
+    -p:AssemblyVersion=0.1.7.0 `
+    -p:FileVersion=0.1.7.0 `
+    "-p:InformationalVersion=$devVersion" `
     --output $installRoot
 
 if ($LASTEXITCODE -ne 0) {
     throw "dotnet publish failed with exit code $LASTEXITCODE"
 }
 
-$exePath = Join-Path $installRoot 'RustyXr.Companion.App.exe'
+$exePath = Join-Path $installRoot $devExeName
 if (-not (Test-Path -LiteralPath $exePath)) {
     throw "Published dev app executable not found at $exePath"
 }
 
 New-Item -ItemType Directory -Force -Path $shortcutDirectory | Out-Null
-$shortcutExePath = $exePath.Replace('\', '/')
-Set-Content -Path $shortcutPath -Encoding ASCII -Value "[InternetShortcut]`r`nURL=file:///$shortcutExePath`r`n"
+Remove-Item -LiteralPath $legacyShortcutPath -Force -ErrorAction SilentlyContinue
+$shell = New-Object -ComObject WScript.Shell
+Set-ShellShortcut `
+    -Shell $shell `
+    -Path $shortcutPath `
+    -TargetPath $exePath `
+    -WorkingDirectory $installRoot `
+    -IconLocation "$exePath,0" `
+    -Description $devDisplayName
+$repairedTaskbarPins = @(Repair-DevTaskbarPin `
+    -Shell $shell `
+    -InstallRoot $installRoot `
+    -ExePath $exePath `
+    -DisplayName $devDisplayName)
 
-Write-Host "Installed Rusty XR Companion Dev to $installRoot"
+Write-Host "Installed $devDisplayName to $installRoot"
 Write-Host "Created Start Menu shortcut at $shortcutPath"
+if ($repairedTaskbarPins.Count -gt 0) {
+    Write-Host "Repaired dev taskbar pin(s): $($repairedTaskbarPins -join ', ')"
+}
 
 if ($Launch) {
     Start-Process -FilePath $exePath -WorkingDirectory $installRoot

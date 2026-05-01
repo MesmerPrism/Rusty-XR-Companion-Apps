@@ -21,7 +21,8 @@ public static class PortableInstallLayout
     public const string DevInstallDirectoryName = "RustyXrCompanionDev";
     public const string AppDataDirectoryName = "RustyXrCompanion";
     public const string StartMenuFolderName = "Rusty XR Companion";
-    public const string ReleaseShortcutName = "Rusty XR Companion.url";
+    public const string ReleaseShortcutName = "Rusty XR Companion.lnk";
+    public const string LegacyReleaseShortcutName = "Rusty XR Companion.url";
     public const string UninstallRegistrySubKey =
         @"Software\Microsoft\Windows\CurrentVersion\Uninstall\RustyXrCompanion";
 
@@ -121,22 +122,22 @@ public static class PortableInstallRegistration
         var shortcutDirectory = PortableInstallLayout.StartMenuDirectory();
         Directory.CreateDirectory(shortcutDirectory);
 
-        var exePath = PortableInstallLayout.AppExePath(installRoot).Replace("\\", "/", StringComparison.Ordinal);
+        var exePath = PortableInstallLayout.AppExePath(installRoot);
         var iconPath = PortableInstallLayout.AppExePath(installRoot);
-        File.WriteAllText(
+        TryDeleteFile(Path.Combine(shortcutDirectory, PortableInstallLayout.LegacyReleaseShortcutName));
+        CreateShellShortcut(
             PortableInstallLayout.ReleaseShortcutPath(),
-            string.Join(
-                Environment.NewLine,
-                "[InternetShortcut]",
-                $"URL=file:///{exePath}",
-                $"IconFile={iconPath}",
-                "IconIndex=0",
-                string.Empty));
+            exePath,
+            installRoot,
+            $"{iconPath},0",
+            PortableInstallLayout.AppDisplayName);
+        RepairReleaseTaskbarPins(installRoot, exePath, iconPath);
     }
 
     public static void RemoveReleaseShortcut()
     {
         TryDeleteFile(PortableInstallLayout.ReleaseShortcutPath());
+        TryDeleteFile(Path.Combine(PortableInstallLayout.StartMenuDirectory(), PortableInstallLayout.LegacyReleaseShortcutName));
 
         var shortcutDirectory = PortableInstallLayout.StartMenuDirectory();
         if (!Directory.Exists(shortcutDirectory))
@@ -149,6 +150,97 @@ public static class PortableInstallRegistration
             if (!Directory.EnumerateFileSystemEntries(shortcutDirectory).Any())
             {
                 Directory.Delete(shortcutDirectory);
+            }
+        }
+        catch
+        {
+        }
+    }
+
+    private static void CreateShellShortcut(
+        string shortcutPath,
+        string targetPath,
+        string workingDirectory,
+        string iconLocation,
+        string description)
+    {
+        var shellType = Type.GetTypeFromProgID("WScript.Shell")
+            ?? throw new InvalidOperationException("Windows Script Host shortcut service is unavailable.");
+        dynamic shell = Activator.CreateInstance(shellType)
+            ?? throw new InvalidOperationException("Could not create Windows Script Host shortcut service.");
+        dynamic shortcut = shell.CreateShortcut(shortcutPath);
+        shortcut.TargetPath = targetPath;
+        shortcut.WorkingDirectory = workingDirectory;
+        shortcut.IconLocation = iconLocation;
+        shortcut.Description = description;
+        shortcut.Save();
+    }
+
+    private static void RepairReleaseTaskbarPins(string installRoot, string exePath, string iconPath)
+    {
+        var taskbarDirectory = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+            "Microsoft",
+            "Internet Explorer",
+            "Quick Launch",
+            "User Pinned",
+            "TaskBar");
+        if (!Directory.Exists(taskbarDirectory))
+        {
+            return;
+        }
+
+        var normalizedInstallRoot = PortableInstallLayout.NormalizeDirectory(installRoot);
+        var desiredShortcutPath = Path.Combine(taskbarDirectory, PortableInstallLayout.ReleaseShortcutName);
+
+        try
+        {
+            var shellType = Type.GetTypeFromProgID("WScript.Shell")
+                ?? throw new InvalidOperationException("Windows Script Host shortcut service is unavailable.");
+            dynamic shell = Activator.CreateInstance(shellType)
+                ?? throw new InvalidOperationException("Could not create Windows Script Host shortcut service.");
+
+            foreach (var shortcutPath in Directory.EnumerateFiles(taskbarDirectory, "*.lnk").ToArray())
+            {
+                try
+                {
+                    dynamic shortcut = shell.CreateShortcut(shortcutPath);
+                    string? targetPath = shortcut.TargetPath;
+                    if (string.IsNullOrWhiteSpace(targetPath))
+                    {
+                        continue;
+                    }
+
+                    var normalizedTargetPath = Path.GetFullPath(targetPath);
+                    if (!normalizedTargetPath.StartsWith(
+                            normalizedInstallRoot + Path.DirectorySeparatorChar,
+                            StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+
+                    if (!string.Equals(shortcutPath, desiredShortcutPath, StringComparison.OrdinalIgnoreCase))
+                    {
+                        if (!File.Exists(desiredShortcutPath))
+                        {
+                            File.Move(shortcutPath, desiredShortcutPath);
+                        }
+                        else
+                        {
+                            File.Delete(shortcutPath);
+                        }
+                    }
+
+                    CreateShellShortcut(
+                        desiredShortcutPath,
+                        exePath,
+                        installRoot,
+                        $"{iconPath},0",
+                        PortableInstallLayout.AppDisplayName);
+                }
+                catch
+                {
+                }
             }
         }
         catch
@@ -420,8 +512,10 @@ public static class PortableInstallUninstaller
             }
 
             $shortcutDirectory = Join-Path ([Environment]::GetFolderPath('StartMenu')) 'Programs\Rusty XR Companion'
-            $releaseShortcut = Join-Path $shortcutDirectory 'Rusty XR Companion.url'
+            $releaseShortcut = Join-Path $shortcutDirectory 'Rusty XR Companion.lnk'
+            $legacyReleaseShortcut = Join-Path $shortcutDirectory 'Rusty XR Companion.url'
             Remove-Item -LiteralPath $releaseShortcut -Force -ErrorAction SilentlyContinue
+            Remove-Item -LiteralPath $legacyReleaseShortcut -Force -ErrorAction SilentlyContinue
             if ((Test-Path -LiteralPath $shortcutDirectory) -and -not (Get-ChildItem -LiteralPath $shortcutDirectory -Force -ErrorAction SilentlyContinue)) {
                 Remove-Item -LiteralPath $shortcutDirectory -Force -ErrorAction SilentlyContinue
             }

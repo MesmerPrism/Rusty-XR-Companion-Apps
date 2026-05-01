@@ -17,7 +17,7 @@ Use the guided setup helper when a release is available:
 The helper downloads the latest portable app zip, installs it under
 `%LOCALAPPDATA%\Programs\RustyXrCompanion`, refreshes the managed Quest tooling
 cache, creates the Start Menu launcher at
-`%APPDATA%\Microsoft\Windows\Start Menu\Programs\Rusty XR Companion\Rusty XR Companion.url`,
+`%APPDATA%\Microsoft\Windows\Start Menu\Programs\Rusty XR Companion\Rusty XR Companion.lnk`,
 registers a per-user Windows uninstall entry, and launches the app. The setup
 window shows both paths before installation starts.
 

@@ -72,7 +72,17 @@ public sealed record QuestSnapshot(
     bool? IsInteractive = null,
     string DisplayPowerState = "",
     IReadOnlyList<QuestControllerStatus>? Controllers = null,
-    QuestProximityStatus? Proximity = null);
+    QuestProximityStatus? Proximity = null,
+    QuestForegroundStatus? ForegroundStatus = null);
+
+public sealed record QuestForegroundStatus(
+    string ResumedActivity,
+    string FocusedWindow,
+    string FocusedApp,
+    bool HasKnownBlocker,
+    bool FocusDiffersFromResumed,
+    string BlockerLabel,
+    string Detail);
 
 public sealed record QuestControllerStatus(
     string HandLabel,

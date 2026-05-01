@@ -201,10 +201,16 @@ public sealed class CoreModelTests
         Assert.Equal(AppInstallChannel.Release, release.Channel);
         Assert.True(release.AutoUpdatesEnabled);
         Assert.Equal("1.2.3", release.CurrentVersion);
+        Assert.Equal("Rusty XR Companion", release.AppDisplayName);
+        Assert.Equal("MesmerPrism.RustyXR.Companion", release.AppUserModelId);
         Assert.Equal(AppInstallChannel.Dev, dev.Channel);
         Assert.False(dev.AutoUpdatesEnabled);
+        Assert.Equal("Rusty XR Companion Dev", dev.AppDisplayName);
+        Assert.Equal("MesmerPrism.RustyXR.Companion.Dev", dev.AppUserModelId);
         Assert.Equal(AppInstallChannel.Source, source.Channel);
         Assert.False(source.AutoUpdatesEnabled);
+        Assert.Equal("Rusty XR Companion Source", source.AppDisplayName);
+        Assert.Equal("MesmerPrism.RustyXR.Companion.Source", source.AppUserModelId);
     }
 
     [Theory]
@@ -298,6 +304,47 @@ public sealed class CoreModelTests
     }
 
     [Fact]
+    public void QuestAdbServiceDetectsForegroundGuardianBlocker()
+    {
+        var activityOutput = """
+            ACTIVITY MANAGER ACTIVITIES
+              topResumedActivity=ActivityRecord{123 u0 com.example.questapp/.MainActivity t44}
+            """;
+        var windowOutput = """
+            WINDOW MANAGER WINDOWS
+              mCurrentFocus=Window{abc u0 com.oculus.guardian/.GuardianDialogActivity}
+              mFocusedApp=ActivityRecord{def u0 com.example.questapp/.MainActivity t44}
+            """;
+
+        var status = QuestAdbService.ParseQuestForegroundStatus(activityOutput, windowOutput);
+
+        Assert.Equal("com.example.questapp/.MainActivity", status.ResumedActivity);
+        Assert.Equal("com.oculus.guardian/.GuardianDialogActivity", status.FocusedWindow);
+        Assert.True(status.HasKnownBlocker);
+        Assert.True(status.FocusDiffersFromResumed);
+        Assert.Equal("Guardian", status.BlockerLabel);
+    }
+
+    [Fact]
+    public void QuestAdbServiceDetectsRuntimePermissionPrompt()
+    {
+        var activityOutput = """
+            ACTIVITY MANAGER ACTIVITIES
+              mResumedActivity: ActivityRecord{123 u0 com.example.questapp/.MainActivity t44}
+            """;
+        var windowOutput = """
+            WINDOW MANAGER WINDOWS
+              mCurrentFocus=Window{abc u0 com.android.permissioncontroller/com.android.permissioncontroller.permission.ui.GrantPermissionsActivity}
+            """;
+
+        var status = QuestAdbService.ParseQuestForegroundStatus(activityOutput, windowOutput);
+
+        Assert.True(status.HasKnownBlocker);
+        Assert.Equal("Permission request", status.BlockerLabel);
+        Assert.Contains("focused window", status.Detail);
+    }
+
+    [Fact]
     public async Task QuestAdbServiceLaunchPassesRuntimeProfileExtras()
     {
         var tempRoot = Path.Combine(Path.GetTempPath(), $"rusty-xr-adb-{Guid.NewGuid():N}");
@@ -366,6 +413,34 @@ public sealed class CoreModelTests
             Assert.True(result.Succeeded);
             Assert.Equal(adbPath, result.FileName);
             Assert.Contains("-s SERIAL shell run-as 'com.example.questapp' cat 'files/camera-source-diagnostics.json'", result.Arguments);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("RUSTY_XR_ADB", previousAdb);
+            Directory.Delete(tempRoot, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task QuestAdbServiceSendsSleepKeyevent()
+    {
+        var tempRoot = Path.Combine(Path.GetTempPath(), $"rusty-xr-adb-{Guid.NewGuid():N}");
+        var adbPath = Path.Combine(tempRoot, "adb.exe");
+        Directory.CreateDirectory(tempRoot);
+        await File.WriteAllTextAsync(adbPath, string.Empty);
+        var previousAdb = Environment.GetEnvironmentVariable("RUSTY_XR_ADB");
+        Environment.SetEnvironmentVariable("RUSTY_XR_ADB", adbPath);
+
+        try
+        {
+            var runner = new RecordingCommandRunner();
+            var service = new QuestAdbService(new ToolLocator(runner), runner);
+
+            var result = await service.SleepDeviceAsync("SERIAL");
+
+            Assert.True(result.Succeeded);
+            Assert.Equal(adbPath, result.FileName);
+            Assert.Contains("-s SERIAL shell input keyevent SLEEP", result.Arguments);
         }
         finally
         {
