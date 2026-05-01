@@ -29,8 +29,8 @@ Companion catalog commands. The composite-layer example uses runtime profiles
 for `synthetic-composite-layer`, `camera-source-diagnostics`,
 `camera-diagnostic-cpu-copy`, `camera-gpu-buffer-probe`,
 `camera-stereo-gpu-composite`,
-`camera-stereo-gpu-composite-quad-surface`, and optional
-`media-projection-stream`.
+`camera-stereo-gpu-composite-quad-surface`, `environment-depth-diagnostics`,
+and optional `media-projection-stream`.
 
 For the full sibling-repo flow, run:
 
@@ -65,3 +65,11 @@ the same normalized shader color domain. The profile is useful for
 collaboration, but it is not yet the final performance or color reference;
 keep the manual visual gate closed while investigating remaining performance
 and tone differences.
+
+The environment-depth diagnostics profile starts only the OpenXR
+environment-depth path. Companion validation checks the latest
+`Rusty XR environment depth status` log line for provider support, swapchain
+creation, acquired frames, runtime capture timestamp progression, near/far
+range metadata, observed depth cadence, average acquire CPU cost, and explicit
+confidence-source reporting. The first headset visual is a simple acquisition
+state color, not a false-color depth texture view.

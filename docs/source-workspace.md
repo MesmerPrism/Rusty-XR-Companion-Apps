@@ -107,6 +107,17 @@ Verify from `Rusty-XR-Companion-Apps`:
 dotnet run --project .\src\RustyXr.Companion.Cli -- catalog verify --path ..\Rusty-XR\examples\quest-composite-layer-apk\catalog\rusty-xr-quest-composite-layer.catalog.json --app rusty-xr-quest-composite-layer --serial <serial> --stop-catalog-apps --install --launch --device-profile xr-composite-smoke-test --runtime-profile camera-stereo-gpu-composite --settle-ms 9000 --logcat-lines 1400 --out .\artifacts\verify
 ```
 
+For OpenXR environment-depth diagnostics, use the same APK with the explicit
+depth runtime profile:
+
+```powershell
+dotnet run --project .\src\RustyXr.Companion.Cli -- catalog verify --path ..\Rusty-XR\examples\quest-composite-layer-apk\catalog\rusty-xr-quest-composite-layer.catalog.json --app rusty-xr-quest-composite-layer --serial <serial> --stop-catalog-apps --install --launch --device-profile xr-composite-smoke-test --runtime-profile environment-depth-diagnostics --settle-ms 9000 --logcat-lines 1400 --out .\artifacts\verify
+```
+
+That profile validates provider support, swapchain metadata, acquisition
+cadence, runtime depth timestamps, acquire CPU cost, confidence availability,
+and the stereo grayscale depth visualizer state.
+
 ## Working Rules
 
 Keep generated files in ignored output locations:

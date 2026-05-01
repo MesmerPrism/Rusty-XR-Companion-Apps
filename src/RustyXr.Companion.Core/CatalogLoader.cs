@@ -154,6 +154,22 @@ public sealed class CatalogLoader
                     },
                     "Enumerates public Camera2 source capabilities and writes camera-source-diagnostics.json into the verification bundle when logcat capture is enabled."),
                 new RuntimeProfile(
+                    "environment-depth-diagnostics",
+                    "Environment depth diagnostics",
+                    new Dictionary<string, string>
+                    {
+                        ["rustyxr.example"] = "quest-composite-layer-apk",
+                        ["rustyxr.cameraTier"] = "synthetic",
+                        ["rustyxr.camera"] = "false",
+                        ["rustyxr.mediaProjection"] = "false",
+                        ["rustyxr.source"] = "environment-depth",
+                        ["rustyxr.depth"] = "visualize",
+                        ["rustyxr.depthHandRemoval"] = "false",
+                        ["rustyxr.xrRenderScale"] = "0.75",
+                        ["rustyxr.xrFixedFoveationLevel"] = "0"
+                    },
+                    "Starts the OpenXR environment-depth provider only for this diagnostic profile, logs depth resolution, near/far, runtime capture timestamps, acquire cost, update cadence, and confidence availability, and renders the current stereo depth texture in headset as a per-eye D16 grayscale diagnostic."),
+                new RuntimeProfile(
                     "camera-diagnostic-cpu-copy",
                     "Camera diagnostic CPU copy",
                     new Dictionary<string, string>

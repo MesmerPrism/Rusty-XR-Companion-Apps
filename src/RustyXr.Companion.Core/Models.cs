@@ -242,8 +242,35 @@ public static class RuntimeProfileLogValidator
                 string.Equals(tier, "camera-stereo-gpu-composite", StringComparison.OrdinalIgnoreCase));
     }
 
+    public static bool RequiresEnvironmentDepthDiagnostics(RuntimeProfile? profile)
+    {
+        if (profile is null)
+        {
+            return false;
+        }
+
+        if (string.Equals(profile.Id, "environment-depth-diagnostics", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        return profile.Values.TryGetValue("rustyxr.depth", out var depth) &&
+               (string.Equals(depth, "visualize", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(depth, "diagnostic", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(depth, "diagnostics", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(depth, "status", StringComparison.OrdinalIgnoreCase));
+    }
+
+    public static bool RequiresLogValidation(RuntimeProfile? profile) =>
+        RequiresAlignedGpuProjection(profile) || RequiresEnvironmentDepthDiagnostics(profile);
+
     public static RuntimeProfileLogValidation Validate(RuntimeProfile? profile, string? logcatText)
     {
+        if (RequiresEnvironmentDepthDiagnostics(profile))
+        {
+            return ValidateEnvironmentDepthDiagnostics(logcatText);
+        }
+
         if (!RequiresAlignedGpuProjection(profile))
         {
             return new RuntimeProfileLogValidation(true, "No aligned GPU projection log validation required.");
@@ -362,6 +389,168 @@ public static class RuntimeProfileLogValidator
             $"Runtime profile requires real stereo GPU projection; observed activeTier={observedTier} alignedProjection={observedAlignment}; missing {string.Join(", ", missing)}.");
     }
 
+    private static RuntimeProfileLogValidation ValidateEnvironmentDepthDiagnostics(string? logcatText)
+    {
+        if (string.IsNullOrWhiteSpace(logcatText))
+        {
+            return new RuntimeProfileLogValidation(
+                false,
+                "Runtime profile requires an environment-depth status line; capture logcat with --logcat-lines.");
+        }
+
+        var statusLine = FindLatestEnvironmentDepthStatusLine(logcatText);
+        if (statusLine is null)
+        {
+            return new RuntimeProfileLogValidation(
+                false,
+                "Runtime profile requires a `Rusty XR environment depth status` log line.");
+        }
+
+        var hasEnabled = statusLine.Contains("depthEnabled=true", StringComparison.Ordinal);
+        var hasExtension = statusLine.Contains("extensionAvailable=true", StringComparison.Ordinal);
+        var hasSupported = statusLine.Contains("supported=true", StringComparison.Ordinal);
+        var hasProviderCreated = statusLine.Contains("providerCreated=true", StringComparison.Ordinal);
+        var hasProviderRunning = statusLine.Contains("providerRunning=true", StringComparison.Ordinal);
+        var hasSwapchain = statusLine.Contains("swapchainCreated=true", StringComparison.Ordinal);
+        var hasVisualizer = statusLine.Contains("visualizer=true", StringComparison.Ordinal);
+        var attempts = 0;
+        var acquired = 0;
+        var uniqueCaptureTimes = 0;
+        var openXrFrameCount = 0;
+        var hasAttempts = TryReadTokenInt(statusLine, "acquireAttempts=", out attempts) && attempts > 0;
+        var hasAcquired = TryReadTokenInt(statusLine, "acquiredFrames=", out acquired) && acquired > 0;
+        var hasUniqueCaptureTime =
+            TryReadTokenInt(statusLine, "uniqueCaptureTimes=", out uniqueCaptureTimes) &&
+            uniqueCaptureTimes > 0;
+        var hasFrameCadence =
+            TryReadTokenInt(statusLine, "openXrFrameCount=", out openXrFrameCount) &&
+            openXrFrameCount >= 120;
+        var hasCaptureTimestamp = statusLine.Contains("captureTimeNs=", StringComparison.Ordinal) &&
+                                  !statusLine.Contains("captureTimeNs=none", StringComparison.Ordinal);
+        var hasDepthRange = statusLine.Contains("nearZ=", StringComparison.Ordinal) &&
+                            statusLine.Contains("farZ=", StringComparison.Ordinal);
+        var hasConfidenceState =
+            statusLine.Contains("confidenceSource=", StringComparison.Ordinal) &&
+            statusLine.Contains("confidencePayload=", StringComparison.Ordinal);
+        var hasConfidenceStatus = statusLine.Contains("confidenceStatus=", StringComparison.Ordinal);
+        var hasDepthTextureFormat = statusLine.Contains("depthFormat=VK_FORMAT_D16_UNORM", StringComparison.Ordinal);
+        var hasEyeMapping = statusLine.Contains("depthVisualEyeMapping=left-layer-0-right-layer-1", StringComparison.Ordinal);
+        var hasDepthTextureTransform = statusLine.Contains("depthVisualTextureTransform=rotate0+flipY", StringComparison.Ordinal);
+        var visualizerDrawLine = FindLatestEnvironmentDepthVisualizerDrawLine(logcatText);
+        var hasVisualizerDraw =
+            visualizerDrawLine is not null &&
+            visualizerDrawLine.Contains("depthTextureFormat=VK_FORMAT_D16_UNORM", StringComparison.Ordinal) &&
+            visualizerDrawLine.Contains("grayscale=linear-d16-meters-infinity-white", StringComparison.Ordinal) &&
+            visualizerDrawLine.Contains("depthVisualTextureTransform=rotate0+flipY", StringComparison.Ordinal);
+
+        if (hasEnabled &&
+            hasExtension &&
+            hasSupported &&
+            hasProviderCreated &&
+            hasProviderRunning &&
+            hasSwapchain &&
+            hasVisualizer &&
+            hasAttempts &&
+            hasAcquired &&
+            hasUniqueCaptureTime &&
+            hasFrameCadence &&
+            hasCaptureTimestamp &&
+            hasDepthRange &&
+            hasConfidenceState &&
+            hasConfidenceStatus &&
+            hasDepthTextureFormat &&
+            hasEyeMapping &&
+            hasDepthTextureTransform &&
+            hasVisualizerDraw)
+        {
+            return new RuntimeProfileLogValidation(
+                true,
+                $"Runtime profile reported active environment-depth acquisition with {acquired} acquired frame(s), {uniqueCaptureTimes} unique capture timestamp(s), OpenXR frame {openXrFrameCount}, depth range metadata, explicit confidence state, and D16 grayscale visualizer draws.");
+        }
+
+        var missing = new List<string>();
+        if (!hasEnabled)
+        {
+            missing.Add("depthEnabled=true");
+        }
+        if (!hasExtension)
+        {
+            missing.Add("extensionAvailable=true");
+        }
+        if (!hasSupported)
+        {
+            missing.Add("supported=true");
+        }
+        if (!hasProviderCreated)
+        {
+            missing.Add("providerCreated=true");
+        }
+        if (!hasProviderRunning)
+        {
+            missing.Add("providerRunning=true");
+        }
+        if (!hasSwapchain)
+        {
+            missing.Add("swapchainCreated=true");
+        }
+        if (!hasVisualizer)
+        {
+            missing.Add("visualizer=true");
+        }
+        if (!hasAttempts)
+        {
+            missing.Add("acquireAttempts>0");
+        }
+        if (!hasAcquired)
+        {
+            missing.Add("acquiredFrames>0");
+        }
+        if (!hasUniqueCaptureTime)
+        {
+            missing.Add("uniqueCaptureTimes>0");
+        }
+        if (!hasFrameCadence)
+        {
+            missing.Add("OpenXR frame cadence evidence >= 120 frames");
+        }
+        if (!hasCaptureTimestamp)
+        {
+            missing.Add("runtime captureTimeNs");
+        }
+        if (!hasDepthRange)
+        {
+            missing.Add("nearZ/farZ");
+        }
+        if (!hasConfidenceState)
+        {
+            missing.Add("confidenceSource/confidencePayload state");
+        }
+        if (!hasConfidenceStatus)
+        {
+            missing.Add("confidenceStatus");
+        }
+        if (!hasDepthTextureFormat)
+        {
+            missing.Add("depthFormat=VK_FORMAT_D16_UNORM");
+        }
+        if (!hasEyeMapping)
+        {
+            missing.Add("left/right depth eye mapping");
+        }
+        if (!hasDepthTextureTransform)
+        {
+            missing.Add("depth texture orientation transform");
+        }
+        if (!hasVisualizerDraw)
+        {
+            missing.Add("environment depth visualizer draw");
+        }
+
+        return new RuntimeProfileLogValidation(
+            false,
+            $"Runtime profile requires environment-depth acquisition diagnostics; missing {string.Join(", ", missing)}.");
+    }
+
     private static string? FindLatestProjectionStatusLine(string text)
     {
         var lines = text.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
@@ -374,6 +563,20 @@ public static class RuntimeProfileLogValidator
 
         return lines.LastOrDefault(line =>
             line.Contains("Rusty XR GPU stereo camera draw prepared", StringComparison.Ordinal));
+    }
+
+    private static string? FindLatestEnvironmentDepthStatusLine(string text)
+    {
+        var lines = text.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
+        return lines.LastOrDefault(line =>
+            line.Contains("Rusty XR environment depth status", StringComparison.Ordinal));
+    }
+
+    private static string? FindLatestEnvironmentDepthVisualizerDrawLine(string text)
+    {
+        var lines = text.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
+        return lines.LastOrDefault(line =>
+            line.Contains("Rusty XR environment depth visualizer draw", StringComparison.Ordinal));
     }
 
     private static string? LastTokenAfter(string text, string prefix)

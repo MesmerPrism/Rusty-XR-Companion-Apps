@@ -34,6 +34,14 @@ dotnet run --project src/RustyXr.Companion.Cli -- catalog verify --path samples\
 That bundle includes before/after snapshots, target process state, foreground
 activity matching, `gfxinfo`, `meminfo`, command results, and notes.
 
+The `environment-depth-diagnostics` runtime profile adds OpenXR environment
+depth validation. It requires a `Rusty XR environment depth status` log line,
+checks that the provider is running, confirms acquired frames and unique
+capture timestamps, records observed depth cadence and acquire CPU cost, and
+requires the per-eye grayscale depth visualizer draw state. Confidence is
+reported explicitly so a run can distinguish available confidence data from a
+runtime/API path that exposes no confidence payload.
+
 The WPF app writes diagnostics under:
 
 ```text

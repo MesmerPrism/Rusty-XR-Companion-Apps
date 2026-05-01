@@ -18,8 +18,11 @@ owns reusable Rust contracts and schemas. This repo owns app UX, Windows
 release tooling, Quest device operations, and contributor-facing docs.
 The sample catalog includes the accepted fullscreen raw-camera composite
 profile, a `quad-surface` A/B profile, native passthrough hotload profiles, and
-safety-gated strobe profiles. Strobing profiles are hazardous and should only
-be launched with explicit informed opt-in.
+safety-gated strobe profiles. It also includes an environment-depth diagnostics
+profile that verifies OpenXR environment-depth provider startup, acquisition,
+runtime capture timestamp progression, update cadence, acquire cost, and
+confidence-state reporting from logcat. Strobing profiles are hazardous and
+should only be launched with explicit informed opt-in.
 
 ## Current Scope
 
@@ -41,8 +44,9 @@ be launched with explicit informed opt-in.
   source bytes
 - catalog install/verify support for local APK paths and GitHub Release asset
   URLs
-- runtime-profile launch support for native passthrough style hotload and
-  strobe timing experiments published by Rusty XR core
+- runtime-profile launch support for native passthrough style hotload,
+  environment-depth diagnostics, and strobe timing experiments published by
+  Rusty XR core
 
 The repo does **not** commit APK bytes. Release packaging downloads the public
 Rusty XR composite-layer APK from a configured release asset, places it beside
@@ -103,6 +107,7 @@ dotnet run --project src/RustyXr.Companion.Cli -- catalog verify --path samples\
 dotnet run --project src/RustyXr.Companion.Cli -- catalog verify --path samples\quest-session-kit\apk-catalog.example.json --app rusty-xr-quest-composite-layer --serial <serial> --stop-catalog-apps --install --launch --device-profile xr-composite-smoke-test --runtime-profile camera-diagnostic-cpu-copy --settle-ms 7000 --logcat-lines 1000 --out .\artifacts\verify
 dotnet run --project src/RustyXr.Companion.Cli -- catalog verify --path samples\quest-session-kit\apk-catalog.example.json --app rusty-xr-quest-composite-layer --serial <serial> --stop-catalog-apps --install --launch --device-profile xr-composite-smoke-test --runtime-profile camera-stereo-gpu-composite --settle-ms 9000 --logcat-lines 1400 --out .\artifacts\verify
 dotnet run --project src/RustyXr.Companion.Cli -- catalog verify --path samples\quest-session-kit\apk-catalog.example.json --app rusty-xr-quest-composite-layer --serial <serial> --stop-catalog-apps --install --launch --device-profile xr-composite-smoke-test --runtime-profile camera-stereo-gpu-composite-quad-surface --settle-ms 9000 --logcat-lines 1400 --out .\artifacts\verify
+dotnet run --project src/RustyXr.Companion.Cli -- catalog verify --path samples\quest-session-kit\apk-catalog.example.json --app rusty-xr-quest-composite-layer --serial <serial> --stop-catalog-apps --install --launch --device-profile xr-composite-smoke-test --runtime-profile environment-depth-diagnostics --settle-ms 9000 --logcat-lines 1400 --out .\artifacts\verify
 dotnet run --project src/RustyXr.Companion.Cli -- catalog verify --path samples\quest-session-kit\apk-catalog.example.json --app rusty-xr-quest-composite-layer --serial <serial> --stop-catalog-apps --install --launch --device-profile xr-composite-smoke-test --runtime-profile media-projection-stream --media-receiver --settle-ms 7000 --logcat-lines 1000 --out .\artifacts\verify
 ```
 

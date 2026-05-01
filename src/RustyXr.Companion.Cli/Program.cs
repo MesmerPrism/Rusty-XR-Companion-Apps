@@ -692,7 +692,7 @@ internal static class CliProgram
         }
 
         var profileLogValidationSucceeded = true;
-        if (RuntimeProfileLogValidator.RequiresAlignedGpuProjection(runtimeProfile))
+        if (RuntimeProfileLogValidator.RequiresLogValidation(runtimeProfile))
         {
             var profileLogValidation = RuntimeProfileLogValidator.Validate(runtimeProfile, logcatText);
             profileLogValidationSucceeded = profileLogValidation.Succeeded;

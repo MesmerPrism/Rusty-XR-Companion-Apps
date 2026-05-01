@@ -601,6 +601,36 @@ public sealed class CoreModelTests
     }
 
     [Fact]
+    public void RuntimeProfileLogValidatorRequiresEnvironmentDepthStatusForDepthProfile()
+    {
+        var profile = new RuntimeProfile(
+            "environment-depth-diagnostics",
+            "Environment depth diagnostics",
+            new Dictionary<string, string>
+            {
+                ["rustyxr.depth"] = "visualize",
+                ["rustyxr.camera"] = "false"
+            },
+            "Depth diagnostics.");
+        var passingLog = string.Join(
+            Environment.NewLine,
+            "Rusty XR OpenXR state FOCUSED",
+            "Rusty XR environment depth status frame=240 depthEnabled=true mode=visualize extensionAvailable=true supported=true providerCreated=true providerRunning=true swapchainCreated=true size=320x320 depthFormat=VK_FORMAT_D16_UNORM layerCount=2 swapchainIndex=1 openXrFrameCount=240 observedOpenXrFps=72.0 acquireAttempts=240 acquiredFrames=120 unavailableFrames=120 acquireErrors=0 uniqueCaptureTimes=30 repeatedCaptureTimes=90 observedAcquireHz=72.0 observedDepthHz=9.0 lastAcquireCpuMs=0.060 avgAcquireCpuMs=0.055 captureTimeNs=123456 nearZ=0.1 farZ=4 handRemovalSupported=true handRemovalEnabled=false confidenceSource=none confidencePayload=false confidenceStatus=not-exposed-by-XR_META_environment_depth visualizer=true depthVisualEncoding=linear-d16-meters-infinity-white depthVisualMaxMeters=20 depthVisualTextureTransform=rotate0+flipY depthVisualEyeMapping=left-layer-0-right-layer-1",
+            "Rusty XR environment depth visualizer draw frame=240 swapchainIndex=1 captureTimeNs=123456 renderTarget=1372x1512 depthTextureFormat=VK_FORMAT_D16_UNORM depthTextureLayers=2 grayscale=linear-d16-meters-infinity-white depthVisualMaxMeters=20 depthVisualTextureTransform=rotate0+flipY confidenceSource=none confidencePayload=false confidenceStatus=not-exposed-by-XR_META_environment_depth");
+        var noFrameLog =
+            "Rusty XR environment depth status frame=240 depthEnabled=true mode=visualize extensionAvailable=true supported=true providerCreated=true providerRunning=true swapchainCreated=true size=320x320 depthFormat=VK_FORMAT_D16_UNORM layerCount=2 swapchainIndex=none openXrFrameCount=240 observedOpenXrFps=72.0 acquireAttempts=240 acquiredFrames=0 unavailableFrames=240 acquireErrors=0 uniqueCaptureTimes=0 repeatedCaptureTimes=0 observedAcquireHz=72.0 observedDepthHz=0.0 lastAcquireCpuMs=0.040 avgAcquireCpuMs=0.040 captureTimeNs=none nearZ=0 farZ=0 handRemovalSupported=true handRemovalEnabled=false confidenceSource=none confidencePayload=false confidenceStatus=not-exposed-by-XR_META_environment_depth visualizer=true depthVisualEncoding=linear-d16-meters-infinity-white depthVisualMaxMeters=20 depthVisualTextureTransform=rotate0+flipY depthVisualEyeMapping=left-layer-0-right-layer-1";
+
+        Assert.True(RuntimeProfileLogValidator.RequiresEnvironmentDepthDiagnostics(profile));
+        Assert.True(RuntimeProfileLogValidator.RequiresLogValidation(profile));
+        Assert.True(RuntimeProfileLogValidator.Validate(profile, passingLog).Succeeded);
+        var result = RuntimeProfileLogValidator.Validate(profile, noFrameLog);
+        Assert.False(result.Succeeded);
+        Assert.Contains("acquiredFrames>0", result.Detail);
+        Assert.Contains("runtime captureTimeNs", result.Detail);
+        Assert.False(RuntimeProfileLogValidator.Validate(profile, null).Succeeded);
+    }
+
+    [Fact]
     public void RuntimeProfileSafetyDetectsIntentionalStrobeProfiles()
     {
         var strobeProfile = new RuntimeProfile(
