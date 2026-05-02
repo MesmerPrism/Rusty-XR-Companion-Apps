@@ -20,6 +20,26 @@ Do not commit:
 Use generic language such as "target app", "user-supplied APK", "selected
 Quest", "device profile", and "runtime profile".
 
+## Release And Third-Party Dependencies
+
+Before changing release packaging, managed tool installs, self-update behavior,
+bundled catalog APKs, scrcpy/hzdb/platform-tools handling, or video/codec
+bridges:
+
+- Make third-party tool installs explicit and user-controlled.
+- Pin public-release tool/APK versions and hashes; reserve `latest` for
+  explicit update checks or dev-channel convenience.
+- Preserve upstream licenses/notices and write source/version/hash/license
+  metadata for managed tools.
+- Include release-level notices for self-contained .NET runtime files and any
+  bundled native/runtime components.
+- For bundled generated APKs, record source repo/tag/commit, APK SHA-256,
+  signing mode, included native libraries, permissions, and debug/release
+  status.
+- Keep hazardous runtime profiles opt-in in GUI and CLI.
+- Do not bundle WebRTC/NDI/FFmpeg/GStreamer/libx264/libx265 or SDK payloads
+  without a dedicated redistribution and notices audit.
+
 ## Build And Validation
 
 ```powershell

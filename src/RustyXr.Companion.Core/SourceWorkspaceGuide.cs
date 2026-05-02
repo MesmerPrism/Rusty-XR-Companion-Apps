@@ -88,6 +88,11 @@ public static class SourceWorkspaceGuide
                 companionPath,
                 @"dotnet run --project .\src\RustyXr.Companion.Cli -- catalog verify --path ..\Rusty-XR\examples\quest-composite-layer-apk\catalog\rusty-xr-quest-composite-layer.catalog.json --app rusty-xr-quest-composite-layer --serial <serial> --stop-catalog-apps --install --launch --device-profile xr-composite-smoke-test --runtime-profile camera-stereo-gpu-composite --settle-ms 9000 --logcat-lines 1400 --out .\artifacts\verify"),
             new SourceWorkspaceCommand(
+                "verify-osc-listener",
+                "Install, launch, and log the generic OSC UDP listener profile.",
+                companionPath,
+                @"dotnet run --project .\src\RustyXr.Companion.Cli -- catalog verify --path ..\Rusty-XR\examples\quest-composite-layer-apk\catalog\rusty-xr-quest-composite-layer.catalog.json --app rusty-xr-quest-composite-layer --serial <serial> --stop-catalog-apps --install --launch --device-profile xr-composite-smoke-test --runtime-profile osc-udp-listener --settle-ms 5000 --logcat-lines 1000 --out .\artifacts\verify"),
+            new SourceWorkspaceCommand(
                 "verify-environment-depth",
                 "Install, launch, and validate OpenXR environment-depth acquisition diagnostics.",
                 companionPath,

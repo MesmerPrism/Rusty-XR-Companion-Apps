@@ -52,6 +52,32 @@ Catalog verification can arm the receiver automatically:
 dotnet run --project src\RustyXr.Companion.Cli -- catalog verify --path samples\quest-session-kit\apk-catalog.example.json --app rusty-xr-quest-composite-layer --serial <serial> --stop-catalog-apps --install --launch --runtime-profile media-projection-stream --media-receiver --settle-ms 7000 --logcat-lines 1000 --out .\artifacts\verify
 ```
 
+## OSC UDP Probe
+
+The companion CLI can send and receive generic OSC messages for lightweight
+control/sensor adapter tests. OSC uses UDP, so test it over the Quest LAN IP;
+the `adb reverse` helper used by MediaProjection is a TCP path and is not used
+for this probe.
+
+Launch a Rusty XR app profile that enables an OSC listener, then send a probe
+message from the companion:
+
+```powershell
+dotnet run --project src\RustyXr.Companion.Cli -- catalog verify --path samples\quest-session-kit\apk-catalog.example.json --app rusty-xr-quest-composite-layer --serial <serial> --stop-catalog-apps --install --launch --runtime-profile osc-udp-listener --settle-ms 5000 --logcat-lines 1000 --out .\artifacts\verify
+dotnet run --project src\RustyXr.Companion.Cli -- osc send --host <quest-lan-ip> --port 9000 --address /rusty-xr/probe --arg string:hello
+```
+
+The headset log should include `Rusty XR OSC packet received`. To test the
+Windows receive side instead, run:
+
+```powershell
+dotnet run --project src\RustyXr.Companion.Cli -- osc receive --host 0.0.0.0 --port 9000 --count 1
+```
+
+The `osc-udp-listener` profile enables the headset diagnostic HUD. Use
+`osc-udp-listener-no-overlay` when you want to measure UDP ingress without
+drawing the HUD.
+
 ## Visual Inspection
 
 For agent and operator verification, capture still frames without routing a
@@ -80,5 +106,6 @@ behavior or app-visible camera acquisition.
 
 Planned public lanes:
 
+- richer OSC endpoint inventory and proof bundles
 - optional LSL stream inventory and status
 - per-session proof bundles under `artifacts/verify/...`

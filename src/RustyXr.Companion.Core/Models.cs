@@ -164,6 +164,85 @@ public sealed record MediaReceiverResult(
     DateTimeOffset StartedAt,
     DateTimeOffset CompletedAt);
 
+public enum OscArgumentKind
+{
+    Int,
+    Float,
+    String,
+    Blob,
+    Bool,
+    Nil,
+    Impulse
+}
+
+public sealed record OscArgument(
+    OscArgumentKind Kind,
+    int? IntValue = null,
+    float? FloatValue = null,
+    string? StringValue = null,
+    bool? BoolValue = null,
+    byte[]? BlobValue = null)
+{
+    public char TypeTag => Kind switch
+    {
+        OscArgumentKind.Int => 'i',
+        OscArgumentKind.Float => 'f',
+        OscArgumentKind.String => 's',
+        OscArgumentKind.Blob => 'b',
+        OscArgumentKind.Bool => BoolValue == true ? 'T' : 'F',
+        OscArgumentKind.Nil => 'N',
+        OscArgumentKind.Impulse => 'I',
+        _ => throw new InvalidOperationException($"Unsupported OSC argument kind: {Kind}.")
+    };
+
+    public static OscArgument Int(int value) => new(OscArgumentKind.Int, IntValue: value);
+
+    public static OscArgument Float(float value) => new(OscArgumentKind.Float, FloatValue: value);
+
+    public static OscArgument String(string value) => new(OscArgumentKind.String, StringValue: value);
+
+    public static OscArgument Blob(byte[] value) => new(OscArgumentKind.Blob, BlobValue: value);
+
+    public static OscArgument Bool(bool value) => new(OscArgumentKind.Bool, BoolValue: value);
+
+    public static OscArgument Nil() => new(OscArgumentKind.Nil);
+
+    public static OscArgument Impulse() => new(OscArgumentKind.Impulse);
+}
+
+public sealed record OscMessage(
+    string Address,
+    IReadOnlyList<OscArgument> Arguments)
+{
+    public bool IsValid => ValidAddress(Address);
+
+    public static bool ValidAddress(string address) =>
+        !string.IsNullOrWhiteSpace(address) &&
+        address.StartsWith("/", StringComparison.Ordinal) &&
+        !address.Contains("\0", StringComparison.Ordinal);
+}
+
+public sealed record OscSendResult(
+    string Host,
+    int Port,
+    OscMessage Message,
+    int ByteCount,
+    DateTimeOffset SentAt);
+
+public sealed record OscReceivedMessage(
+    OscMessage Message,
+    string PeerAddress,
+    int ByteCount,
+    DateTimeOffset ReceivedAt);
+
+public sealed record OscReceiveResult(
+    string Host,
+    int Port,
+    int PacketCount,
+    IReadOnlyList<OscReceivedMessage> Packets,
+    DateTimeOffset StartedAt,
+    DateTimeOffset CompletedAt);
+
 public sealed record QuestAppTarget(
     string Id,
     string Label,

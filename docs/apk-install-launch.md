@@ -88,6 +88,12 @@ design space, see [Brain Candy](https://braincandyapp.com/), a Meta Quest VR
 experience that presents its own strobing-lights warning and frames rhythmic
 audio-visual stimulation as non-clinical perception exploration.
 
+Use `osc-udp-listener` when validating the generic OSC control/sensor adapter.
+It starts a UDP listener on `0.0.0.0:9000`, enables the headset diagnostic HUD,
+and keeps camera and MediaProjection sources disabled. Use
+`osc-udp-listener-no-overlay` when you want the same listener without drawing
+the HUD.
+
 Run a launch verification pass with a device profile and a diagnostics bundle:
 
 ```powershell
@@ -122,6 +128,17 @@ dotnet run --project src\RustyXr.Companion.Cli -- catalog verify --path samples\
 The verifier configures `adb reverse`, starts a local receiver, and records how
 many media frames arrived. It cannot accept the headset MediaProjection consent
 popup for the user.
+
+For OSC probes, launch the listener profile and send a datagram to the Quest LAN
+IP. OSC is UDP, so this path does not use `adb reverse`:
+
+```powershell
+dotnet run --project src\RustyXr.Companion.Cli -- catalog verify --path samples\quest-session-kit\apk-catalog.example.json --app rusty-xr-quest-composite-layer --serial <serial> --stop-catalog-apps --install --launch --device-profile xr-composite-smoke-test --runtime-profile osc-udp-listener --settle-ms 5000 --logcat-lines 1000 --out .\artifacts\verify
+dotnet run --project src\RustyXr.Companion.Cli -- osc send --host <quest-lan-ip> --port 9000 --address /rusty-xr/probe --arg string:hello
+```
+
+The diagnostic HUD can also be toggled on a running compatible APK through a
+runtime-profile launch extra such as `rustyxr.diagnosticHudCommand=toggle`.
 
 For passthrough style hotload, launch a passthrough profile once and then send
 another catalog profile to the running activity:

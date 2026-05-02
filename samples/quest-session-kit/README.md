@@ -27,6 +27,7 @@ checkout ignored build outputs:
 Build the APKs in Rusty-XR first, then install or verify them through the
 Companion catalog commands. The composite-layer example uses runtime profiles
 for `synthetic-composite-layer`, `camera-source-diagnostics`,
+`osc-udp-listener`, `osc-udp-listener-no-overlay`,
 `camera-diagnostic-cpu-copy`, `camera-gpu-buffer-probe`,
 `camera-stereo-gpu-composite`,
 `camera-stereo-gpu-composite-quad-surface`, `environment-depth-diagnostics`,

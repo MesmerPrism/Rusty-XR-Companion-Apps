@@ -132,7 +132,8 @@ jobs:
           Invoke-WebRequest -Uri $apkUrl -OutFile $apkPath
           powershell -ExecutionPolicy Bypass -File .\tools\app\Include-ReleaseCatalogApk.ps1 `
             -AppPublishRoot artifacts\app-win-x64 `
-            -ApkPath $apkPath
+            -ApkPath $apkPath `
+            -SourceUri $apkUrl
 
       - name: Decode setup signing certificate
         id: setup_certificate

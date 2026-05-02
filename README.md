@@ -8,7 +8,8 @@ It helps you find Quest development tooling, connect a headset over USB or
 Wi-Fi ADB, install a user-supplied APK, launch or stop a target app, apply
 simple development profiles, install official operator tooling, start a display
 cast through `scrcpy`, receive MediaProjection display-composite frames,
-capture visual proof, pass catalog runtime profiles as launch extras, manage a
+send and receive generic OSC UDP probe messages, capture visual proof, pass
+catalog runtime profiles as launch extras, manage a
 keep-awake proximity hold, read headset and controller battery status, and export
 diagnostics that can be shared without a source checkout.
 
@@ -21,8 +22,10 @@ profile, a `quad-surface` A/B profile, native passthrough hotload profiles, and
 safety-gated strobe profiles. It also includes an environment-depth diagnostics
 profile that verifies OpenXR environment-depth provider startup, acquisition,
 runtime capture timestamp progression, update cadence, acquire cost, and
-confidence-state reporting from logcat. Strobing profiles are hazardous and
-should only be launched with explicit informed opt-in.
+confidence-state reporting from logcat. The OSC listener profile enables the
+headset diagnostic HUD by default, with a no-overlay companion profile for
+separating UDP ingress cost from HUD rendering cost. Strobing profiles are
+hazardous and should only be launched with explicit informed opt-in.
 
 ## Current Scope
 
@@ -47,6 +50,10 @@ should only be launched with explicit informed opt-in.
 - runtime-profile launch support for native passthrough style hotload,
   environment-depth diagnostics, and strobe timing experiments published by
   Rusty XR core
+- generic OSC UDP send/receive CLI utilities for companion-to-headset adapter
+  smoke tests
+- bundled catalog profiles for the Rusty XR generic diagnostic HUD, including
+  a no-overlay OSC A/B profile
 
 The repo does **not** commit APK bytes. Release packaging downloads the public
 Rusty XR composite-layer APK from a configured release asset, places it beside
@@ -99,6 +106,8 @@ dotnet run --project src/RustyXr.Companion.Cli -- profile apply --serial <serial
 dotnet run --project src/RustyXr.Companion.Cli -- cast --serial <serial> --max-size 1280
 dotnet run --project src/RustyXr.Companion.Cli -- media reverse --serial <serial> --device-port 8787 --host-port 8787
 dotnet run --project src/RustyXr.Companion.Cli -- media receive --port 8787 --out .\artifacts\media-stream --once
+dotnet run --project src/RustyXr.Companion.Cli -- osc send --host <quest-lan-ip> --port 9000 --address /rusty-xr/probe --arg string:hello
+dotnet run --project src/RustyXr.Companion.Cli -- osc receive --port 9000 --count 1
 dotnet run --project src/RustyXr.Companion.Cli -- hzdb proximity keep-awake --serial <serial> --duration-ms 28800000
 dotnet run --project src/RustyXr.Companion.Cli -- hzdb screenshot --serial <serial> --out .\artifacts\screenshots
 dotnet run --project src/RustyXr.Companion.Cli -- doctor --snapshots --out .\artifacts\diagnostics

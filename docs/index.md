@@ -19,13 +19,15 @@ Use it when you need to:
 - launch or stop a target app, including catalog runtime profiles
 - apply simple headset development settings
 - start a display cast through `scrcpy`
+- send and receive generic OSC UDP probe messages
 - capture headset screenshots and toggle proximity keep-awake state
 - export diagnostics that another developer can inspect
 
 The app is intentionally generic. It does not bundle a private runtime. The
 published Windows install includes the public Rusty XR camera composite-layer
-example, including passthrough hotload and safety-gated strobe profiles, and
-still supports local APK paths, public catalog files, and the CLI.
+example, including the diagnostic HUD, OSC listener profiles, passthrough
+hotload profiles, and safety-gated strobe profiles. It still supports local APK
+paths, public catalog files, and the CLI.
 
 ## Start Here
 

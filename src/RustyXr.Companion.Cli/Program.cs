@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using System.Globalization;
 using System.Text;
 using System.Text.Json;
 using RustyXr.Companion.Core;
@@ -47,6 +48,7 @@ internal static class CliProgram
                 "wifi" => await WifiAsync(args.Skip(1).ToArray()).ConfigureAwait(false),
                 "hzdb" => await HzdbAsync(args.Skip(1).ToArray()).ConfigureAwait(false),
                 "media" => await MediaAsync(args.Skip(1).ToArray()).ConfigureAwait(false),
+                "osc" => await OscAsync(args.Skip(1).ToArray()).ConfigureAwait(false),
                 "tooling" => await ToolingAsync(args.Skip(1).ToArray()).ConfigureAwait(false),
                 "catalog" => await CatalogAsync(args.Skip(1).ToArray()).ConfigureAwait(false),
                 "workspace" => Workspace(args.Skip(1).ToArray()),
@@ -319,46 +321,108 @@ internal static class CliProgram
         switch (subcommand)
         {
             case "reverse":
-            {
-                var devicePort = options.TryGet("--device-port", out var devicePortText)
-                    ? int.Parse(devicePortText)
-                    : MediaFrameReceiverService.DefaultPort;
-                var hostPort = options.TryGet("--host-port", out var hostPortText)
-                    ? int.Parse(hostPortText)
-                    : MediaFrameReceiverService.DefaultPort;
-                var result = await new QuestAdbService()
-                    .ReverseTcpAsync(Required(options, "--serial"), devicePort, hostPort)
-                    .ConfigureAwait(false);
-                WriteCommandResult(result);
-                return result.Succeeded ? 0 : result.ExitCode;
-            }
-
-            case "receive":
-            {
-                var host = options.ValueOrNull("--host") ?? "127.0.0.1";
-                var port = options.TryGet("--port", out var portText)
-                    ? int.Parse(portText)
-                    : MediaFrameReceiverService.DefaultPort;
-                var output = options.ValueOrNull("--out") ??
-                             Path.Combine(
-                                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                                 "RustyXrCompanion",
-                                 "media-stream");
-                using var timeout = new CancellationTokenSource();
-                if (options.TryGet("--timeout-ms", out var timeoutText))
                 {
-                    timeout.CancelAfter(int.Parse(timeoutText));
+                    var devicePort = options.TryGet("--device-port", out var devicePortText)
+                        ? int.Parse(devicePortText)
+                        : MediaFrameReceiverService.DefaultPort;
+                    var hostPort = options.TryGet("--host-port", out var hostPortText)
+                        ? int.Parse(hostPortText)
+                        : MediaFrameReceiverService.DefaultPort;
+                    var result = await new QuestAdbService()
+                        .ReverseTcpAsync(Required(options, "--serial"), devicePort, hostPort)
+                        .ConfigureAwait(false);
+                    WriteCommandResult(result);
+                    return result.Succeeded ? 0 : result.ExitCode;
                 }
 
-                var result = await new MediaFrameReceiverService()
-                    .ReceiveAsync(host, port, output, options.Has("--once"), timeout.Token)
-                    .ConfigureAwait(false);
-                WriteObject(result, options.Has("--json"));
-                return 0;
-            }
+            case "receive":
+                {
+                    var host = options.ValueOrNull("--host") ?? "127.0.0.1";
+                    var port = options.TryGet("--port", out var portText)
+                        ? int.Parse(portText)
+                        : MediaFrameReceiverService.DefaultPort;
+                    var output = options.ValueOrNull("--out") ??
+                                 Path.Combine(
+                                     Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                                     "RustyXrCompanion",
+                                     "media-stream");
+                    using var timeout = new CancellationTokenSource();
+                    if (options.TryGet("--timeout-ms", out var timeoutText))
+                    {
+                        timeout.CancelAfter(int.Parse(timeoutText));
+                    }
+
+                    var result = await new MediaFrameReceiverService()
+                        .ReceiveAsync(host, port, output, options.Has("--once"), timeout.Token)
+                        .ConfigureAwait(false);
+                    WriteObject(result, options.Has("--json"));
+                    return 0;
+                }
 
             default:
                 return Fail("Use: media <reverse|receive> [options]");
+        }
+    }
+
+    private static async Task<int> OscAsync(string[] args)
+    {
+        if (args.Length == 0)
+        {
+            return Fail("Use: osc <send|receive> [options]");
+        }
+
+        var subcommand = args[0].ToLowerInvariant();
+        var options = ArgOptions.Parse(args.Skip(1));
+        var service = new OscService();
+        switch (subcommand)
+        {
+            case "send":
+                {
+                    var host = options.ValueOrNull("--host") ?? "127.0.0.1";
+                    var port = options.TryGet("--port", out var portText)
+                        ? int.Parse(portText, CultureInfo.InvariantCulture)
+                        : OscService.DefaultPort;
+                    var address = options.ValueOrNull("--address") ?? "/rusty-xr/probe";
+                    var arguments = options.Values("--arg").Select(ParseOscArgument).ToArray();
+                    if (arguments.Length == 0)
+                    {
+                        arguments = [OscArgument.String("hello")];
+                    }
+
+                    var result = await service
+                        .SendAsync(host, port, new OscMessage(address, arguments))
+                        .ConfigureAwait(false);
+                    WriteObject(result, options.Has("--json"));
+                    return 0;
+                }
+
+            case "receive":
+                {
+                    var host = options.ValueOrNull("--host") ?? "0.0.0.0";
+                    var port = options.TryGet("--port", out var portText)
+                        ? int.Parse(portText, CultureInfo.InvariantCulture)
+                        : OscService.DefaultPort;
+                    var count = options.TryGet("--count", out var countText)
+                        ? int.Parse(countText, CultureInfo.InvariantCulture)
+                        : 1;
+                    var maxPacketBytes = options.TryGet("--max-packet-bytes", out var maxPacketText)
+                        ? int.Parse(maxPacketText, CultureInfo.InvariantCulture)
+                        : OscService.DefaultMaxPacketBytes;
+                    using var timeout = new CancellationTokenSource();
+                    if (options.TryGet("--timeout-ms", out var timeoutText))
+                    {
+                        timeout.CancelAfter(int.Parse(timeoutText, CultureInfo.InvariantCulture));
+                    }
+
+                    var result = await service
+                        .ReceiveAsync(host, port, count, maxPacketBytes, timeout.Token)
+                        .ConfigureAwait(false);
+                    WriteObject(result, options.Has("--json"));
+                    return 0;
+                }
+
+            default:
+                return Fail("Use: osc <send|receive> [options]");
         }
     }
 
@@ -375,22 +439,22 @@ internal static class CliProgram
         switch (subcommand)
         {
             case "status":
-            {
-                var status = options.Has("--latest")
-                    ? await service.GetStatusAsync().ConfigureAwait(false)
-                    : service.GetLocalStatus();
-                WriteObject(status, options.Has("--json"));
-                return status.IsReady ? 0 : 2;
-            }
+                {
+                    var status = options.Has("--latest")
+                        ? await service.GetStatusAsync().ConfigureAwait(false)
+                        : service.GetLocalStatus();
+                    WriteObject(status, options.Has("--json"));
+                    return status.IsReady ? 0 : 2;
+                }
 
             case "install-official":
-            {
-                var progress = new InlineProgress<OfficialQuestToolingProgress>(item =>
-                    Console.Error.WriteLine($"[{item.PercentComplete,3}%] {item.Status}: {item.Detail}"));
-                var result = await service.InstallOrUpdateAsync(progress).ConfigureAwait(false);
-                WriteObject(result, options.Has("--json"));
-                return result.Status.IsReady ? 0 : 2;
-            }
+                {
+                    var progress = new InlineProgress<OfficialQuestToolingProgress>(item =>
+                        Console.Error.WriteLine($"[{item.PercentComplete,3}%] {item.Status}: {item.Detail}"));
+                    var result = await service.InstallOrUpdateAsync(progress).ConfigureAwait(false);
+                    WriteObject(result, options.Has("--json"));
+                    return result.Status.IsReady ? 0 : 2;
+                }
 
             default:
                 return Fail("Use: tooling <status|install-official> [--json]");
@@ -949,6 +1013,8 @@ internal static class CliProgram
           hzdb screenshot --serial <serial> [--method <screencap|metacam>] [--out <folder-or-png>] [--json]
           media reverse --serial <serial> [--device-port <n>] [--host-port <n>]
           media receive [--host 127.0.0.1] [--port <n>] [--out <folder>] [--once] [--timeout-ms <n>] [--json]
+          osc send [--host <host>] [--port <n>] [--address /path] [--arg kind:value] [--json]
+          osc receive [--host 0.0.0.0] [--port <n>] [--count <n>] [--timeout-ms <n>] [--json]
           tooling status [--latest] [--json]
           tooling install-official [--json]
           workspace guide [--root <folder>] [--json]
@@ -972,6 +1038,29 @@ internal static class CliProgram
         QuestAppDiagnostics Diagnostics,
         IReadOnlyList<CommandResult> Commands,
         IReadOnlyList<string> Notes);
+
+    private static OscArgument ParseOscArgument(string raw)
+    {
+        var parts = raw.Split(':', 2);
+        if (parts.Length != 2)
+        {
+            throw new ArgumentException($"OSC argument '{raw}' must use kind:value.");
+        }
+
+        var kind = parts[0].ToLowerInvariant();
+        var value = parts[1];
+        return kind switch
+        {
+            "int" or "i" => OscArgument.Int(int.Parse(value, CultureInfo.InvariantCulture)),
+            "float" or "f" => OscArgument.Float(float.Parse(value, CultureInfo.InvariantCulture)),
+            "string" or "s" => OscArgument.String(value),
+            "bool" => OscArgument.Bool(bool.Parse(value)),
+            "nil" => OscArgument.Nil(),
+            "impulse" => OscArgument.Impulse(),
+            "blob-hex" => OscArgument.Blob(Convert.FromHexString(value)),
+            _ => throw new ArgumentException($"Unsupported OSC argument kind '{kind}'.")
+        };
+    }
 
     private sealed class ArgOptions
     {

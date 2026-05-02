@@ -42,6 +42,11 @@ requires the per-eye grayscale depth visualizer draw state. Confidence is
 reported explicitly so a run can distinguish available confidence data from a
 runtime/API path that exposes no confidence payload.
 
+The `osc-udp-listener` runtime profile enables the Rusty XR generic diagnostic
+HUD in headset. The HUD displays listener state, local bind address, packet
+count, last peer, last packet summary, and HUD command state. Use
+`osc-udp-listener-no-overlay` when measuring OSC ingress without HUD rendering.
+
 The WPF app writes diagnostics under:
 
 ```text

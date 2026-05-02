@@ -118,6 +118,15 @@ That profile validates provider support, swapchain metadata, acquisition
 cadence, runtime depth timestamps, acquire CPU cost, confidence availability,
 and the stereo grayscale depth visualizer state.
 
+For a generic OSC adapter smoke test, launch the listener profile and send a
+probe to the Quest's LAN IP. Use `osc-udp-listener-no-overlay` instead when
+you want the same UDP listener without drawing the headset diagnostic HUD:
+
+```powershell
+dotnet run --project .\src\RustyXr.Companion.Cli -- catalog verify --path ..\Rusty-XR\examples\quest-composite-layer-apk\catalog\rusty-xr-quest-composite-layer.catalog.json --app rusty-xr-quest-composite-layer --serial <serial> --stop-catalog-apps --install --launch --device-profile xr-composite-smoke-test --runtime-profile osc-udp-listener --settle-ms 5000 --logcat-lines 1000 --out .\artifacts\verify
+dotnet run --project .\src\RustyXr.Companion.Cli -- osc send --host <quest-lan-ip> --port 9000 --address /rusty-xr/probe --arg string:hello
+```
+
 ## Working Rules
 
 Keep generated files in ignored output locations:

@@ -43,6 +43,7 @@ The portable app zip also includes:
 
 - `catalogs/rusty-xr-quest-composite-layer.catalog.json`
 - `catalogs/apks/rusty-xr-quest-composite-layer-debug.apk`
+- `catalogs/apks/rusty-xr-quest-composite-layer-debug.apk.metadata.txt`
 - `agent-onboarding/AGENTS.md`
 - `agent-onboarding/README.md`
 - `agent-onboarding/source-workspace.md`
@@ -51,10 +52,17 @@ The CLI zip includes the same `agent-onboarding/` folder so a local agent can
 start from the command-line-only release too.
 
 The WPF app auto-loads this catalog on startup and defaults to the accepted
-`camera-stereo-gpu-composite` runtime profile. The APK URL comes from the
+`camera-stereo-gpu-composite` runtime profile. The catalog also includes OSC
+listener profiles that exercise the headset diagnostic HUD and a no-overlay
+profile for HUD cost isolation. The APK URL comes from the
 workflow dispatch `composite_apk_url` input, the
 `RUSTY_XR_COMPOSITE_APK_URL` repository variable, or the default latest Rusty
 XR release asset URL, in that order.
+
+For public releases, prefer a versioned Rusty XR release asset URL in
+`composite_apk_url`. The packaging step writes a metadata file beside the APK
+with the source URL, SHA-256, signing mode, native libraries, permissions, and
+debuggable status.
 
 ## Signing Secrets
 
