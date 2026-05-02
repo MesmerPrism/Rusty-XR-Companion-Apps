@@ -30,6 +30,19 @@ entry:
 The APK bytes are not committed. Build the APK from Rusty XR, then use
 Companion's catalog install, launch, and verify commands.
 
+The source sample catalog also includes the public Rusty XR Quest broker proof:
+
+- app id: `rusty-xr-quest-broker`
+- package: `com.example.rustyxr.broker`
+- activity: `.MainActivity`
+- source APK path:
+  `..\Rusty-XR\examples\quest-broker-apk\build\outputs\rusty-xr-quest-broker-debug.apk`
+- profiles: `broker-latency-websocket-lsl` and `broker-osc-drive-ingress`
+
+The broker has been validated with a Unity client on Quest for localhost
+WebSocket samples, optional LSL forwarding, and OSC-driven scene values. A
+dedicated public Unity example is planned separately.
+
 Recent Rusty XR catalog profiles include native passthrough hotload modes,
 `XR_META_passthrough_color_lut` color-LUT flicker modes, and pure full-field
 red/black strobe modes that request 120 Hz display refresh. The strobe modes

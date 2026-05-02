@@ -49,6 +49,25 @@ public static class SourceWorkspaceGuide
             "build",
             "outputs",
             CompanionContentLayout.CompositeQuestApkFileName);
+        var brokerBuildScript = Path.Combine(
+            rustyXrPath,
+            "examples",
+            "quest-broker-apk",
+            "tools",
+            "Build-QuestBrokerApk.ps1");
+        var brokerCatalog = Path.Combine(
+            rustyXrPath,
+            "examples",
+            "quest-broker-apk",
+            "catalog",
+            "rusty-xr-quest-broker.catalog.json");
+        var brokerApk = Path.Combine(
+            rustyXrPath,
+            "examples",
+            "quest-broker-apk",
+            "build",
+            "outputs",
+            "rusty-xr-quest-broker-debug.apk");
         var companionCliProject = Path.Combine(
             companionPath,
             "src",
@@ -93,6 +112,26 @@ public static class SourceWorkspaceGuide
                 companionPath,
                 @"dotnet run --project .\src\RustyXr.Companion.Cli -- catalog verify --path ..\Rusty-XR\examples\quest-composite-layer-apk\catalog\rusty-xr-quest-composite-layer.catalog.json --app rusty-xr-quest-composite-layer --serial <serial> --stop-catalog-apps --install --launch --device-profile xr-composite-smoke-test --runtime-profile osc-udp-listener --settle-ms 5000 --logcat-lines 1000 --out .\artifacts\verify"),
             new SourceWorkspaceCommand(
+                "build-broker-apk",
+                "Build the public Rusty XR Quest broker proof-of-concept APK.",
+                rustyXrPath,
+                @"powershell -ExecutionPolicy Bypass -File .\examples\quest-broker-apk\tools\Build-QuestBrokerApk.ps1"),
+            new SourceWorkspaceCommand(
+                "verify-broker-apk",
+                "Install, launch, and log the localhost broker status/WebSocket proof.",
+                companionPath,
+                @"dotnet run --project .\src\RustyXr.Companion.Cli -- catalog verify --path ..\Rusty-XR\examples\quest-broker-apk\catalog\rusty-xr-quest-broker.catalog.json --app rusty-xr-quest-broker --serial <serial> --stop-catalog-apps --install --launch --device-profile broker-smoke-test --runtime-profile broker-latency-websocket-lsl --settle-ms 5000 --logcat-lines 1000 --out .\artifacts\verify"),
+            new SourceWorkspaceCommand(
+                "verify-broker-osc-ingress",
+                "Install, launch, and log the broker OSC drive ingress profile.",
+                companionPath,
+                @"dotnet run --project .\src\RustyXr.Companion.Cli -- catalog verify --path ..\Rusty-XR\examples\quest-broker-apk\catalog\rusty-xr-quest-broker.catalog.json --app rusty-xr-quest-broker --serial <serial> --stop-catalog-apps --install --launch --device-profile broker-smoke-test --runtime-profile broker-osc-drive-ingress --settle-ms 5000 --logcat-lines 1000 --out .\artifacts\verify"),
+            new SourceWorkspaceCommand(
+                "send-broker-osc-drive",
+                "Send one OSC drive value to a broker running on the Quest LAN IP.",
+                companionPath,
+                @"dotnet run --project .\src\RustyXr.Companion.Cli -- osc send --host <quest-lan-ip> --port 9000 --address /rusty-xr/drive/radius --arg float:0.75"),
+            new SourceWorkspaceCommand(
                 "verify-environment-depth",
                 "Install, launch, and validate OpenXR environment-depth acquisition diagnostics.",
                 companionPath,
@@ -114,6 +153,10 @@ public static class SourceWorkspaceGuide
             compositeCatalog,
             compositeApk,
             File.Exists(compositeApk),
+            brokerBuildScript,
+            brokerCatalog,
+            brokerApk,
+            File.Exists(brokerApk),
             new[]
             {
                 "Keep both public repos as siblings under one workspace folder.",
@@ -155,6 +198,7 @@ public static class SourceWorkspaceGuide
             "- Rust with the aarch64-linux-android target for Rusty XR APK examples",
             "- Android SDK, NDK, build tools, and JDK layout accepted by the Rusty XR example build scripts",
             "- Quest-compatible OpenXR loader only for the immersive composite-layer example",
+            "- Optional compliant Android liblsl.so only for LSL-capable broker APK builds",
             string.Empty,
             "## Agent Steps",
             string.Empty
@@ -234,6 +278,10 @@ public sealed record SourceWorkspaceStatus(
     string CompositeCatalogPath,
     string CompositeApkPath,
     bool CompositeApkPresent,
+    string BrokerBuildScriptPath,
+    string BrokerCatalogPath,
+    string BrokerApkPath,
+    bool BrokerApkPresent,
     IReadOnlyList<string> AgentSteps,
     IReadOnlyList<SourceWorkspaceCommand> Commands);
 

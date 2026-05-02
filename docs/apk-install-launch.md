@@ -63,7 +63,7 @@ dotnet run --project src\RustyXr.Companion.Cli -- workspace guide
 ```
 
 The guide reports the expected catalog and APK output paths for the Rusty XR
-minimal and composite-layer examples.
+minimal, composite-layer, and broker examples.
 
 ```powershell
 dotnet run --project src/RustyXr.Companion.Cli -- catalog list --json
@@ -139,6 +139,22 @@ dotnet run --project src\RustyXr.Companion.Cli -- osc send --host <quest-lan-ip>
 
 The diagnostic HUD can also be toggled on a running compatible APK through a
 runtime-profile launch extra such as `rustyxr.diagnosticHudCommand=toggle`.
+
+For the public broker proof-of-concept, use the sibling Rusty XR source catalog
+after building `examples\quest-broker-apk`. The `broker-latency-websocket-lsl`
+profile starts the localhost HTTP/WebSocket API and forwards samples to LSL
+only when the APK was built with a compliant Android `liblsl.so`. The
+`broker-osc-drive-ingress` profile listens for `/rusty-xr/drive/radius` on UDP
+port `9000` and rebroadcasts accepted values to localhost WebSocket clients:
+
+```powershell
+dotnet run --project src\RustyXr.Companion.Cli -- catalog verify --path ..\Rusty-XR\examples\quest-broker-apk\catalog\rusty-xr-quest-broker.catalog.json --app rusty-xr-quest-broker --serial <serial> --stop-catalog-apps --install --launch --device-profile broker-smoke-test --runtime-profile broker-osc-drive-ingress --settle-ms 5000 --logcat-lines 1000 --out .\artifacts\verify
+dotnet run --project src\RustyXr.Companion.Cli -- osc send --host <quest-lan-ip> --port 9000 --address /rusty-xr/drive/radius --arg float:0.75
+```
+
+That OSC ingress path has been validated with a Unity client on Quest driving a
+live scene parameter. The public Unity example will be a later, dedicated
+project.
 
 For passthrough style hotload, launch a passthrough profile once and then send
 another catalog profile to the running activity:

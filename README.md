@@ -26,6 +26,10 @@ confidence-state reporting from logcat. The OSC listener profile enables the
 headset diagnostic HUD by default, with a no-overlay companion profile for
 separating UDP ingress cost from HUD rendering cost. Strobing profiles are
 hazardous and should only be launched with explicit informed opt-in.
+The source-workspace guide and sample catalog also cover the public Rusty XR
+Quest broker proof-of-concept for localhost WebSocket samples, optional LSL
+forwarding, and OSC drive ingress. The broker has been validated with a Unity
+client on Quest; a dedicated public Unity example is planned separately.
 
 ## Current Scope
 
@@ -54,6 +58,8 @@ hazardous and should only be launched with explicit informed opt-in.
   smoke tests
 - bundled catalog profiles for the Rusty XR generic diagnostic HUD, including
   a no-overlay OSC A/B profile
+- source-workspace broker commands for building, launching, and probing the
+  public Quest broker APK proof-of-concept
 
 The repo does **not** commit APK bytes. Release packaging downloads the public
 Rusty XR composite-layer APK from a configured release asset, places it beside
@@ -118,6 +124,8 @@ dotnet run --project src/RustyXr.Companion.Cli -- catalog verify --path samples\
 dotnet run --project src/RustyXr.Companion.Cli -- catalog verify --path samples\quest-session-kit\apk-catalog.example.json --app rusty-xr-quest-composite-layer --serial <serial> --stop-catalog-apps --install --launch --device-profile xr-composite-smoke-test --runtime-profile camera-stereo-gpu-composite-quad-surface --settle-ms 9000 --logcat-lines 1400 --out .\artifacts\verify
 dotnet run --project src/RustyXr.Companion.Cli -- catalog verify --path samples\quest-session-kit\apk-catalog.example.json --app rusty-xr-quest-composite-layer --serial <serial> --stop-catalog-apps --install --launch --device-profile xr-composite-smoke-test --runtime-profile environment-depth-diagnostics --settle-ms 9000 --logcat-lines 1400 --out .\artifacts\verify
 dotnet run --project src/RustyXr.Companion.Cli -- catalog verify --path samples\quest-session-kit\apk-catalog.example.json --app rusty-xr-quest-composite-layer --serial <serial> --stop-catalog-apps --install --launch --device-profile xr-composite-smoke-test --runtime-profile media-projection-stream --media-receiver --settle-ms 7000 --logcat-lines 1000 --out .\artifacts\verify
+dotnet run --project src/RustyXr.Companion.Cli -- catalog verify --path samples\quest-session-kit\apk-catalog.example.json --app rusty-xr-quest-broker --serial <serial> --stop-catalog-apps --install --launch --device-profile broker-smoke-test --runtime-profile broker-osc-drive-ingress --settle-ms 5000 --logcat-lines 1000 --out .\artifacts\verify
+dotnet run --project src/RustyXr.Companion.Cli -- osc send --host <quest-lan-ip> --port 9000 --address /rusty-xr/drive/radius --arg float:0.75
 ```
 
 ## Documentation

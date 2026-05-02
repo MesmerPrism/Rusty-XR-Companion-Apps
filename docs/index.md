@@ -20,6 +20,8 @@ Use it when you need to:
 - apply simple headset development settings
 - start a display cast through `scrcpy`
 - send and receive generic OSC UDP probe messages
+- launch and probe the public Rusty XR Quest broker proof-of-concept from a
+  sibling source checkout
 - capture headset screenshots and toggle proximity keep-awake state
 - export diagnostics that another developer can inspect
 
@@ -28,6 +30,10 @@ published Windows install includes the public Rusty XR camera composite-layer
 example, including the diagnostic HUD, OSC listener profiles, passthrough
 hotload profiles, and safety-gated strobe profiles. It still supports local APK
 paths, public catalog files, and the CLI.
+The source-workspace path also covers the public broker APK proof for localhost
+WebSocket samples, optional LSL forwarding, and OSC drive events. That broker
+has been validated with a Unity client on Quest; a dedicated public Unity
+example is planned after the broker API settles.
 
 ## Start Here
 

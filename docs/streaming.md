@@ -78,6 +78,21 @@ The `osc-udp-listener` profile enables the headset diagnostic HUD. Use
 `osc-udp-listener-no-overlay` when you want to measure UDP ingress without
 drawing the HUD.
 
+## Broker OSC Drive
+
+The Rusty XR broker proof-of-concept exposes a sidecar OSC ingress profile.
+After building `examples\quest-broker-apk` in the sibling Rusty XR checkout,
+launch the broker and send a drive value to the Quest LAN IP:
+
+```powershell
+dotnet run --project src\RustyXr.Companion.Cli -- catalog verify --path ..\Rusty-XR\examples\quest-broker-apk\catalog\rusty-xr-quest-broker.catalog.json --app rusty-xr-quest-broker --serial <serial> --stop-catalog-apps --install --launch --runtime-profile broker-osc-drive-ingress --settle-ms 5000 --logcat-lines 1000 --out .\artifacts\verify
+dotnet run --project src\RustyXr.Companion.Cli -- osc send --host <quest-lan-ip> --port 9000 --address /rusty-xr/drive/radius --arg float:0.75
+```
+
+The broker turns accepted OSC packets into localhost WebSocket `osc_drive`
+events. This path has been validated with a Unity client on Quest, but the
+public Unity example is intentionally deferred.
+
 ## Visual Inspection
 
 For agent and operator verification, capture still frames without routing a

@@ -65,6 +65,8 @@ on machines that need to build APKs from source.
   `SDK`, `NDK`, and `OpenJDK` children.
 - Quest-compatible OpenXR loader only for the immersive composite-layer
   example.
+- Optional compliant Android `liblsl.so` only for LSL-capable broker APK
+  builds.
 
 The companion CLI can install and launch APKs without Android Studio. Android
 build tooling is required only when building new APK bytes from source.
@@ -126,6 +128,35 @@ you want the same UDP listener without drawing the headset diagnostic HUD:
 dotnet run --project .\src\RustyXr.Companion.Cli -- catalog verify --path ..\Rusty-XR\examples\quest-composite-layer-apk\catalog\rusty-xr-quest-composite-layer.catalog.json --app rusty-xr-quest-composite-layer --serial <serial> --stop-catalog-apps --install --launch --device-profile xr-composite-smoke-test --runtime-profile osc-udp-listener --settle-ms 5000 --logcat-lines 1000 --out .\artifacts\verify
 dotnet run --project .\src\RustyXr.Companion.Cli -- osc send --host <quest-lan-ip> --port 9000 --address /rusty-xr/probe --arg string:hello
 ```
+
+For the broker proof-of-concept, build the sidecar APK in `Rusty-XR`:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\examples\quest-broker-apk\tools\Build-QuestBrokerApk.ps1
+```
+
+Pass `-LslAndroidLibraryPath <path-to-android-arm64-liblsl.so>` only when you
+are intentionally packaging a compliant native LSL build. Without it, the APK
+still answers status requests, accepts localhost WebSocket latency samples,
+logs diagnostics, and supports OSC ingress/egress.
+
+Verify the broker launch from `Rusty-XR-Companion-Apps`:
+
+```powershell
+dotnet run --project .\src\RustyXr.Companion.Cli -- catalog verify --path ..\Rusty-XR\examples\quest-broker-apk\catalog\rusty-xr-quest-broker.catalog.json --app rusty-xr-quest-broker --serial <serial> --stop-catalog-apps --install --launch --device-profile broker-smoke-test --runtime-profile broker-latency-websocket-lsl --settle-ms 5000 --logcat-lines 1000 --out .\artifacts\verify
+```
+
+For OSC drive ingress, launch the broker profile and send a value over the
+Quest LAN IP:
+
+```powershell
+dotnet run --project .\src\RustyXr.Companion.Cli -- catalog verify --path ..\Rusty-XR\examples\quest-broker-apk\catalog\rusty-xr-quest-broker.catalog.json --app rusty-xr-quest-broker --serial <serial> --stop-catalog-apps --install --launch --device-profile broker-smoke-test --runtime-profile broker-osc-drive-ingress --settle-ms 5000 --logcat-lines 1000 --out .\artifacts\verify
+dotnet run --project .\src\RustyXr.Companion.Cli -- osc send --host <quest-lan-ip> --port 9000 --address /rusty-xr/drive/radius --arg float:0.75
+```
+
+The public broker path was validated with a Unity client on Quest consuming
+localhost WebSocket events and driving a live scene parameter. The Unity
+project itself is not published in this iteration.
 
 ## Working Rules
 
