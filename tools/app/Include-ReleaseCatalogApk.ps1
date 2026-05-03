@@ -14,7 +14,11 @@ param(
 
     [string]$ApkFileName = 'rusty-xr-quest-composite-layer-debug.apk',
 
-    [string]$SourceUri = ''
+    [string]$SourceUri = '',
+
+    [string]$NativeLibraries = 'librusty_xr_quest_composite_native.so,libopenxr_loader.so,libc++_shared.so',
+
+    [string]$Permissions = 'INTERNET,ACCESS_NETWORK_STATE,CAMERA,FOREGROUND_SERVICE,FOREGROUND_SERVICE_MEDIA_PROJECTION,POST_NOTIFICATIONS,HEADSET_CAMERA,SCENE,OPENXR,HAND_TRACKING'
 )
 
 Set-StrictMode -Version Latest
@@ -64,8 +68,8 @@ $source = if ([string]::IsNullOrWhiteSpace($SourceUri)) { $resolvedApkPath } els
     "sizeBytes=$($apkInfo.Length)",
     "signing=debug keystore; CN=Rusty XR Debug, O=Rusty XR, C=US",
     "debuggable=true",
-    "nativeLibraries=librusty_xr_quest_composite_native.so,libopenxr_loader.so,libc++_shared.so",
-    "permissions=INTERNET,ACCESS_NETWORK_STATE,CAMERA,FOREGROUND_SERVICE,FOREGROUND_SERVICE_MEDIA_PROJECTION,POST_NOTIFICATIONS,HEADSET_CAMERA,SCENE,OPENXR,HAND_TRACKING"
+    "nativeLibraries=$NativeLibraries",
+    "permissions=$Permissions"
 ) | Set-Content -Path $metadataPath -Encoding utf8
 
 Write-Host "Bundled Quest APK: $targetPath"

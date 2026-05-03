@@ -14,6 +14,10 @@ on:
         description: "Optional Rusty XR composite-layer APK URL override"
         required: false
         type: string
+      broker_apk_url:
+        description: "Optional Rusty XR broker APK URL override"
+        required: false
+        type: string
 
 permissions:
   contents: write
@@ -29,6 +33,7 @@ jobs:
       APP_ZIP_FILE_NAME: RustyXrCompanion-win-x64.zip
       CLI_ZIP_FILE_NAME: rusty-xr-companion-cli-win-x64.zip
       COMPOSITE_APK_FILE_NAME: rusty-xr-quest-composite-layer-debug.apk
+      BROKER_APK_FILE_NAME: rusty-xr-quest-broker-debug.apk
 
     steps:
       - uses: actions/checkout@v4
@@ -110,30 +115,54 @@ jobs:
           "/p:InformationalVersion=${{ steps.version.outputs.package_version }}"
           --output artifacts/cli-win-x64
 
-      - name: Include bundled Rusty XR Quest APK
+      - name: Include bundled Rusty XR Quest APKs
         shell: pwsh
         env:
           INPUT_COMPOSITE_APK_URL: ${{ github.event_name == 'workflow_dispatch' && inputs.composite_apk_url || '' }}
           CONFIGURED_COMPOSITE_APK_URL: ${{ vars.RUSTY_XR_COMPOSITE_APK_URL || '' }}
+          INPUT_BROKER_APK_URL: ${{ github.event_name == 'workflow_dispatch' && inputs.broker_apk_url || '' }}
+          CONFIGURED_BROKER_APK_URL: ${{ vars.RUSTY_XR_BROKER_APK_URL || '' }}
         run: |
-          $defaultUrl = "https://github.com/MesmerPrism/Rusty-XR/releases/latest/download/$env:COMPOSITE_APK_FILE_NAME"
-          $apkUrl = @(
+          New-Item -ItemType Directory -Force -Path artifacts\bundled-apks | Out-Null
+
+          $defaultCompositeUrl = "https://github.com/MesmerPrism/Rusty-XR/releases/latest/download/$env:COMPOSITE_APK_FILE_NAME"
+          $compositeApkUrl = @(
             $env:INPUT_COMPOSITE_APK_URL,
             $env:CONFIGURED_COMPOSITE_APK_URL,
-            $defaultUrl
+            $defaultCompositeUrl
           ) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -First 1
 
-          if ([string]::IsNullOrWhiteSpace($apkUrl)) {
+          if ([string]::IsNullOrWhiteSpace($compositeApkUrl)) {
             throw "No Rusty XR composite-layer APK URL was configured."
           }
 
-          New-Item -ItemType Directory -Force -Path artifacts\bundled-apks | Out-Null
-          $apkPath = Join-Path 'artifacts\bundled-apks' $env:COMPOSITE_APK_FILE_NAME
-          Invoke-WebRequest -Uri $apkUrl -OutFile $apkPath
+          $compositeApkPath = Join-Path 'artifacts\bundled-apks' $env:COMPOSITE_APK_FILE_NAME
+          Invoke-WebRequest -Uri $compositeApkUrl -OutFile $compositeApkPath
           powershell -ExecutionPolicy Bypass -File .\tools\app\Include-ReleaseCatalogApk.ps1 `
             -AppPublishRoot artifacts\app-win-x64 `
-            -ApkPath $apkPath `
-            -SourceUri $apkUrl
+            -ApkPath $compositeApkPath `
+            -SourceUri $compositeApkUrl
+
+          $defaultBrokerUrl = "https://github.com/MesmerPrism/Rusty-XR/releases/latest/download/$env:BROKER_APK_FILE_NAME"
+          $brokerApkUrl = @(
+            $env:INPUT_BROKER_APK_URL,
+            $env:CONFIGURED_BROKER_APK_URL,
+            $defaultBrokerUrl
+          ) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -First 1
+
+          if ([string]::IsNullOrWhiteSpace($brokerApkUrl)) {
+            throw "No Rusty XR broker APK URL was configured."
+          }
+
+          $brokerApkPath = Join-Path 'artifacts\bundled-apks' $env:BROKER_APK_FILE_NAME
+          Invoke-WebRequest -Uri $brokerApkUrl -OutFile $brokerApkPath
+          powershell -ExecutionPolicy Bypass -File .\tools\app\Include-ReleaseCatalogApk.ps1 `
+            -AppPublishRoot artifacts\app-win-x64 `
+            -ApkPath $brokerApkPath `
+            -ApkFileName $env:BROKER_APK_FILE_NAME `
+            -SourceUri $brokerApkUrl `
+            -NativeLibraries "liblsl.so,librustyxr_broker_lsl_jni.so,libc++_shared.so" `
+            -Permissions "INTERNET,ACCESS_NETWORK_STATE,FOREGROUND_SERVICE,POST_NOTIFICATIONS"
 
       - name: Decode setup signing certificate
         id: setup_certificate

@@ -25,7 +25,9 @@ entry:
 - app id: `rusty-xr-quest-composite-layer`
 - package: `com.example.rustyxr.composite`
 - activity: `.CompositeLayerActivity`
-- APK path in releases: `catalogs/apks/rusty-xr-quest-composite-layer-debug.apk`
+- APK paths in releases:
+  `catalogs/apks/rusty-xr-quest-composite-layer-debug.apk` and
+  `catalogs/apks/rusty-xr-quest-broker-debug.apk`
 
 The APK bytes are not committed. Build the APK from Rusty XR, then use
 Companion's catalog install, launch, and verify commands.
@@ -39,9 +41,10 @@ The source sample catalog also includes the public Rusty XR Quest broker proof:
   `..\Rusty-XR\examples\quest-broker-apk\build\outputs\rusty-xr-quest-broker-debug.apk`
 - profiles: `broker-latency-websocket-lsl` and `broker-osc-drive-ingress`
 
-The broker has been validated with a Unity client on Quest for localhost
-WebSocket samples, optional LSL forwarding, and OSC-driven scene values. A
-dedicated public Unity example is planned separately.
+The broker has been validated with
+[The Big Red Button Institute](https://github.com/MesmerPrism/the-big-red-button-institute)
+for localhost WebSocket samples, optional LSL forwarding, and OSC-driven Unity
+scene values.
 
 Recent Rusty XR catalog profiles include native passthrough hotload modes,
 `XR_META_passthrough_color_lut` color-LUT flicker modes, and pure full-field

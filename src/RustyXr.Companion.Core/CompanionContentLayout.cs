@@ -5,6 +5,7 @@ public static class CompanionContentLayout
     public const string CatalogDirectoryName = "catalogs";
     public const string DefaultCatalogFileName = "rusty-xr-quest-composite-layer.catalog.json";
     public const string CompositeQuestApkFileName = "rusty-xr-quest-composite-layer-debug.apk";
+    public const string BrokerQuestApkFileName = "rusty-xr-quest-broker-debug.apk";
     public const string DefaultCatalogAppId = "rusty-xr-quest-composite-layer";
     public const string DefaultDeviceProfileId = "xr-composite-smoke-test";
     public const string DefaultRuntimeProfileId = "camera-stereo-gpu-composite";
@@ -21,6 +22,13 @@ public static class CompanionContentLayout
             CatalogDirectoryName,
             "apks",
             CompositeQuestApkFileName);
+
+    public static string BundledBrokerApkPath(string? baseDirectory = null)
+        => Path.Combine(
+            baseDirectory ?? AppContext.BaseDirectory,
+            CatalogDirectoryName,
+            "apks",
+            BrokerQuestApkFileName);
 
     public static string FallbackSampleCatalogPath()
         => Path.Combine("samples", "quest-session-kit", "apk-catalog.example.json");

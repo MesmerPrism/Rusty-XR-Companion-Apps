@@ -31,9 +31,11 @@ example, including the diagnostic HUD, OSC listener profiles, passthrough
 hotload profiles, and safety-gated strobe profiles. It still supports local APK
 paths, public catalog files, and the CLI.
 The source-workspace path also covers the public broker APK proof for localhost
-WebSocket samples, optional LSL forwarding, and OSC drive events. That broker
-has been validated with a Unity client on Quest; a dedicated public Unity
-example is planned after the broker API settles.
+WebSocket samples, optional LSL forwarding, and OSC drive events. The matching
+public Unity Quest example is
+[The Big Red Button Institute](https://github.com/MesmerPrism/the-big-red-button-institute),
+which compares direct Unity OSC/BLE input against broker-routed stream events
+on one visible button.
 
 ## Start Here
 

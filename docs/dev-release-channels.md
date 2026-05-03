@@ -27,7 +27,8 @@ The release launcher with the Companion icon is created at:
 ```
 
 The release app zip also carries the bundled public Rusty XR Quest camera
-composite-layer catalog and APK under the install root's `catalogs\` folder.
+composite-layer and broker catalog entries and APKs under the install root's
+`catalogs\` folder.
 Because auto-update replaces the install root from the latest app zip, updated
 catalog/APK payloads arrive through the same release update path.
 

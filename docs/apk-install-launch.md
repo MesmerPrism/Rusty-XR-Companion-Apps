@@ -7,10 +7,10 @@ nav_order: 4
 
 The companion installs local APKs and launches package targets through ADB.
 Published Windows installs also include the public Rusty XR Quest camera
-composite-layer APK. On first launch, the WPF app auto-loads the bundled
+composite-layer and broker APKs. On first launch, the WPF app auto-loads the bundled
 catalog from `catalogs/rusty-xr-quest-composite-layer.catalog.json`, selects
-the `rusty-xr-quest-composite-layer` app, and resolves the bundled APK under
-`catalogs/apks/`.
+the `rusty-xr-quest-composite-layer` app by default, and resolves bundled APKs
+under `catalogs/apks/`.
 
 ## Install
 
@@ -152,9 +152,10 @@ dotnet run --project src\RustyXr.Companion.Cli -- catalog verify --path ..\Rusty
 dotnet run --project src\RustyXr.Companion.Cli -- osc send --host <quest-lan-ip> --port 9000 --address /rusty-xr/drive/radius --arg float:0.75
 ```
 
-That OSC ingress path has been validated with a Unity client on Quest driving a
-live scene parameter. The public Unity example will be a later, dedicated
-project.
+That OSC ingress path has been validated with
+[The Big Red Button Institute](https://github.com/MesmerPrism/the-big-red-button-institute),
+the public Unity Quest example for comparing direct Unity OSC/BLE input against
+broker-routed stream events.
 
 For passthrough style hotload, launch a passthrough profile once and then send
 another catalog profile to the running activity:

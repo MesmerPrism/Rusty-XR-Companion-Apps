@@ -132,6 +132,26 @@ public static class SourceWorkspaceGuide
                 companionPath,
                 @"dotnet run --project .\src\RustyXr.Companion.Cli -- osc send --host <quest-lan-ip> --port 9000 --address /rusty-xr/drive/radius --arg float:0.75"),
             new SourceWorkspaceCommand(
+                "compare-broker-osc-routes",
+                "Write a clock-aligned direct target-app OSC versus broker OSC/WebSocket comparison bundle.",
+                companionPath,
+                @"dotnet run --project .\src\RustyXr.Companion.Cli -- broker compare --quest-host <quest-lan-ip> --serial <serial> --count 16 --interval-ms 250 --out .\artifacts\broker-compare --json"),
+            new SourceWorkspaceCommand(
+                "verify-lsl-runtime",
+                "Check that the companion can load a user-supplied Windows lsl.dll.",
+                companionPath,
+                @"dotnet run --project .\src\RustyXr.Companion.Cli -- lsl runtime --lsl-dll <path-to-windows-lsl.dll> --json"),
+            new SourceWorkspaceCommand(
+                "run-lsl-loopback",
+                "Write a local LSL loopback diagnostics bundle with JSON, CSV, Markdown, and PDF outputs.",
+                companionPath,
+                @"dotnet run --project .\src\RustyXr.Companion.Cli -- lsl loopback --lsl-dll <path-to-windows-lsl.dll> --count 16 --interval-ms 100 --out .\artifacts\lsl-loopback --json"),
+            new SourceWorkspaceCommand(
+                "run-broker-lsl-roundtrip",
+                "Compare broker WebSocket latency samples against the broker-forwarded LSL stream.",
+                companionPath,
+                @"dotnet run --project .\src\RustyXr.Companion.Cli -- lsl broker-roundtrip --serial <serial> --lsl-dll <path-to-windows-lsl.dll> --count 8 --interval-ms 250 --out .\artifacts\lsl-broker --json"),
+            new SourceWorkspaceCommand(
                 "verify-environment-depth",
                 "Install, launch, and validate OpenXR environment-depth acquisition diagnostics.",
                 companionPath,

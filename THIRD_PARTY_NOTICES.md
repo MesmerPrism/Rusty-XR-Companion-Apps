@@ -26,6 +26,18 @@ Companion can launch it when it is installed, present on `PATH`, or installed
 into the managed LocalAppData tool cache from the upstream GitHub release.
 Rusty XR Companion does not relicense scrcpy.
 
+## Bundled Rusty XR Example APKs
+
+Published companion app zips can include public Rusty XR example APKs generated
+from the Rusty XR source repository. Each bundled APK is accompanied by a
+metadata file that records its source URL, SHA-256 hash, signing mode, native
+library list, permission list, and debug status.
+
+The Rusty XR broker APK may include native Lab Streaming Layer (`liblsl`) files
+when that release asset was built with an Android `liblsl.so`. Those native
+libraries keep their upstream license terms; Rusty XR Companion records their
+presence in the bundled APK metadata and does not relicense them.
+
 ## User-Supplied APKs
 
 APKs installed through this utility remain the responsibility of the user or

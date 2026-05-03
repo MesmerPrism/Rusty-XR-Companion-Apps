@@ -146,6 +146,24 @@ Verify the broker launch from `Rusty-XR-Companion-Apps`:
 dotnet run --project .\src\RustyXr.Companion.Cli -- catalog verify --path ..\Rusty-XR\examples\quest-broker-apk\catalog\rusty-xr-quest-broker.catalog.json --app rusty-xr-quest-broker --serial <serial> --stop-catalog-apps --install --launch --device-profile broker-smoke-test --runtime-profile broker-latency-websocket-lsl --settle-ms 5000 --logcat-lines 1000 --out .\artifacts\verify
 ```
 
+Forward the broker's device-local TCP endpoint to the operator machine and
+probe the general broker contract:
+
+```powershell
+dotnet run --project .\src\RustyXr.Companion.Cli -- broker forward --serial <serial>
+dotnet run --project .\src\RustyXr.Companion.Cli -- broker status --json
+dotnet run --project .\src\RustyXr.Companion.Cli -- broker capabilities --json
+dotnet run --project .\src\RustyXr.Companion.Cli -- broker streams --json
+dotnet run --project .\src\RustyXr.Companion.Cli -- broker sample --subscribe --json
+```
+
+For a single diagnostic pass that writes a verification bundle and optionally
+checks OSC ingress, use:
+
+```powershell
+dotnet run --project .\src\RustyXr.Companion.Cli -- broker verify --serial <serial> --osc-host <quest-lan-ip> --out .\artifacts\verify --json
+```
+
 For OSC drive ingress, launch the broker profile and send a value over the
 Quest LAN IP:
 
@@ -154,9 +172,42 @@ dotnet run --project .\src\RustyXr.Companion.Cli -- catalog verify --path ..\Rus
 dotnet run --project .\src\RustyXr.Companion.Cli -- osc send --host <quest-lan-ip> --port 9000 --address /rusty-xr/drive/radius --arg float:0.75
 ```
 
-The public broker path was validated with a Unity client on Quest consuming
-localhost WebSocket events and driving a live scene parameter. The Unity
-project itself is not published in this iteration.
+For a clock-aligned comparison bundle, run `broker compare` after the broker
+profile and a target app are running. The direct route expects the target app to
+listen on UDP `9001` for `/rusty-xr/drive/radius`, include the host send
+timestamp in its acknowledgement, and reply on `/rusty-xr/drive/ack` to the
+companion's requested acknowledgement port. Use `--skip-direct-osc` or
+`--skip-broker-osc` when only one route is active:
+
+```powershell
+dotnet run --project .\src\RustyXr.Companion.Cli -- broker compare --quest-host <quest-lan-ip> --serial <serial> --count 16 --interval-ms 250 --out .\artifacts\broker-compare --json
+```
+
+The bundle contains `broker-comparison.json`, `broker-comparison.md`,
+`direct-osc-roundtrip.csv`, and `broker-osc-stream.csv` when both routes are
+available. If `broker status --json` reports OSC ingress disabled, relaunch the
+broker with the OSC ingress runtime profile before trusting broker-route counts.
+
+For LSL diagnostics, pass a compatible Windows `lsl.dll`. The local loopback
+path does not require a Quest and writes JSON, CSV, Markdown, and PDF reports:
+
+```powershell
+dotnet run --project .\src\RustyXr.Companion.Cli -- lsl runtime --lsl-dll <path-to-windows-lsl.dll> --json
+dotnet run --project .\src\RustyXr.Companion.Cli -- lsl loopback --lsl-dll <path-to-windows-lsl.dll> --count 16 --interval-ms 100 --out .\artifacts\lsl-loopback --json
+```
+
+After the LSL-capable broker APK is running and forwarded, compare WebSocket
+latency samples against the broker's forwarded LSL string stream:
+
+```powershell
+dotnet run --project .\src\RustyXr.Companion.Cli -- broker forward --serial <serial>
+dotnet run --project .\src\RustyXr.Companion.Cli -- lsl broker-roundtrip --serial <serial> --lsl-dll <path-to-windows-lsl.dll> --count 8 --interval-ms 250 --out .\artifacts\lsl-broker --json
+```
+
+The public Unity-side target for this broker comparison is
+[The Big Red Button Institute](https://github.com/MesmerPrism/the-big-red-button-institute).
+It consumes localhost WebSocket events from the broker, exposes the direct Unity
+OSC acknowledgement route, and drives one visible button through both paths.
 
 ## Working Rules
 

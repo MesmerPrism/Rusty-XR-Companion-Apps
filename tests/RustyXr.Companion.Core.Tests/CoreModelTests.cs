@@ -154,6 +154,10 @@ public sealed class CoreModelTests
                 Path.Combine("catalogs", "apks", CompanionContentLayout.CompositeQuestApkFileName),
                 apkPath,
                 StringComparison.OrdinalIgnoreCase);
+            Assert.EndsWith(
+                Path.Combine("catalogs", "apks", CompanionContentLayout.BrokerQuestApkFileName),
+                CompanionContentLayout.BundledBrokerApkPath(root),
+                StringComparison.OrdinalIgnoreCase);
         }
         finally
         {

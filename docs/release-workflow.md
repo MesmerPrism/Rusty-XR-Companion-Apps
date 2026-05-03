@@ -7,8 +7,9 @@ nav_order: 9
 
 The release lane is portable and does not commit APK payloads. The app source
 tree carries catalog metadata only. During release packaging, the workflow
-downloads the public Rusty XR Quest camera composite-layer APK from a release
-asset and copies it into the portable app payload beside the default catalog.
+downloads the public Rusty XR Quest camera composite-layer and broker APKs from
+release assets and copies them into the portable app payload beside the default
+catalog.
 Published release installs and local dev installs are intentionally separate.
 
 The GitHub workflow:
@@ -17,8 +18,8 @@ The GitHub workflow:
 2. builds the GitHub Pages site
 3. publishes the WPF app as a self-contained win-x64 app
 4. publishes the CLI as a self-contained win-x64 app
-5. downloads and validates the public Rusty XR composite-layer APK
-6. copies that APK into `artifacts/app-win-x64/catalogs/apks`
+5. downloads and validates the public Rusty XR composite-layer and broker APKs
+6. copies those APKs into `artifacts/app-win-x64/catalogs/apks`
 7. publishes the guided setup helper
 8. signs the setup helper when signing secrets are configured
 9. copies the setup helper into the app payload as
@@ -44,6 +45,8 @@ The portable app zip also includes:
 - `catalogs/rusty-xr-quest-composite-layer.catalog.json`
 - `catalogs/apks/rusty-xr-quest-composite-layer-debug.apk`
 - `catalogs/apks/rusty-xr-quest-composite-layer-debug.apk.metadata.txt`
+- `catalogs/apks/rusty-xr-quest-broker-debug.apk`
+- `catalogs/apks/rusty-xr-quest-broker-debug.apk.metadata.txt`
 - `agent-onboarding/AGENTS.md`
 - `agent-onboarding/README.md`
 - `agent-onboarding/source-workspace.md`
@@ -54,15 +57,19 @@ start from the command-line-only release too.
 The WPF app auto-loads this catalog on startup and defaults to the accepted
 `camera-stereo-gpu-composite` runtime profile. The catalog also includes OSC
 listener profiles that exercise the headset diagnostic HUD and a no-overlay
-profile for HUD cost isolation. The APK URL comes from the
+profile for HUD cost isolation. It also includes the Rusty XR broker app and
+broker runtime profiles used by the OSC, WebSocket, LSL, and bio-simulation
+diagnostics. The composite APK URL comes from the
 workflow dispatch `composite_apk_url` input, the
 `RUSTY_XR_COMPOSITE_APK_URL` repository variable, or the default latest Rusty
-XR release asset URL, in that order.
+XR release asset URL, in that order. The broker APK URL follows the same order
+with `broker_apk_url`, `RUSTY_XR_BROKER_APK_URL`, and the latest Rusty XR broker
+release asset.
 
 For public releases, prefer a versioned Rusty XR release asset URL in
-`composite_apk_url`. The packaging step writes a metadata file beside the APK
-with the source URL, SHA-256, signing mode, native libraries, permissions, and
-debuggable status.
+`composite_apk_url` and `broker_apk_url`. The packaging step writes metadata
+files beside both APKs with the source URL, SHA-256, signing mode, native
+libraries, permissions, and debuggable status.
 
 ## Signing Secrets
 
@@ -78,6 +85,7 @@ Optional variable:
 ```text
 WINDOWS_PREVIEW_SETUP_TIMESTAMP_URL
 RUSTY_XR_COMPOSITE_APK_URL
+RUSTY_XR_BROKER_APK_URL
 ```
 
 Generate or export a certificate with:

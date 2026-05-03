@@ -226,6 +226,29 @@ public sealed class QuestAdbService
             cancellationToken);
     }
 
+    public Task<CommandResult> ForwardTcpAsync(
+        string serial,
+        int hostPort,
+        int devicePort,
+        CancellationToken cancellationToken = default)
+    {
+        if (hostPort is <= 0 or > 65535)
+        {
+            throw new ArgumentOutOfRangeException(nameof(hostPort), "Port must be between 1 and 65535.");
+        }
+
+        if (devicePort is <= 0 or > 65535)
+        {
+            throw new ArgumentOutOfRangeException(nameof(devicePort), "Port must be between 1 and 65535.");
+        }
+
+        return RunAdbAsync(
+            serial,
+            $"forward tcp:{hostPort} tcp:{devicePort}",
+            TimeSpan.FromSeconds(15),
+            cancellationToken);
+    }
+
     public async Task<QuestAppDiagnostics> GetAppDiagnosticsAsync(
         string serial,
         string packageName,

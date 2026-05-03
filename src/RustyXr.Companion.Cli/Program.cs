@@ -49,6 +49,8 @@ internal static class CliProgram
                 "hzdb" => await HzdbAsync(args.Skip(1).ToArray()).ConfigureAwait(false),
                 "media" => await MediaAsync(args.Skip(1).ToArray()).ConfigureAwait(false),
                 "osc" => await OscAsync(args.Skip(1).ToArray()).ConfigureAwait(false),
+                "lsl" => await LslAsync(args.Skip(1).ToArray()).ConfigureAwait(false),
+                "broker" => await BrokerAsync(args.Skip(1).ToArray()).ConfigureAwait(false),
                 "tooling" => await ToolingAsync(args.Skip(1).ToArray()).ConfigureAwait(false),
                 "catalog" => await CatalogAsync(args.Skip(1).ToArray()).ConfigureAwait(false),
                 "workspace" => Workspace(args.Skip(1).ToArray()),
@@ -425,6 +427,522 @@ internal static class CliProgram
                 return Fail("Use: osc <send|receive> [options]");
         }
     }
+
+    private static async Task<int> BrokerAsync(string[] args)
+    {
+        if (args.Length == 0)
+        {
+            return Fail("Use: broker <forward|status|command|capabilities|streams|subscribe|unsubscribe|sample|verify|compare|bio-simulate> [options]");
+        }
+
+        var subcommand = args[0].ToLowerInvariant();
+        var options = ArgOptions.Parse(args.Skip(1));
+        return subcommand switch
+        {
+            "forward" => await BrokerForwardAsync(options).ConfigureAwait(false),
+            "status" => await BrokerStatusAsync(options).ConfigureAwait(false),
+            "command" => await BrokerCommandAsync(options.ValueOrNull("--command") ?? "status_request", options).ConfigureAwait(false),
+            "capabilities" => await BrokerCommandAsync("list_capabilities", options).ConfigureAwait(false),
+            "streams" => await BrokerCommandAsync("list_streams", options).ConfigureAwait(false),
+            "subscribe" => await BrokerCommandAsync("subscribe", options, requireStream: true).ConfigureAwait(false),
+            "unsubscribe" => await BrokerCommandAsync("unsubscribe", options, requireStream: true).ConfigureAwait(false),
+            "sample" => await BrokerLatencySampleAsync(options).ConfigureAwait(false),
+            "verify" => await BrokerVerifyAsync(options).ConfigureAwait(false),
+            "compare" => await BrokerCompareAsync(options).ConfigureAwait(false),
+            "bio-simulate" => await BrokerBioSimulateAsync(options).ConfigureAwait(false),
+            _ => Fail("Use: broker <forward|status|command|capabilities|streams|subscribe|unsubscribe|sample|verify|compare|bio-simulate> [options]")
+        };
+    }
+
+    private static async Task<int> LslAsync(string[] args)
+    {
+        if (args.Length == 0)
+        {
+            return Fail("Use: lsl <runtime|loopback|broker-roundtrip> [options]");
+        }
+
+        var subcommand = args[0].ToLowerInvariant();
+        var options = ArgOptions.Parse(args.Skip(1));
+        return subcommand switch
+        {
+            "runtime" => LslRuntime(options),
+            "loopback" => await LslLoopbackAsync(options).ConfigureAwait(false),
+            "broker-roundtrip" => await LslBrokerRoundTripAsync(options).ConfigureAwait(false),
+            _ => Fail("Use: lsl <runtime|loopback|broker-roundtrip> [options]")
+        };
+    }
+
+    private static int LslRuntime(ArgOptions options)
+    {
+        var state = LslNativeRuntime.GetRuntimeState(options.ValueOrNull("--lsl-dll") ?? string.Empty);
+        WriteObject(state, options.Has("--json"));
+        return state.Available ? 0 : 2;
+    }
+
+    private static async Task<int> LslLoopbackAsync(ArgOptions options)
+    {
+        var report = await new LslDiagnosticsService()
+            .RunLocalLoopbackAsync(new LslLocalRoundTripOptions(
+                Count: ParseInt(options, "--count", 16),
+                IntervalMilliseconds: ParseInt(options, "--interval-ms", 100),
+                TimeoutMilliseconds: ParseInt(options, "--timeout-ms", 3000),
+                ResolveTimeoutMilliseconds: ParseInt(options, "--resolve-timeout-ms", 5000),
+                WarmupMilliseconds: ParseInt(options, "--warmup-ms", 300),
+                StreamName: options.ValueOrNull("--stream-name") ?? string.Empty,
+                StreamType: options.ValueOrNull("--stream-type") ?? LslDiagnosticDefaults.LocalLoopbackStreamType,
+                SourceId: options.ValueOrNull("--source-id") ?? string.Empty,
+                LslDllPath: options.ValueOrNull("--lsl-dll") ?? string.Empty))
+            .ConfigureAwait(false);
+
+        if (options.TryGet("--out", out var outputRoot))
+        {
+            var folder = LslDiagnosticsReportWriter.WriteLocal(report, outputRoot, includePdf: !options.Has("--no-pdf"));
+            Console.Error.WriteLine($"LSL local round-trip bundle written to {folder}");
+        }
+
+        WriteObject(report, options.Has("--json"));
+        return report.Succeeded ? 0 : 2;
+    }
+
+    private static async Task<int> LslBrokerRoundTripAsync(ArgOptions options)
+    {
+        var host = options.ValueOrNull("--host") ?? BrokerClientService.DefaultHost;
+        var port = ParsePort(options, "--port", BrokerClientService.DefaultPort);
+        var hostPort = ParsePort(options, "--host-port", port);
+        var devicePort = ParsePort(options, "--device-port", BrokerClientService.DefaultPort);
+        var notes = new List<string>();
+
+        if (options.TryGet("--serial", out var serial))
+        {
+            var forwardResult = await new QuestAdbService()
+                .ForwardTcpAsync(serial, hostPort, devicePort)
+                .ConfigureAwait(false);
+            notes.Add(forwardResult.Succeeded
+                ? $"ADB forward active on tcp:{hostPort} -> tcp:{devicePort}."
+                : $"ADB forward failed: {forwardResult.CondensedOutput}");
+        }
+
+        var report = await new LslDiagnosticsService()
+            .RunBrokerRoundTripAsync(new LslBrokerRoundTripOptions(
+                Count: ParseInt(options, "--count", 8),
+                IntervalMilliseconds: ParseInt(options, "--interval-ms", 250),
+                TimeoutMilliseconds: ParseInt(options, "--timeout-ms", 5000),
+                ResolveTimeoutMilliseconds: ParseInt(options, "--resolve-timeout-ms", 10000),
+                WarmupMilliseconds: ParseInt(options, "--warmup-ms", 500),
+                SequenceStart: ParseLong(options, "--sequence-start", DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()),
+                StreamName: options.ValueOrNull("--stream-name") ?? LslDiagnosticDefaults.BrokerLatencyStreamName,
+                StreamType: options.ValueOrNull("--stream-type") ?? LslDiagnosticDefaults.BrokerLatencyStreamType,
+                Path: options.ValueOrNull("--path") ?? "lsl_broker_roundtrip",
+                PayloadSizeBytes: ParseInt(options, "--bytes", 128),
+                BrokerHost: host,
+                BrokerPort: hostPort,
+                LslDllPath: options.ValueOrNull("--lsl-dll") ?? string.Empty))
+            .ConfigureAwait(false);
+        if (notes.Count > 0)
+        {
+            report = report with { Notes = report.Notes.Concat(notes).ToArray() };
+        }
+
+        if (options.TryGet("--out", out var outputRoot))
+        {
+            var folder = LslDiagnosticsReportWriter.WriteBroker(report, outputRoot, includePdf: !options.Has("--no-pdf"));
+            Console.Error.WriteLine($"LSL broker round-trip bundle written to {folder}");
+        }
+
+        WriteObject(report, options.Has("--json"));
+        return report.Succeeded ? 0 : 2;
+    }
+
+    private static async Task<int> BrokerForwardAsync(ArgOptions options)
+    {
+        var hostPort = ParsePort(options, "--host-port", BrokerClientService.DefaultPort);
+        var devicePort = ParsePort(options, "--device-port", BrokerClientService.DefaultPort);
+        var result = await new QuestAdbService()
+            .ForwardTcpAsync(Required(options, "--serial"), hostPort, devicePort)
+            .ConfigureAwait(false);
+
+        if (options.Has("--json"))
+        {
+            WriteObject(new
+            {
+                result,
+                statusUrl = BrokerClientService.CreateStatusUri(null, BrokerClientService.DefaultHost, hostPort),
+                eventsUrl = BrokerClientService.CreateEventsUri(null, BrokerClientService.DefaultHost, hostPort)
+            }, json: true);
+        }
+        else
+        {
+            WriteCommandResult(result);
+            if (result.Succeeded)
+            {
+                Console.WriteLine($"Broker status: {BrokerClientService.CreateStatusUri(null, BrokerClientService.DefaultHost, hostPort)}");
+                Console.WriteLine($"Broker events: {BrokerClientService.CreateEventsUri(null, BrokerClientService.DefaultHost, hostPort)}");
+            }
+        }
+
+        return result.Succeeded ? 0 : result.ExitCode;
+    }
+
+    private static async Task<int> BrokerStatusAsync(ArgOptions options)
+    {
+        var port = ParsePort(options, "--port", BrokerClientService.DefaultPort);
+        var uri = BrokerClientService.CreateStatusUri(options.ValueOrNull("--url"), options.ValueOrNull("--host"), port);
+        var result = await new BrokerClientService().GetStatusAsync(uri).ConfigureAwait(false);
+        WriteObject(result.Status, json: true);
+        return 0;
+    }
+
+    private static async Task<int> BrokerCommandAsync(
+        string command,
+        ArgOptions options,
+        bool requireStream = false)
+    {
+        var stream = options.ValueOrNull("--stream");
+        if (requireStream && string.IsNullOrWhiteSpace(stream))
+        {
+            return Fail("--stream is required.");
+        }
+
+        var request = new BrokerCommandRequest(
+            NormalizeBrokerCommand(command),
+            options.ValueOrNull("--request-id") ?? $"companion-{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}",
+            options.ValueOrNull("--client-id") ?? "rusty-xr-companion-cli",
+            "Rusty XR Companion CLI",
+            AppBuildIdentity.Detect().DisplayLabel,
+            stream);
+        var result = await new BrokerClientService()
+            .SendCommandAsync(
+                BrokerEventsUri(options),
+                request,
+                TimeSpan.FromMilliseconds(ParseInt(options, "--listen-ms", 0)),
+                ParseInt(options, "--max-messages", 16))
+            .ConfigureAwait(false);
+
+        WriteObject(result, options.Has("--json"));
+        return result.HasAcceptedAck ? 0 : 2;
+    }
+
+    private static async Task<int> BrokerLatencySampleAsync(ArgOptions options)
+    {
+        var sequenceId = options.TryGet("--sequence", out var sequenceText)
+            ? long.Parse(sequenceText, CultureInfo.InvariantCulture)
+            : DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        var request = new BrokerLatencySampleRequest(
+            sequenceId,
+            options.ValueOrNull("--path") ?? "companion_probe",
+            ParseInt(options, "--bytes", 128),
+            options.ValueOrNull("--client-id") ?? "rusty-xr-companion-cli",
+            "Rusty XR Companion CLI",
+            AppBuildIdentity.Detect().DisplayLabel);
+        var subscribe = options.Has("--subscribe");
+        var listenMs = ParseInt(options, "--listen-ms", subscribe ? 1000 : 0);
+        var result = await new BrokerClientService()
+            .SendLatencySampleAsync(
+                BrokerEventsUri(options),
+                request,
+                subscribe,
+                TimeSpan.FromMilliseconds(listenMs),
+                ParseInt(options, "--max-messages", 16))
+            .ConfigureAwait(false);
+
+        WriteObject(result, options.Has("--json"));
+        return BrokerResultHasMessageType(result, "latency_ack") ? 0 : 2;
+    }
+
+    private static async Task<int> BrokerVerifyAsync(ArgOptions options)
+    {
+        var host = options.ValueOrNull("--host") ?? BrokerClientService.DefaultHost;
+        var port = ParsePort(options, "--port", BrokerClientService.DefaultPort);
+        var hostPort = ParsePort(options, "--host-port", port);
+        var devicePort = ParsePort(options, "--device-port", BrokerClientService.DefaultPort);
+        var statusUri = BrokerClientService.CreateStatusUri(options.ValueOrNull("--status-url"), host, hostPort);
+        var eventsUri = BrokerClientService.CreateEventsUri(options.ValueOrNull("--events-url"), host, hostPort);
+        var client = new BrokerClientService();
+        var notes = new List<string>();
+        CommandResult? forwardResult = null;
+
+        if (options.TryGet("--serial", out var serial))
+        {
+            forwardResult = await new QuestAdbService()
+                .ForwardTcpAsync(serial, hostPort, devicePort)
+                .ConfigureAwait(false);
+            if (!forwardResult.Succeeded)
+            {
+                notes.Add($"ADB forward failed: {forwardResult.CondensedOutput}");
+            }
+        }
+
+        var status = await client.GetStatusAsync(statusUri).ConfigureAwait(false);
+        var streamsProbe = await client
+            .SendCommandAsync(
+                eventsUri,
+                BrokerCommandRequest("list_streams", options, "verify-streams"),
+                TimeSpan.Zero,
+                ParseInt(options, "--max-messages", 16))
+            .ConfigureAwait(false);
+        var latencyProbe = await client
+            .SendLatencySampleAsync(
+                eventsUri,
+                new BrokerLatencySampleRequest(
+                    DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+                    options.ValueOrNull("--path") ?? "companion_verify",
+                    ParseInt(options, "--bytes", 128),
+                    options.ValueOrNull("--client-id") ?? "rusty-xr-companion-cli",
+                    "Rusty XR Companion CLI",
+                    AppBuildIdentity.Detect().DisplayLabel),
+                subscribeToLatencyStream: true,
+                TimeSpan.FromMilliseconds(ParseInt(options, "--listen-ms", 1000)),
+                ParseInt(options, "--max-messages", 16))
+            .ConfigureAwait(false);
+
+        OscSendResult? oscSend = null;
+        BrokerWebSocketProbeResult? oscProbe = null;
+        var oscStream = string.Empty;
+        if (options.TryGet("--osc-host", out var oscHost))
+        {
+            var oscAddress = options.ValueOrNull("--osc-address") ?? "/rusty-xr/drive/radius";
+            oscStream = options.ValueOrNull("--osc-stream") ?? "osc:" + oscAddress;
+            var oscPort = ParsePort(options, "--osc-port", OscService.DefaultPort);
+            var oscValue = options.TryGet("--osc-value", out var oscValueText)
+                ? float.Parse(oscValueText, CultureInfo.InvariantCulture)
+                : 0.42f;
+            var oscListenMs = ParseInt(options, "--osc-listen-ms", 5000);
+            var oscProbeTask = client.SendCommandAsync(
+                eventsUri,
+                BrokerCommandRequest("subscribe", options, "verify-osc", oscStream),
+                TimeSpan.FromMilliseconds(oscListenMs),
+                ParseInt(options, "--max-messages", 16));
+
+            await Task.Delay(ParseInt(options, "--osc-send-delay-ms", 500)).ConfigureAwait(false);
+            oscSend = await new OscService()
+                .SendAsync(oscHost, oscPort, new OscMessage(oscAddress, [OscArgument.Float(oscValue)]))
+                .ConfigureAwait(false);
+            oscProbe = await oscProbeTask.ConfigureAwait(false);
+        }
+
+        var statusOk = BrokerStatusContractVersion(status.Status) == "rusty.xr.broker.v1";
+        var streamsOk = streamsProbe.HasAcceptedAck;
+        var latencyAckOk = BrokerResultHasMessageType(latencyProbe, "latency_ack");
+        var latencyStreamOk = BrokerResultHasStreamEvent(latencyProbe, "latency:sample");
+        var oscOk = oscProbe is null || BrokerResultHasStreamEvent(oscProbe, oscStream);
+        if (!statusOk)
+        {
+            notes.Add("Status response did not report contractVersion rusty.xr.broker.v1.");
+        }
+        if (!streamsOk)
+        {
+            notes.Add("Stream list command did not return an accepted command ack.");
+        }
+        if (!latencyAckOk || !latencyStreamOk)
+        {
+            notes.Add("Latency sample probe did not receive both a latency ack and latency stream event.");
+        }
+        if (!oscOk)
+        {
+            notes.Add($"OSC probe did not receive stream event {oscStream}.");
+        }
+
+        var report = new BrokerVerificationReport(
+            DateTimeOffset.Now,
+            statusUri,
+            eventsUri,
+            forwardResult,
+            status.Status,
+            streamsProbe,
+            latencyProbe,
+            oscSend,
+            oscProbe,
+            statusOk,
+            streamsOk,
+            latencyAckOk,
+            latencyStreamOk,
+            oscOk,
+            notes);
+
+        if (options.TryGet("--out", out var outputRoot))
+        {
+            var folder = WriteBrokerVerificationBundle(report, outputRoot);
+            Console.Error.WriteLine($"Broker verification bundle written to {folder}");
+        }
+
+        WriteObject(report, options.Has("--json"));
+        return report.Succeeded ? 0 : 2;
+    }
+
+    private static async Task<int> BrokerCompareAsync(ArgOptions options)
+    {
+        var questHost = options.ValueOrNull("--quest-host") ??
+                        options.ValueOrNull("--osc-host") ??
+                        "127.0.0.1";
+        var host = options.ValueOrNull("--host") ?? BrokerClientService.DefaultHost;
+        var port = ParsePort(options, "--port", BrokerClientService.DefaultPort);
+        var hostPort = ParsePort(options, "--host-port", port);
+        var devicePort = ParsePort(options, "--device-port", BrokerClientService.DefaultPort);
+        var notes = new List<string>();
+
+        if (options.TryGet("--serial", out var serial))
+        {
+            var forwardResult = await new QuestAdbService()
+                .ForwardTcpAsync(serial, hostPort, devicePort)
+                .ConfigureAwait(false);
+            if (!forwardResult.Succeeded)
+            {
+                notes.Add($"ADB forward failed: {forwardResult.CondensedOutput}");
+            }
+            else
+            {
+                notes.Add($"ADB forward active on tcp:{hostPort} -> tcp:{devicePort}.");
+            }
+        }
+
+        var compareOptions = new BrokerComparisonOptions(
+            questHost,
+            Count: ParseInt(options, "--count", 8),
+            IntervalMilliseconds: ParseInt(options, "--interval-ms", 250),
+            TimeoutMilliseconds: ParseInt(options, "--timeout-ms", 5000),
+            IncludeDirectOsc: !options.Has("--skip-direct-osc"),
+            IncludeBrokerOsc: !options.Has("--skip-broker-osc"),
+            DirectOscAddress: options.ValueOrNull("--direct-osc-address") ??
+                              options.ValueOrNull("--address") ??
+                              BrokerDiagnosticDefaults.DriveAddress,
+            DirectOscPort: ParsePort(options, "--direct-osc-port", BrokerDiagnosticDefaults.DirectOscPort),
+            DirectAcknowledgementAddress: options.ValueOrNull("--ack-address") ??
+                                          BrokerDiagnosticDefaults.DirectAcknowledgementAddress,
+            DirectAcknowledgementPort: ParseInt(options, "--ack-port", BrokerDiagnosticDefaults.DirectAcknowledgementPort),
+            BrokerOscAddress: options.ValueOrNull("--broker-osc-address") ??
+                              options.ValueOrNull("--address") ??
+                              BrokerDiagnosticDefaults.DriveAddress,
+            BrokerOscPort: ParsePort(options, "--broker-osc-port", BrokerDiagnosticDefaults.BrokerOscPort),
+            BrokerHost: host,
+            BrokerPort: hostPort,
+            BrokerSubscribeLeadMilliseconds: ParseInt(options, "--broker-subscribe-lead-ms", 500),
+            MaxBrokerMessages: ParseInt(options, "--max-messages", 64),
+            ConfigureBrokerOscIngress: !options.Has("--no-configure-broker-osc"));
+
+        var report = await new BrokerComparisonService()
+            .RunAsync(compareOptions)
+            .ConfigureAwait(false);
+        if (notes.Count > 0)
+        {
+            report = report with
+            {
+                Notes = report.Notes.Concat(notes).ToArray()
+            };
+        }
+
+        if (options.TryGet("--out", out var outputRoot))
+        {
+            var folder = BrokerComparisonReportWriter.Write(report, outputRoot);
+            Console.Error.WriteLine($"Broker comparison bundle written to {folder}");
+        }
+
+        WriteObject(report, options.Has("--json"));
+        return report.Succeeded ? 0 : 2;
+    }
+
+    private static Uri BrokerEventsUri(ArgOptions options)
+    {
+        var port = ParsePort(options, "--port", BrokerClientService.DefaultPort);
+        return BrokerClientService.CreateEventsUri(options.ValueOrNull("--url"), options.ValueOrNull("--host"), port);
+    }
+
+    private static async Task<int> BrokerBioSimulateAsync(ArgOptions options)
+    {
+        var host = options.ValueOrNull("--host") ?? BrokerClientService.DefaultHost;
+        var port = ParsePort(options, "--port", BrokerClientService.DefaultPort);
+        var hostPort = ParsePort(options, "--host-port", port);
+        var devicePort = ParsePort(options, "--device-port", BrokerClientService.DefaultPort);
+        var notes = new List<string>();
+
+        if (options.TryGet("--serial", out var serial))
+        {
+            var forwardResult = await new QuestAdbService()
+                .ForwardTcpAsync(serial, hostPort, devicePort)
+                .ConfigureAwait(false);
+            if (!forwardResult.Succeeded)
+            {
+                notes.Add($"ADB forward failed: {forwardResult.CondensedOutput}");
+            }
+            else
+            {
+                notes.Add($"ADB forward active on tcp:{hostPort} -> tcp:{devicePort}.");
+            }
+        }
+
+        var report = await new BrokerBioSimulationService()
+            .RunAsync(new BrokerBioSimulationOptions(
+                Count: ParseInt(options, "--count", 4),
+                IntervalMilliseconds: ParseInt(options, "--interval-ms", 250),
+                IncludeHeartRate: !options.Has("--skip-hr"),
+                IncludeEcg: !options.Has("--skip-ecg"),
+                IncludeAcc: !options.Has("--skip-acc"),
+                BaseBpm: ParseInt(options, "--base-bpm", 72),
+                EcgSamplesPerFrame: ParseInt(options, "--ecg-samples", 8),
+                AccSamplesPerFrame: ParseInt(options, "--acc-samples", 8),
+                BrokerHost: host,
+                BrokerPort: hostPort))
+            .ConfigureAwait(false);
+
+        var output = new
+        {
+            report.CapturedAt,
+            report.Options,
+            report.Samples,
+            notes,
+            report.Succeeded
+        };
+
+        if (options.TryGet("--out", out var outputRoot))
+        {
+            var folder = Path.Combine(outputRoot, $"broker-bio-sim-{DateTimeOffset.Now:yyyyMMdd-HHmmss}");
+            Directory.CreateDirectory(folder);
+            File.WriteAllText(Path.Combine(folder, "broker-bio-sim.json"), JsonSerializer.Serialize(output, JsonOptions));
+            Console.Error.WriteLine($"Broker bio simulation bundle written to {folder}");
+        }
+
+        WriteObject(output, options.Has("--json"));
+        return report.Succeeded ? 0 : 2;
+    }
+
+    private static BrokerCommandRequest BrokerCommandRequest(
+        string command,
+        ArgOptions options,
+        string requestPrefix,
+        string? stream = null) =>
+        new(
+            command,
+            $"{requestPrefix}-{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}",
+            options.ValueOrNull("--client-id") ?? "rusty-xr-companion-cli",
+            "Rusty XR Companion CLI",
+            AppBuildIdentity.Detect().DisplayLabel,
+            stream);
+
+    private static bool BrokerResultHasMessageType(BrokerWebSocketProbeResult result, string messageType) =>
+        result.ReceivedMessages.Any(message =>
+            string.Equals(message.Type, messageType, StringComparison.Ordinal));
+
+    private static bool BrokerResultHasStreamEvent(BrokerWebSocketProbeResult result, string stream) =>
+        result.ReceivedMessages.Any(message =>
+            string.Equals(message.Type, "stream_event", StringComparison.Ordinal) &&
+            message.Payload.ValueKind == JsonValueKind.Object &&
+            message.Payload.TryGetProperty("stream", out var streamProperty) &&
+            string.Equals(streamProperty.GetString(), stream, StringComparison.Ordinal));
+
+    private static string BrokerStatusContractVersion(JsonElement status) =>
+        status.ValueKind == JsonValueKind.Object &&
+        status.TryGetProperty("contractVersion", out var version) &&
+        version.ValueKind == JsonValueKind.String
+            ? version.GetString() ?? string.Empty
+            : string.Empty;
+
+    private static string NormalizeBrokerCommand(string command) =>
+        command.ToLowerInvariant() switch
+        {
+            "status" => "status_request",
+            "capabilities" => "list_capabilities",
+            "streams" => "list_streams",
+            _ => command
+        };
 
     private static async Task<int> ToolingAsync(string[] args)
     {
@@ -906,6 +1424,14 @@ internal static class CliProgram
         return folder;
     }
 
+    private static string WriteBrokerVerificationBundle(BrokerVerificationReport report, string outputRoot)
+    {
+        var folder = Path.Combine(outputRoot, $"broker-verify-{DateTimeOffset.Now:yyyyMMdd-HHmmss}");
+        Directory.CreateDirectory(folder);
+        File.WriteAllText(Path.Combine(folder, "broker-verification.json"), JsonSerializer.Serialize(report, JsonOptions));
+        return folder;
+    }
+
     private static string ToMarkdown(CatalogVerificationReport report)
     {
         var lines = new List<string>
@@ -983,6 +1509,27 @@ internal static class CliProgram
             ? value
             : throw new ArgumentException($"{name} is required.");
 
+    private static int ParseInt(ArgOptions options, string name, int fallback) =>
+        options.TryGet(name, out var value)
+            ? int.Parse(value, CultureInfo.InvariantCulture)
+            : fallback;
+
+    private static long ParseLong(ArgOptions options, string name, long fallback) =>
+        options.TryGet(name, out var value)
+            ? long.Parse(value, CultureInfo.InvariantCulture)
+            : fallback;
+
+    private static int ParsePort(ArgOptions options, string name, int fallback)
+    {
+        var port = ParseInt(options, name, fallback);
+        if (port is <= 0 or > 65535)
+        {
+            throw new ArgumentOutOfRangeException(name, "Port must be between 1 and 65535.");
+        }
+
+        return port;
+    }
+
     private static int Fail(string message)
     {
         Console.Error.WriteLine(message);
@@ -1015,6 +1562,17 @@ internal static class CliProgram
           media receive [--host 127.0.0.1] [--port <n>] [--out <folder>] [--once] [--timeout-ms <n>] [--json]
           osc send [--host <host>] [--port <n>] [--address /path] [--arg kind:value] [--json]
           osc receive [--host 0.0.0.0] [--port <n>] [--count <n>] [--timeout-ms <n>] [--json]
+          lsl runtime [--lsl-dll <path>] [--json]
+          lsl loopback [--lsl-dll <path>] [--count <n>] [--interval-ms <n>] [--warmup-ms <n>] [--out <folder>] [--no-pdf] [--json]
+          lsl broker-roundtrip [--serial <serial>] [--lsl-dll <path>] [--count <n>] [--interval-ms <n>] [--warmup-ms <n>] [--out <folder>] [--no-pdf] [--json]
+          broker forward --serial <serial> [--host-port <n>] [--device-port <n>] [--json]
+          broker status [--host 127.0.0.1] [--port <n>] [--url <http-url>] [--json]
+          broker command --command <status|capabilities|streams|subscribe|unsubscribe|name> [--stream <id>] [--host 127.0.0.1] [--port <n>] [--url <ws-url>] [--listen-ms <n>] [--json]
+          broker subscribe --stream <id> [--listen-ms <n>] [--json]
+          broker sample [--subscribe] [--sequence <n>] [--path <name>] [--bytes <n>] [--listen-ms <n>] [--json]
+          broker verify [--serial <serial>] [--host-port <n>] [--device-port <n>] [--osc-host <quest-ip>] [--osc-value <n>] [--out <folder>] [--json]
+          broker compare --quest-host <quest-ip> [--serial <serial>] [--count <n>] [--interval-ms <n>] [--ack-port <n>] [--skip-direct-osc] [--skip-broker-osc] [--no-configure-broker-osc] [--out <folder>] [--json]
+          broker bio-simulate [--serial <serial>] [--count <n>] [--interval-ms <n>] [--skip-hr] [--skip-ecg] [--skip-acc] [--base-bpm <n>] [--ecg-samples <n>] [--acc-samples <n>] [--out <folder>] [--json]
           tooling status [--latest] [--json]
           tooling install-official [--json]
           workspace guide [--root <folder>] [--json]
@@ -1038,6 +1596,32 @@ internal static class CliProgram
         QuestAppDiagnostics Diagnostics,
         IReadOnlyList<CommandResult> Commands,
         IReadOnlyList<string> Notes);
+
+    private sealed record BrokerVerificationReport(
+        DateTimeOffset CapturedAt,
+        Uri StatusUrl,
+        Uri EventsUrl,
+        CommandResult? ForwardResult,
+        JsonElement Status,
+        BrokerWebSocketProbeResult StreamsProbe,
+        BrokerWebSocketProbeResult LatencyProbe,
+        OscSendResult? OscSend,
+        BrokerWebSocketProbeResult? OscProbe,
+        bool StatusOk,
+        bool StreamsOk,
+        bool LatencyAckOk,
+        bool LatencyStreamOk,
+        bool OscOk,
+        IReadOnlyList<string> Notes)
+    {
+        public bool Succeeded =>
+            (ForwardResult is null || ForwardResult.Succeeded) &&
+            StatusOk &&
+            StreamsOk &&
+            LatencyAckOk &&
+            LatencyStreamOk &&
+            OscOk;
+    }
 
     private static OscArgument ParseOscArgument(string raw)
     {

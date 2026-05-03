@@ -11,7 +11,13 @@ cast through `scrcpy`, receive MediaProjection display-composite frames,
 send and receive generic OSC UDP probe messages, capture visual proof, pass
 catalog runtime profiles as launch extras, manage a
 keep-awake proximity hold, read headset and controller battery status, and export
-diagnostics that can be shared without a source checkout.
+diagnostics that can be shared without a source checkout. The CLI also provides
+a clock-aligned broker comparison runner for checking a direct target-app OSC
+route against the same OSC drive stream routed through the Quest broker, plus a
+broker bio-simulation command for publishing Polar-compatible HR/RR, ECG, and
+ACC diagnostic payloads through the broker, and LSL round-trip diagnostics that
+write JSON, CSV, Markdown, and PDF report bundles from a user-supplied
+Windows `lsl.dll`.
 
 This repo is designed to work alongside the public
 [Rusty XR](https://github.com/MesmerPrism/Rusty-XR) core workspace. Rusty XR
@@ -28,8 +34,10 @@ separating UDP ingress cost from HUD rendering cost. Strobing profiles are
 hazardous and should only be launched with explicit informed opt-in.
 The source-workspace guide and sample catalog also cover the public Rusty XR
 Quest broker proof-of-concept for localhost WebSocket samples, optional LSL
-forwarding, and OSC drive ingress. The broker has been validated with a Unity
-client on Quest; a dedicated public Unity example is planned separately.
+forwarding, and OSC drive ingress. The matching public Unity Quest example is
+[The Big Red Button Institute](https://github.com/MesmerPrism/the-big-red-button-institute),
+which compares direct Unity OSC/BLE input against broker-routed stream events
+on one visible button.
 
 ## Current Scope
 
@@ -56,6 +64,13 @@ client on Quest; a dedicated public Unity example is planned separately.
   Rusty XR core
 - generic OSC UDP send/receive CLI utilities for companion-to-headset adapter
   smoke tests
+- clock-aligned `broker compare` diagnostics that write JSON, Markdown, and
+  CSV bundles for direct target-app OSC acknowledgements and broker-routed OSC
+  WebSocket events
+- `broker bio-simulate` diagnostics for Polar-compatible standard Heart Rate
+  Measurement and Polar PMD ECG/ACC payloads published as broker stream events
+- LSL runtime, local loopback, and broker latency round-trip diagnostics with
+  PDF report output
 - bundled catalog profiles for the Rusty XR generic diagnostic HUD, including
   a no-overlay OSC A/B profile
 - source-workspace broker commands for building, launching, and probing the
@@ -125,6 +140,16 @@ dotnet run --project src/RustyXr.Companion.Cli -- catalog verify --path samples\
 dotnet run --project src/RustyXr.Companion.Cli -- catalog verify --path samples\quest-session-kit\apk-catalog.example.json --app rusty-xr-quest-composite-layer --serial <serial> --stop-catalog-apps --install --launch --device-profile xr-composite-smoke-test --runtime-profile environment-depth-diagnostics --settle-ms 9000 --logcat-lines 1400 --out .\artifacts\verify
 dotnet run --project src/RustyXr.Companion.Cli -- catalog verify --path samples\quest-session-kit\apk-catalog.example.json --app rusty-xr-quest-composite-layer --serial <serial> --stop-catalog-apps --install --launch --device-profile xr-composite-smoke-test --runtime-profile media-projection-stream --media-receiver --settle-ms 7000 --logcat-lines 1000 --out .\artifacts\verify
 dotnet run --project src/RustyXr.Companion.Cli -- catalog verify --path samples\quest-session-kit\apk-catalog.example.json --app rusty-xr-quest-broker --serial <serial> --stop-catalog-apps --install --launch --device-profile broker-smoke-test --runtime-profile broker-osc-drive-ingress --settle-ms 5000 --logcat-lines 1000 --out .\artifacts\verify
+dotnet run --project src/RustyXr.Companion.Cli -- broker forward --serial <serial>
+dotnet run --project src/RustyXr.Companion.Cli -- broker status --json
+dotnet run --project src/RustyXr.Companion.Cli -- broker streams --json
+dotnet run --project src/RustyXr.Companion.Cli -- broker sample --subscribe --json
+dotnet run --project src/RustyXr.Companion.Cli -- broker verify --serial <serial> --osc-host <quest-lan-ip> --out .\artifacts\verify --json
+dotnet run --project src/RustyXr.Companion.Cli -- broker compare --quest-host <quest-lan-ip> --serial <serial> --count 16 --interval-ms 250 --out .\artifacts\broker-compare --json
+dotnet run --project src/RustyXr.Companion.Cli -- broker bio-simulate --serial <serial> --count 8 --interval-ms 250 --out .\artifacts\broker-bio-sim --json
+dotnet run --project src/RustyXr.Companion.Cli -- lsl runtime --lsl-dll <path-to-windows-lsl.dll> --json
+dotnet run --project src/RustyXr.Companion.Cli -- lsl loopback --lsl-dll <path-to-windows-lsl.dll> --count 16 --out .\artifacts\lsl-loopback --json
+dotnet run --project src/RustyXr.Companion.Cli -- lsl broker-roundtrip --serial <serial> --lsl-dll <path-to-windows-lsl.dll> --count 8 --out .\artifacts\lsl-broker --json
 dotnet run --project src/RustyXr.Companion.Cli -- osc send --host <quest-lan-ip> --port 9000 --address /rusty-xr/drive/radius --arg float:0.75
 ```
 
@@ -159,10 +184,11 @@ install folder and launcher location before it starts:
 - `%LOCALAPPDATA%\Programs\RustyXrCompanion`
 - `%APPDATA%\Microsoft\Windows\Start Menu\Programs\Rusty XR Companion\Rusty XR Companion.lnk`
 
-The app zip includes a bundled `catalogs\` catalog and the public Rusty XR
-Quest camera composite-layer APK under `catalogs\apks\`. On first launch the
-WPF app auto-loads that catalog so the composite-layer example is already in
-the APK list for install and launch on a connected Quest.
+The app zip includes a bundled `catalogs\` catalog plus the public Rusty XR
+Quest camera composite-layer and broker APKs under `catalogs\apks\`. On first
+launch the WPF app auto-loads that catalog so the composite-layer and broker
+examples are already in the APK list for install and launch on a connected
+Quest.
 Both the app zip and CLI zip include `agent-onboarding\AGENTS.md` plus
 `agent-onboarding\source-workspace.md` so local agents can start from a
 released install even before the source repos are checked out.
