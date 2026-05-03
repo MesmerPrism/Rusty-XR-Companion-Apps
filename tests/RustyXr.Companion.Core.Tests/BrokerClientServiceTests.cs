@@ -4,6 +4,7 @@ using RustyXr.Companion.Core;
 
 namespace RustyXr.Companion.Core.Tests;
 
+[Collection("adb-env")]
 public sealed class BrokerClientServiceTests
 {
     [Fact]

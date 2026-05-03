@@ -249,6 +249,34 @@ public sealed class QuestAdbService
             cancellationToken);
     }
 
+    public Task<CommandResult> PushFileAsync(
+        string serial,
+        string hostPath,
+        string devicePath,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(hostPath))
+        {
+            throw new ArgumentException("Host path is required.", nameof(hostPath));
+        }
+
+        if (!File.Exists(hostPath))
+        {
+            throw new FileNotFoundException("File to push was not found.", hostPath);
+        }
+
+        if (string.IsNullOrWhiteSpace(devicePath) || !devicePath.StartsWith("/", StringComparison.Ordinal))
+        {
+            throw new ArgumentException("An absolute device path is required.", nameof(devicePath));
+        }
+
+        return RunAdbAsync(
+            serial,
+            $"push \"{hostPath}\" {devicePath}",
+            TimeSpan.FromMinutes(2),
+            cancellationToken);
+    }
+
     public async Task<QuestAppDiagnostics> GetAppDiagnosticsAsync(
         string serial,
         string packageName,

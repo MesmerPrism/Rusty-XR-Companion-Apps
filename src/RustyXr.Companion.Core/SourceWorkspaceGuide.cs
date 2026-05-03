@@ -127,6 +127,86 @@ public static class SourceWorkspaceGuide
                 companionPath,
                 @"dotnet run --project .\src\RustyXr.Companion.Cli -- catalog verify --path ..\Rusty-XR\examples\quest-broker-apk\catalog\rusty-xr-quest-broker.catalog.json --app rusty-xr-quest-broker --serial <serial> --stop-catalog-apps --install --launch --device-profile broker-smoke-test --runtime-profile broker-osc-drive-ingress --settle-ms 5000 --logcat-lines 1000 --out .\artifacts\verify"),
             new SourceWorkspaceCommand(
+                "start-broker-shell-helper",
+                "Build, push, and launch the optional ADB shell helper, then read broker shell-helper status.",
+                companionPath,
+                @"dotnet run --project .\src\RustyXr.Companion.Cli -- broker shell-helper start --serial <serial> --rusty-xr-root ..\Rusty-XR --probe-codecs --emit-synthetic-video-metadata --json"),
+            new SourceWorkspaceCommand(
+                "probe-broker-shell-helper-cameras",
+                "Build, push, launch, and report bounded shell-visible camera metadata plus Camera2 open/capture feasibility.",
+                companionPath,
+                @"dotnet run --project .\src\RustyXr.Companion.Cli -- broker shell-helper start --serial <serial> --rusty-xr-root ..\Rusty-XR --probe-cameras --probe-camera-open --json"),
+            new SourceWorkspaceCommand(
+                "probe-broker-shell-helper-binary",
+                "Build, push, launch, forward, and validate the optional ADB shell helper synthetic binary video side channel.",
+                companionPath,
+                @"dotnet run --project .\src\RustyXr.Companion.Cli -- broker shell-helper binary-probe --serial <serial> --rusty-xr-root ..\Rusty-XR --json"),
+            new SourceWorkspaceCommand(
+                "probe-broker-shell-helper-mediacodec",
+                "Build, push, launch, forward, and validate the optional ADB shell helper MediaCodec synthetic-Surface side channel.",
+                companionPath,
+                @"dotnet run --project .\src\RustyXr.Companion.Cli -- broker shell-helper binary-probe --serial <serial> --rusty-xr-root ..\Rusty-XR --mediacodec-synthetic --encoded-video-frames 4 --encoded-video-width 320 --encoded-video-height 180 --json"),
+            new SourceWorkspaceCommand(
+                "probe-broker-shell-helper-screenrecord",
+                "Build, push, launch, forward, validate, and save the optional ADB shell helper screenrecord H.264 display side channel.",
+                companionPath,
+                @"dotnet run --project .\src\RustyXr.Companion.Cli -- broker shell-helper binary-probe --serial <serial> --rusty-xr-root ..\Rusty-XR --screenrecord-source --encoded-video-width 320 --encoded-video-height 180 --encoded-video-bitrate 500000 --screenrecord-time-limit 1 --payload-out .\artifacts\broker-shell-helper\screenrecord.h264 --json"),
+            new SourceWorkspaceCommand(
+                "probe-broker-app-camera-luma",
+                "Forward, start, receive, and save a bounded broker app-context Camera2 raw-luma side-channel probe.",
+                companionPath,
+                @"dotnet run --project .\src\RustyXr.Companion.Cli -- broker app-camera-luma-probe --serial <serial> --camera-id <id> --frame-count 2 --payload-out .\artifacts\broker-app-camera\luma.raw --json"),
+            new SourceWorkspaceCommand(
+                "inspect-broker-shell-helper-h264",
+                "Inspect a saved broker shell-helper H.264 artifact and optionally add --decode --ffmpeg <path> for an external decoder probe.",
+                companionPath,
+                @"dotnet run --project .\src\RustyXr.Companion.Cli -- media inspect-h264 --payload .\artifacts\broker-shell-helper\screenrecord.h264 --json"),
+            new SourceWorkspaceCommand(
+                "inspect-broker-app-camera-luma",
+                "Inspect a saved broker app-context raw-luma artifact and optionally write a local PGM contact sheet.",
+                companionPath,
+                @"dotnet run --project .\src\RustyXr.Companion.Cli -- media inspect-raw-luma --payload .\artifacts\broker-app-camera\luma.raw --width 720 --height 480 --contact-sheet .\artifacts\broker-app-camera\luma.pgm --json"),
+            new SourceWorkspaceCommand(
+                "probe-broker-app-camera-h264",
+                "Forward, start, receive, and save a bounded broker app-context Camera2-to-H.264 side-channel probe.",
+                companionPath,
+                @"dotnet run --project .\src\RustyXr.Companion.Cli -- broker app-camera-h264-probe --serial <serial> --camera-id <id> --capture-ms 900 --max-packets 12 --payload-out .\artifacts\broker-app-camera\camera.h264 --json"),
+            new SourceWorkspaceCommand(
+                "probe-broker-app-camera-h264-decode",
+                "Run the broker-local Android MediaCodec H.264 decode-consumption probe for the app-camera side channel.",
+                companionPath,
+                @"dotnet run --project .\src\RustyXr.Companion.Cli -- broker app-camera-h264-decode-probe --serial <serial> --camera-id <id> --capture-ms 900 --max-packets 12 --json"),
+            new SourceWorkspaceCommand(
+                "launch-composite-broker-h264-consumer",
+                "Launch the composite-layer APK with camera disabled and the broker H.264 consumer SurfaceTexture probe enabled.",
+                companionPath,
+                @"adb shell am start -a android.intent.action.MAIN -c com.oculus.intent.category.VR -n com.example.rustyxr.composite/.CompositeLayerActivity --ez rustyxr.camera false --ez rustyxr.mediaProjection false --ez rustyxr.brokerH264Consumer true --es rustyxr.brokerH264CameraId <id> --ei rustyxr.brokerH264Width 720 --ei rustyxr.brokerH264Height 480 --ei rustyxr.brokerH264CaptureMs 900 --ei rustyxr.brokerH264MaxPackets 12 --es rustyxr.brokerH264DecodeOutputMode surface-texture"),
+            new SourceWorkspaceCommand(
+                "launch-composite-broker-h264-openxr-layer",
+                "Launch the composite-layer APK with broker H.264 decoded into hardware buffers, tagged with broker Camera2 projection metadata when available, and drawn by the OpenXR GPU-buffer path.",
+                companionPath,
+                @"adb shell am start -a android.intent.action.MAIN -c com.oculus.intent.category.VR -n com.example.rustyxr.composite/.CompositeLayerActivity --ez rustyxr.camera false --es rustyxr.cameraTier gpu-buffer-probe --ez rustyxr.cameraAllowCpuFallback false --ei rustyxr.cameraCpuUploadHz 0 --ez rustyxr.mediaProjection false --ez rustyxr.brokerH264Consumer true --es rustyxr.brokerH264CameraId <id> --ei rustyxr.brokerH264Width 720 --ei rustyxr.brokerH264Height 480 --ei rustyxr.brokerH264CaptureMs 900 --ei rustyxr.brokerH264MaxPackets 12 --es rustyxr.brokerH264DecodeOutputMode hardware-buffer"),
+            new SourceWorkspaceCommand(
+                "launch-composite-broker-h264-stereo-projection",
+                "Launch the composite-layer APK with two broker H.264 streams decoded into paired hardware buffers and handed to the OpenXR stereo projection path.",
+                companionPath,
+                @"adb shell am start -a android.intent.action.MAIN -c com.oculus.intent.category.VR -n com.example.rustyxr.composite/.CompositeLayerActivity --ez rustyxr.camera false --es rustyxr.cameraTier gpu-projected --es rustyxr.cameraStereoLayout separate --ez rustyxr.cameraAllowCpuFallback false --ei rustyxr.cameraCpuUploadHz 0 --ez rustyxr.mediaProjection false --ez rustyxr.brokerH264Consumer true --ez rustyxr.brokerH264Stereo true --es rustyxr.brokerH264LeftCameraId <left-id> --es rustyxr.brokerH264RightCameraId <right-id> --ei rustyxr.brokerH264StreamPort 8879 --ei rustyxr.brokerH264RightStreamPort 8880 --ei rustyxr.brokerH264Width 720 --ei rustyxr.brokerH264Height 480 --ei rustyxr.brokerH264CaptureMs 900 --ei rustyxr.brokerH264MaxPackets 12 --es rustyxr.brokerH264DecodeOutputMode hardware-buffer --es rustyxr.cameraTextureTransformSource public-broker-h264-stereo-visual-check --es rustyxr.cameraTextureTransformReason visual-check --es rustyxr.leftCameraTextureTransformSource public-broker-h264-left-visual-check --es rustyxr.leftCameraTextureTransformReason visual-check --es rustyxr.rightCameraTextureTransformSource public-broker-h264-right-visual-check --es rustyxr.rightCameraTextureTransformReason visual-check --ez rustyxr.visualReleaseAccepted false"),
+            new SourceWorkspaceCommand(
+                "launch-composite-broker-h264-live-stereo-projection",
+                "Launch the composite-layer APK with live-bounded broker H.264 stereo streams, concurrent receive, schema-2 source timestamps, and OpenXR stereo projection diagnostics.",
+                companionPath,
+                @"adb shell am start -a android.intent.action.MAIN -c com.oculus.intent.category.VR -n com.example.rustyxr.composite/.CompositeLayerActivity --ez rustyxr.camera false --es rustyxr.cameraTier gpu-projected --es rustyxr.cameraStereoLayout separate --ez rustyxr.cameraAllowCpuFallback false --ei rustyxr.cameraCpuUploadHz 0 --ez rustyxr.mediaProjection false --ez rustyxr.brokerH264Consumer true --ez rustyxr.brokerH264Stereo true --ez rustyxr.brokerH264LiveStream true --es rustyxr.brokerH264LeftCameraId <left-id> --es rustyxr.brokerH264RightCameraId <right-id> --ei rustyxr.brokerH264StreamPort 8879 --ei rustyxr.brokerH264RightStreamPort 8880 --ei rustyxr.brokerH264Width 720 --ei rustyxr.brokerH264Height 480 --ei rustyxr.brokerH264CaptureMs 15000 --ei rustyxr.brokerH264MaxPackets 120 --ei rustyxr.brokerH264BitrateBps 2000000 --ei rustyxr.brokerH264StreamTimeoutMs 30000 --ei rustyxr.brokerH264DecodeTimeoutMs 20000 --es rustyxr.brokerH264DecodeOutputMode hardware-buffer --es rustyxr.cameraTextureTransformSource public-broker-h264-live-stereo-visual-check --es rustyxr.cameraTextureTransformReason visual-check --es rustyxr.leftCameraTextureTransformSource public-broker-h264-live-left-visual-check --es rustyxr.leftCameraTextureTransformReason visual-check --es rustyxr.rightCameraTextureTransformSource public-broker-h264-live-right-visual-check --es rustyxr.rightCameraTextureTransformReason visual-check --ez rustyxr.visualReleaseAccepted false"),
+            new SourceWorkspaceCommand(
+                "inspect-broker-app-camera-h264",
+                "Inspect a saved broker app-context H.264 artifact and optionally add --decode --ffmpeg <path> for an external decoder probe.",
+                companionPath,
+                @"dotnet run --project .\src\RustyXr.Companion.Cli -- media inspect-h264 --payload .\artifacts\broker-app-camera\camera.h264 --json"),
+            new SourceWorkspaceCommand(
+                "stop-broker-shell-helper",
+                "Run the helper in disconnect-report mode so the broker records shell-helper disconnected state.",
+                companionPath,
+                @"dotnet run --project .\src\RustyXr.Companion.Cli -- broker shell-helper stop --serial <serial> --rusty-xr-root ..\Rusty-XR --no-build --json"),
+            new SourceWorkspaceCommand(
                 "send-broker-osc-drive",
                 "Send one OSC drive value to a broker running on the Quest LAN IP.",
                 companionPath,

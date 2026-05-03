@@ -17,7 +17,23 @@ route against the same OSC drive stream routed through the Quest broker, plus a
 broker bio-simulation command for publishing Polar-compatible HR/RR, ECG, and
 ACC diagnostic payloads through the broker, and LSL round-trip diagnostics that
 write JSON, CSV, Markdown, and PDF report bundles from a user-supplied
-Windows `lsl.dll`.
+Windows `lsl.dll`. In a source workspace, the CLI can also build, push, launch,
+disconnect-report, and binary-probe the optional Rusty XR broker ADB shell
+helper, including a guarded MediaCodec synthetic-Surface packet probe with
+broker metric reporting, host receive counters, a lightweight H.264 NAL
+summary, and a guarded shell screenrecord display-source probe; that helper runs
+as Android `shell` only because an authorized ADB host launches it. The CLI can
+also run the broker app-context raw-luma Camera2 side-channel probe, which
+forwards the broker endpoint and a binary payload port, starts a bounded
+`raw_luma8` capture inside the broker APK, and validates the received frame
+packets on the host. Saved raw-luma artifacts can be inspected for frame
+alignment, hashes, luma statistics, and optional PGM contact sheets without
+bundling media codecs. The CLI can also start the broker app-context
+Camera2-to-platform-H.264 side-channel probe and receive the bounded encoded
+packets with the existing H.264 structure summary. A broker-local
+`broker app-camera-h264-decode-probe` command verifies Android platform
+MediaCodec can consume those H.264 packets before the full XR texture path is
+attempted.
 
 This repo is designed to work alongside the public
 [Rusty XR](https://github.com/MesmerPrism/Rusty-XR) core workspace. Rusty XR
@@ -71,6 +87,29 @@ on one visible button.
   Measurement and Polar PMD ECG/ACC payloads published as broker stream events
 - LSL runtime, local loopback, and broker latency round-trip diagnostics with
   PDF report output
+- source-workspace `broker shell-helper` commands for building and launching
+  the optional ADB shell-helper stub and checking broker helper status
+- source-workspace `broker app-camera-luma-probe` diagnostics for bounded
+  app-context Camera2 luma payload delivery over ADB-forwarded TCP
+- source-workspace `broker app-camera-h264-probe` diagnostics for bounded
+  app-context Camera2-to-platform-H.264 payload delivery over ADB-forwarded TCP
+- source-workspace `broker app-camera-h264-decode-probe` diagnostics for
+  broker-local Android MediaCodec H.264 consumption with byte-buffer output
+- source-workspace `launch-composite-broker-h264-consumer` diagnostics for
+  composite-app broker H.264 consumption through a decoder `SurfaceTexture`
+  external texture
+- source-workspace `launch-composite-broker-h264-openxr-layer` diagnostics for
+  broker H.264 decode into hardware buffers, broker Camera2 projection metadata
+  latching when available, and drawing by the composite APK's OpenXR GPU-buffer
+  path
+- source-workspace `launch-composite-broker-h264-stereo-projection`
+  diagnostics for two broker H.264 streams decoded into paired hardware buffers
+  and handed to the OpenXR stereo projection path
+- source-workspace `launch-composite-broker-h264-live-stereo-projection`
+  diagnostics for the live-bounded broker H.264 stereo path with schema-2 source
+  timestamps, concurrent left/right receive, and source/wire/decode cadence
+  reporting before OpenXR stereo projection
+- raw-luma artifact inspection for saved broker app-camera payloads
 - bundled catalog profiles for the Rusty XR generic diagnostic HUD, including
   a no-overlay OSC A/B profile
 - source-workspace broker commands for building, launching, and probing the
@@ -147,6 +186,20 @@ dotnet run --project src/RustyXr.Companion.Cli -- broker sample --subscribe --js
 dotnet run --project src/RustyXr.Companion.Cli -- broker verify --serial <serial> --osc-host <quest-lan-ip> --out .\artifacts\verify --json
 dotnet run --project src/RustyXr.Companion.Cli -- broker compare --quest-host <quest-lan-ip> --serial <serial> --count 16 --interval-ms 250 --out .\artifacts\broker-compare --json
 dotnet run --project src/RustyXr.Companion.Cli -- broker bio-simulate --serial <serial> --count 8 --interval-ms 250 --out .\artifacts\broker-bio-sim --json
+dotnet run --project src/RustyXr.Companion.Cli -- broker app-camera-luma-probe --serial <serial> --camera-id <id> --frame-count 2 --payload-out .\artifacts\broker-app-camera\luma.raw --json
+dotnet run --project src/RustyXr.Companion.Cli -- media inspect-raw-luma --payload .\artifacts\broker-app-camera\luma.raw --width 720 --height 480 --contact-sheet .\artifacts\broker-app-camera\luma.pgm --json
+dotnet run --project src/RustyXr.Companion.Cli -- broker app-camera-h264-probe --serial <serial> --camera-id <id> --capture-ms 900 --max-packets 12 --payload-out .\artifacts\broker-app-camera\camera.h264 --json
+dotnet run --project src/RustyXr.Companion.Cli -- broker app-camera-h264-decode-probe --serial <serial> --camera-id <id> --capture-ms 900 --max-packets 12 --json
+dotnet run --project src/RustyXr.Companion.Cli -- media inspect-h264 --payload .\artifacts\broker-app-camera\camera.h264 --json
+dotnet run --project src/RustyXr.Companion.Cli -- broker shell-helper start --serial <serial> --rusty-xr-root ..\Rusty-XR --probe-codecs --emit-synthetic-video-metadata --json
+dotnet run --project src/RustyXr.Companion.Cli -- broker shell-helper start --serial <serial> --rusty-xr-root ..\Rusty-XR --probe-cameras --json
+dotnet run --project src/RustyXr.Companion.Cli -- broker shell-helper start --serial <serial> --rusty-xr-root ..\Rusty-XR --probe-cameras --probe-camera-open --json
+dotnet run --project src/RustyXr.Companion.Cli -- broker shell-helper binary-probe --serial <serial> --rusty-xr-root ..\Rusty-XR --json
+dotnet run --project src/RustyXr.Companion.Cli -- broker shell-helper binary-probe --serial <serial> --rusty-xr-root ..\Rusty-XR --mediacodec-synthetic --encoded-video-frames 4 --encoded-video-width 320 --encoded-video-height 180 --json
+dotnet run --project src/RustyXr.Companion.Cli -- broker shell-helper binary-probe --serial <serial> --rusty-xr-root ..\Rusty-XR --screenrecord-source --encoded-video-width 320 --encoded-video-height 180 --encoded-video-bitrate 500000 --screenrecord-time-limit 1 --payload-out .\artifacts\broker-shell-helper\screenrecord.h264 --json
+dotnet run --project src/RustyXr.Companion.Cli -- media inspect-h264 --payload .\artifacts\broker-shell-helper\screenrecord.h264 --json
+dotnet run --project src/RustyXr.Companion.Cli -- broker shell-helper status --serial <serial> --json
+dotnet run --project src/RustyXr.Companion.Cli -- broker shell-helper stop --serial <serial> --rusty-xr-root ..\Rusty-XR --no-build --json
 dotnet run --project src/RustyXr.Companion.Cli -- lsl runtime --lsl-dll <path-to-windows-lsl.dll> --json
 dotnet run --project src/RustyXr.Companion.Cli -- lsl loopback --lsl-dll <path-to-windows-lsl.dll> --count 16 --out .\artifacts\lsl-loopback --json
 dotnet run --project src/RustyXr.Companion.Cli -- lsl broker-roundtrip --serial <serial> --lsl-dll <path-to-windows-lsl.dll> --count 8 --out .\artifacts\lsl-broker --json
