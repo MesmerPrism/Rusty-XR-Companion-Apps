@@ -20,7 +20,7 @@ The command writes:
 The report includes:
 
 - Windows and .NET version
-- ADB, hzdb, and scrcpy discovery
+- ADB, hzdb, scrcpy, FFmpeg, and FFprobe discovery
 - ADB device list
 - optional live headset snapshots with headset battery, controller batteries, wake state, foreground app, and proximity readback
 - notes for command failures

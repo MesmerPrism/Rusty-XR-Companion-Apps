@@ -26,6 +26,23 @@ Companion can launch it when it is installed, present on `PATH`, or installed
 into the managed LocalAppData tool cache from the upstream GitHub release.
 Rusty XR Companion does not relicense scrcpy.
 
+## FFmpeg
+
+FFmpeg is an open-source media framework. Rusty XR Companion can use an
+external `ffmpeg.exe` / `ffprobe.exe` sidecar to decode saved H.264 preview
+artifacts and inspect media streams. The public app and CLI zips do not bundle
+FFmpeg binaries.
+
+Users may point the companion at their own FFmpeg executable, place FFmpeg on
+`PATH`, or explicitly install the managed media runtime into the LocalAppData
+tool cache. The managed media installer selects a Windows x64 LGPL shared
+FFmpeg build from BtbN/FFmpeg-Builds, verifies the release SHA-256 before use,
+records source/version/hash/license metadata, and classifies `ffmpeg -version`
+output for `--enable-gpl` and `--enable-nonfree`.
+
+FFmpeg remains licensed by the FFmpeg project and its configured third-party
+libraries. Rusty XR Companion does not relicense FFmpeg.
+
 ## Bundled Rusty XR Example APKs
 
 Published companion app zips can include public Rusty XR example APKs generated

@@ -18,6 +18,17 @@ That fetches Meta `hzdb`, Android platform-tools, and `scrcpy` from their
 upstream release locations and keeps their licenses separate from this MIT
 repo.
 
+The optional media runtime is separate from Quest connection tooling. Install
+it only when you want saved H.264 preview decode through FFmpeg:
+
+```powershell
+dotnet run --project src/RustyXr.Companion.Cli -- tooling install-media
+```
+
+That command downloads a verified Windows x64 LGPL shared FFmpeg build into
+the managed LocalAppData cache. The public app and CLI zips do not bundle
+FFmpeg binaries.
+
 ## USB
 
 USB is the best first check because it proves the Windows machine, headset,

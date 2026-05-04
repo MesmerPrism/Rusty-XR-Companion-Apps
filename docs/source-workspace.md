@@ -48,13 +48,16 @@ shipped or downloaded into a per-user cache:
 - Android platform-tools / `adb`
 - Meta `hzdb`
 - `scrcpy` for display casting
+- optional FFmpeg media runtime for saved H.264 preview decode and probing
 - catalog APK downloads from public release assets
 - diagnostics, screenshot, logcat, and media-receiver bundles
 
 The companion does not ship the Rust compiler, Android SDK/NDK/JDK, OpenXR
-loader binaries, signing identity, or app-specific release payloads. Those are
-large, license-sensitive, or machine-specific build inputs. Install them only
-on machines that need to build APKs from source.
+loader binaries, signing identity, app-specific release payloads, or FFmpeg
+binaries in the app zip. Those are large, license-sensitive, or
+machine-specific build inputs. Install source build tooling only on machines
+that need to build APKs from source; install the optional FFmpeg media runtime
+only when preview decoding is needed.
 
 ## Source APK Prerequisites
 
@@ -80,6 +83,7 @@ git status --short
 dotnet build RustyXr.Companion.slnx
 dotnet run --project .\src\RustyXr.Companion.Cli -- workspace guide
 dotnet run --project .\src\RustyXr.Companion.Cli -- tooling install-official
+dotnet run --project .\src\RustyXr.Companion.Cli -- tooling install-media
 dotnet run --project .\src\RustyXr.Companion.Cli -- devices
 ```
 
@@ -280,9 +284,11 @@ with start-code, SPS, PPS, IDR, and non-IDR counts. Add
 raw H.264 artifact for decoder or texture-fixture follow-up work; keep those
 generated artifacts under `.\artifacts\` or another ignored output directory.
 Use `media inspect-h264` on a saved artifact for file size, SHA-256, and
-Annex-B/NAL structure checks. Add `--decode --ffmpeg <path>` when you have a
-local FFmpeg executable and want the CLI to run an external first-frame decoder
-probe; FFmpeg is not bundled by this repo.
+Annex-B/NAL structure checks. Run `tooling install-media` or add
+`--decode --ffmpeg <path>` when you want the CLI to run an external first-frame
+decoder probe. The app zip does not bundle FFmpeg binaries, but the companion
+can install a verified optional FFmpeg media runtime into the managed
+LocalAppData cache.
 
 ```powershell
 dotnet run --project .\src\RustyXr.Companion.Cli -- broker shell-helper start --serial <serial> --rusty-xr-root ..\Rusty-XR --probe-codecs --emit-synthetic-video-metadata --json

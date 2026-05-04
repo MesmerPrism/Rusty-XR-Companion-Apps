@@ -266,9 +266,10 @@
                 <Border Style="{StaticResource PanelBorder}">
                     <StackPanel>
                         <TextBlock Text="Tooling" FontWeight="SemiBold" FontSize="15" />
-                        <TextBlock Text="ADB is required. Managed tooling can install official hzdb, Android platform-tools, and scrcpy into LocalAppData." Margin="0,4,0,10" />
+                        <TextBlock Text="ADB is required. Managed tooling can install official hzdb, Android platform-tools, scrcpy, and the optional FFmpeg media runtime into LocalAppData." Margin="0,4,0,10" />
                         <Button Content="Refresh Tooling" Command="{Binding RefreshToolsCommand}" />
                         <Button Content="Install / Update Managed Tooling" Command="{Binding InstallToolingCommand}" />
+                        <Button Content="Install / Update Media Runtime" Command="{Binding InstallMediaToolingCommand}" />
                         <ItemsControl ItemsSource="{Binding Tools}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
@@ -468,36 +469,79 @@
                             <ColumnDefinition Width="320" />
                         </Grid.ColumnDefinitions>
 
-                        <StackPanel Grid.Column="0" MaxWidth="620" HorizontalAlignment="Left">
-                            <TextBlock Text="Display Cast" FontWeight="SemiBold" />
-                            <TextBlock Text="Starts a scrcpy display stream for the selected Quest. Use managed tooling to install scrcpy when it is not already on PATH." Margin="0,4,0,12" />
-                            <StackPanel Orientation="Horizontal">
-                                <Button Content="Start Display Cast" Command="{Binding StartCastCommand}" Width="180" />
-                                <Button Content="Install / Update Tooling" Command="{Binding InstallToolingCommand}" Width="190" />
+                        <ScrollViewer Grid.Column="0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                            <StackPanel MaxWidth="620" HorizontalAlignment="Left">
+                                <TextBlock Text="Display Cast" FontWeight="SemiBold" />
+                                <TextBlock Text="Starts a scrcpy display stream for the selected Quest. Use managed tooling to install scrcpy when it is not already on PATH." Margin="0,4,0,12" />
+                                <StackPanel Orientation="Horizontal">
+                                    <Button Content="Start Display Cast" Command="{Binding StartCastCommand}" Width="180" />
+                                    <Button Content="Install / Update Tooling" Command="{Binding InstallToolingCommand}" Width="190" />
+                                </StackPanel>
+
+                                <TextBlock Text="MediaProjection Receiver" FontWeight="SemiBold" Margin="0,14,0,0" />
+                                <TextBlock Text="Use this with examples that stream display-composite frames over the Rusty XR media-pipeline protocol. Configure adb reverse first, then start the receiver and accept the headset capture prompt." Margin="0,4,0,10" />
+                                <TextBlock Text="Receiver port" />
+                                <TextBox Text="{Binding MediaPort, UpdateSourceTrigger=PropertyChanged}" Width="120" HorizontalAlignment="Left" />
+                                <TextBlock Text="Output folder" />
+                                <TextBox Text="{Binding MediaOutputRoot, UpdateSourceTrigger=PropertyChanged}" />
+                                <WrapPanel>
+                                    <Button Content="ADB Reverse Media Port" Command="{Binding ReverseMediaPortCommand}" />
+                                    <Button Content="Receive One Media Frame" Command="{Binding ReceiveMediaOnceCommand}" />
+                                </WrapPanel>
+
+                                <TextBlock Text="Broker Camera H.264" FontWeight="SemiBold" Margin="0,14,0,0" />
+                                <TextBlock Text="Start a bounded broker app-camera H.264 stream from the selected Quest, save the elementary stream, and decode a preview frame when FFmpeg is available." Margin="0,4,0,10" />
+                                <WrapPanel>
+                                    <StackPanel Width="120" Margin="0,0,10,0">
+                                        <TextBlock Text="Camera ID" />
+                                        <TextBox Text="{Binding BrokerH264CameraId, UpdateSourceTrigger=PropertyChanged}" />
+                                    </StackPanel>
+                                    <StackPanel Width="95" Margin="0,0,10,0">
+                                        <TextBlock Text="Width" />
+                                        <TextBox Text="{Binding BrokerH264PreferredWidth, UpdateSourceTrigger=PropertyChanged}" />
+                                    </StackPanel>
+                                    <StackPanel Width="95" Margin="0,0,10,0">
+                                        <TextBlock Text="Height" />
+                                        <TextBox Text="{Binding BrokerH264PreferredHeight, UpdateSourceTrigger=PropertyChanged}" />
+                                    </StackPanel>
+                                    <StackPanel Width="115" Margin="0,0,10,0">
+                                        <TextBlock Text="Capture ms" />
+                                        <TextBox Text="{Binding BrokerH264CaptureMilliseconds, UpdateSourceTrigger=PropertyChanged}" />
+                                    </StackPanel>
+                                    <StackPanel Width="115" Margin="0,0,10,0">
+                                        <TextBlock Text="Max packets" />
+                                        <TextBox Text="{Binding BrokerH264MaxPackets, UpdateSourceTrigger=PropertyChanged}" />
+                                    </StackPanel>
+                                    <StackPanel Width="140" Margin="0,0,10,0">
+                                        <TextBlock Text="Bitrate bps" />
+                                        <TextBox Text="{Binding BrokerH264BitrateBps, UpdateSourceTrigger=PropertyChanged}" />
+                                    </StackPanel>
+                                </WrapPanel>
+                                <CheckBox Content="Live bounded stream" IsChecked="{Binding BrokerH264LiveStream}" Margin="0,0,0,10" />
+                                <Button Content="Capture H.264 Preview" Command="{Binding CaptureBrokerH264PreviewCommand}" Width="200" HorizontalAlignment="Left" />
+
+                                <TextBlock Text="H.264 Preview Decode" FontWeight="SemiBold" Margin="0,14,0,0" />
+                                <TextBlock Text="Decode a saved broker camera H.264 artifact through an external FFmpeg executable. Leave FFmpeg path blank for auto-discovery." Margin="0,4,0,10" />
+                                <TextBlock Text="H.264 payload" />
+                                <TextBox Text="{Binding H264PreviewPayloadPath, UpdateSourceTrigger=PropertyChanged}" />
+                                <TextBlock Text="Preview PNG output" />
+                                <TextBox Text="{Binding H264PreviewOutputPath, UpdateSourceTrigger=PropertyChanged}" />
+                                <TextBlock Text="FFmpeg path" />
+                                <TextBox Text="{Binding FfmpegPath, UpdateSourceTrigger=PropertyChanged}" />
+                                <Button Content="Decode H.264 Preview" Command="{Binding DecodeH264PreviewCommand}" Width="200" HorizontalAlignment="Left" />
+
+                                <TextBlock Text="Visual Inspection" FontWeight="SemiBold" Margin="0,14,0,0" />
+                                <TextBlock Text="Capture a headset screenshot for agent or operator verification. screencap uses ADB first; alternate hzdb methods can be entered when needed." Margin="0,4,0,10" />
+                                <TextBlock Text="Screenshot method" />
+                                <TextBox Text="{Binding ScreenshotMethod, UpdateSourceTrigger=PropertyChanged}" Width="160" HorizontalAlignment="Left" />
+                                <Button Content="Capture Headset Screenshot" Command="{Binding CaptureScreenshotCommand}" Width="230" HorizontalAlignment="Left" />
                             </StackPanel>
-
-                            <TextBlock Text="MediaProjection Receiver" FontWeight="SemiBold" Margin="0,14,0,0" />
-                            <TextBlock Text="Use this with examples that stream display-composite frames over the Rusty XR media-pipeline protocol. Configure adb reverse first, then start the receiver and accept the headset capture prompt." Margin="0,4,0,10" />
-                            <TextBlock Text="Receiver port" />
-                            <TextBox Text="{Binding MediaPort, UpdateSourceTrigger=PropertyChanged}" Width="120" HorizontalAlignment="Left" />
-                            <TextBlock Text="Output folder" />
-                            <TextBox Text="{Binding MediaOutputRoot, UpdateSourceTrigger=PropertyChanged}" />
-                            <WrapPanel>
-                                <Button Content="ADB Reverse Media Port" Command="{Binding ReverseMediaPortCommand}" />
-                                <Button Content="Receive One Media Frame" Command="{Binding ReceiveMediaOnceCommand}" />
-                            </WrapPanel>
-
-                            <TextBlock Text="Visual Inspection" FontWeight="SemiBold" Margin="0,14,0,0" />
-                            <TextBlock Text="Capture a headset screenshot for agent or operator verification. screencap uses ADB first; alternate hzdb methods can be entered when needed." Margin="0,4,0,10" />
-                            <TextBlock Text="Screenshot method" />
-                            <TextBox Text="{Binding ScreenshotMethod, UpdateSourceTrigger=PropertyChanged}" Width="160" HorizontalAlignment="Left" />
-                            <Button Content="Capture Headset Screenshot" Command="{Binding CaptureScreenshotCommand}" Width="230" HorizontalAlignment="Left" />
-
-                        </StackPanel>
+                        </ScrollViewer>
 
                         <Border Grid.Column="1" Style="{StaticResource PanelBorder}">
                             <StackPanel>
                                 <TextBlock Text="Last Visual Proof" FontWeight="SemiBold" />
+                                <Image Source="{Binding H264PreviewImage}" Height="180" Stretch="Uniform" Margin="0,10,0,10" />
                                 <TextBlock Text="{Binding LastVisualProof}" FontFamily="Consolas" Margin="0,10,0,0" />
                             </StackPanel>
                         </Border>

@@ -47,6 +47,17 @@ dotnet run --project src/RustyXr.Companion.Cli -- doctor
 - confirm ADB can see the selected serial
 - try a smaller `--max-size`
 
+## H.264 Preview Decode Fails
+
+- run `tooling install-media`
+- run `tooling media-status --latest` or `doctor` and confirm FFmpeg and
+  FFprobe are available
+- leave the WPF FFmpeg path blank for managed runtime / `PATH` discovery, or
+  set it to an explicit `ffmpeg.exe`
+- check that the saved `.h264` payload has SPS/PPS/IDR in the H.264 summary
+- keep preview payloads and PNGs under `artifacts\` or another ignored local
+  output folder
+
 ## Immersive Example Stays Loading Or Black
 
 First isolate the OpenXR and camera route from MediaProjection. Launch the

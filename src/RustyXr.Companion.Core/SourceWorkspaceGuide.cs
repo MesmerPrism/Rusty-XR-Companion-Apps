@@ -82,6 +82,11 @@ public static class SourceWorkspaceGuide
                 companionPath,
                 @"dotnet run --project .\src\RustyXr.Companion.Cli -- tooling install-official"),
             new SourceWorkspaceCommand(
+                "companion-media-runtime",
+                "Install or update the optional companion-managed FFmpeg media runtime.",
+                companionPath,
+                @"dotnet run --project .\src\RustyXr.Companion.Cli -- tooling install-media"),
+            new SourceWorkspaceCommand(
                 "devices",
                 "Confirm ADB sees a trusted Quest.",
                 companionPath,
@@ -202,6 +207,11 @@ public static class SourceWorkspaceGuide
                 companionPath,
                 @"dotnet run --project .\src\RustyXr.Companion.Cli -- media inspect-h264 --payload .\artifacts\broker-app-camera\camera.h264 --json"),
             new SourceWorkspaceCommand(
+                "decode-broker-app-camera-h264-preview",
+                "Decode the first saved broker app-context H.264 frame to a PNG preview using an external FFmpeg sidecar.",
+                companionPath,
+                @"dotnet run --project .\src\RustyXr.Companion.Cli -- media decode-h264-preview --payload .\artifacts\broker-app-camera\camera.h264 --out .\artifacts\broker-app-camera\camera-preview.png --json"),
+            new SourceWorkspaceCommand(
                 "stop-broker-shell-helper",
                 "Run the helper in disconnect-report mode so the broker records shell-helper disconnected state.",
                 companionPath,
@@ -260,7 +270,7 @@ public static class SourceWorkspaceGuide
             new[]
             {
                 "Keep both public repos as siblings under one workspace folder.",
-                "Use the companion-managed tooling cache for adb, hzdb, and scrcpy.",
+                "Use the companion-managed tooling cache for adb, hzdb, scrcpy, and optional FFmpeg media decode tooling.",
                 "Install Rust and Android build tooling only on machines that build APKs from source.",
                 "Build APK bytes under Rusty XR ignored build folders, then verify them through catalog commands.",
                 "Keep diagnostics, screenshots, media frames, APKs, signing material, and local caches out of git."
@@ -290,6 +300,7 @@ public static class SourceWorkspaceGuide
             "- Android platform-tools / adb",
             "- Meta hzdb",
             "- scrcpy for display casting",
+            "- optional FFmpeg media runtime for decode/probe previews",
             "- catalog APK downloads and verification bundles",
             string.Empty,
             "## Source APK Build Prerequisites",

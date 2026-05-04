@@ -20,10 +20,12 @@ WPF app / CLI
   - public models
   - tooling discovery
   - managed official Quest tooling installer
+  - managed optional FFmpeg media runtime installer
   - ADB command services
   - `hzdb` wake, proximity, and screenshot helpers
   - catalog loading
   - scrcpy launch wrapper
+  - broker H.264 packet receive and optional preview decode services
 - `RustyXr.Companion.Diagnostics`
   - Windows environment analysis
   - diagnostics bundle writer
@@ -40,6 +42,8 @@ WPF app / CLI
 - external processes are launched through services
 - official third-party tooling is downloaded into LocalAppData and remains
   licensed by its upstream publisher
+- FFmpeg is an optional external media sidecar; the app zip does not bundle it
+  and the managed installer verifies source hashes before use
 - live-device commands require an explicit serial when more than one device is
   present
 - APK package IDs are user or catalog data, not private hard-coded defaults

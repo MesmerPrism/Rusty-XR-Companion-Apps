@@ -234,8 +234,24 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path artifacts\windows-installer | Out-Null
+          Copy-Item -LiteralPath LICENSE -Destination artifacts\app-win-x64\LICENSE -Force
+          Copy-Item -LiteralPath THIRD_PARTY_NOTICES.md -Destination artifacts\app-win-x64\THIRD_PARTY_NOTICES.md -Force
+          Copy-Item -LiteralPath LICENSE -Destination artifacts\cli-win-x64\LICENSE -Force
+          Copy-Item -LiteralPath THIRD_PARTY_NOTICES.md -Destination artifacts\cli-win-x64\THIRD_PARTY_NOTICES.md -Force
+          Copy-Item -LiteralPath THIRD_PARTY_NOTICES.md -Destination artifacts\windows-installer\THIRD_PARTY_NOTICES.md -Force
           Compress-Archive -Path artifacts\app-win-x64\* -DestinationPath "artifacts\windows-installer\$env:APP_ZIP_FILE_NAME"
           Compress-Archive -Path artifacts\cli-win-x64\* -DestinationPath "artifacts\windows-installer\$env:CLI_ZIP_FILE_NAME"
+
+      - name: Write release manifest
+        shell: pwsh
+        run: >
+          powershell -ExecutionPolicy Bypass -File .\tools\app\Write-ReleaseManifest.ps1
+          -ReleaseRoot artifacts\windows-installer
+          -AppPublishRoot artifacts\app-win-x64
+          -CliPublishRoot artifacts\cli-win-x64
+          -Version '${{ steps.version.outputs.package_version }}'
+          -TagName '${{ steps.version.outputs.tag_name }}'
+          -CommitSha '${{ github.sha }}'
 
       - name: Write SHA256 sums
         shell: pwsh
@@ -243,7 +259,9 @@ jobs:
           $files = @(
             "artifacts\windows-installer\$env:SETUP_FILE_NAME",
             "artifacts\windows-installer\$env:APP_ZIP_FILE_NAME",
-            "artifacts\windows-installer\$env:CLI_ZIP_FILE_NAME"
+            "artifacts\windows-installer\$env:CLI_ZIP_FILE_NAME",
+            "artifacts\windows-installer\RELEASE_MANIFEST.json",
+            "artifacts\windows-installer\THIRD_PARTY_NOTICES.md"
           )
 
           Get-FileHash -Path $files -Algorithm SHA256 |
@@ -267,6 +285,8 @@ jobs:
             "artifacts\windows-installer\$env:SETUP_FILE_NAME",
             "artifacts\windows-installer\$env:APP_ZIP_FILE_NAME",
             "artifacts\windows-installer\$env:CLI_ZIP_FILE_NAME",
+            'artifacts\windows-installer\RELEASE_MANIFEST.json',
+            'artifacts\windows-installer\THIRD_PARTY_NOTICES.md',
             'artifacts\windows-installer\SHA256SUMS.txt'
           )
 

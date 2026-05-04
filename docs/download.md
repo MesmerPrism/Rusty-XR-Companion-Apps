@@ -48,6 +48,9 @@ the local release install when a newer portable app zip is published.
 
 If the helper cannot reach an upstream tooling source, the app install still
 completes and the **Install / Update Managed Tooling** button can retry later.
+The optional FFmpeg media runtime is installed separately through **Install /
+Update Media Runtime** or `tooling install-media`; the release zip does not
+bundle FFmpeg binaries.
 
 ## Uninstall
 
@@ -66,6 +69,8 @@ checkbox only when you also want to remove that local cache.
 
 - [Portable app zip](https://github.com/MesmerPrism/Rusty-XR-Companion-Apps/releases/latest/download/RustyXrCompanion-win-x64.zip)
 - [CLI zip](https://github.com/MesmerPrism/Rusty-XR-Companion-Apps/releases/latest/download/rusty-xr-companion-cli-win-x64.zip)
+- [Release manifest](https://github.com/MesmerPrism/Rusty-XR-Companion-Apps/releases/latest/download/RELEASE_MANIFEST.json)
+- [Third-party notices](https://github.com/MesmerPrism/Rusty-XR-Companion-Apps/releases/latest/download/THIRD_PARTY_NOTICES.md)
 - [Checksums](https://github.com/MesmerPrism/Rusty-XR-Companion-Apps/releases/latest/download/SHA256SUMS.txt)
 - [Release page](https://github.com/MesmerPrism/Rusty-XR-Companion-Apps/releases)
 

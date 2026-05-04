@@ -13,6 +13,8 @@ nav_order: 3
 - Android Platform Tools, `adb.exe` on `PATH`, or the companion's managed
   tooling install
 - optional: managed `scrcpy` or `scrcpy.exe` on `PATH` for display casting
+- optional: managed FFmpeg media runtime, `ffmpeg.exe` on `PATH`, or an
+  explicit FFmpeg path for H.264 preview decode
 
 For Rusty XR APK source builds, keep `Rusty-XR` and
 `Rusty-XR-Companion-Apps` as sibling folders and follow
@@ -56,13 +58,20 @@ dotnet run --project src/RustyXr.Companion.Cli -- devices
 dotnet run --project src/RustyXr.Companion.Cli -- tooling install-official
 ```
 
-5. Refresh device status:
+5. Install the optional media runtime if you want broker H.264 preview decode
+   without manually installing FFmpeg:
+
+```powershell
+dotnet run --project src/RustyXr.Companion.Cli -- tooling install-media
+```
+
+6. Refresh device status:
 
 ```powershell
 dotnet run --project src/RustyXr.Companion.Cli -- status --serial <serial>
 ```
 
-6. Optional: enable Wi-Fi ADB from the trusted USB connection:
+7. Optional: enable Wi-Fi ADB from the trusted USB connection:
 
 ```powershell
 dotnet run --project src/RustyXr.Companion.Cli -- wifi enable --serial <usb-serial>

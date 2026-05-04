@@ -11,7 +11,8 @@ operator workflows.
 Use it when you need to:
 
 - confirm ADB, optional Quest tooling, and optional casting tools are available
-- install managed `hzdb`, Android platform-tools, and `scrcpy`
+- install managed `hzdb`, Android platform-tools, `scrcpy`, and optional
+  FFmpeg media preview tooling
 - find Quest devices over ADB
 - connect to a Quest over Wi-Fi ADB
 - read headset battery, controller batteries, wake state, and proximity state
@@ -19,6 +20,8 @@ Use it when you need to:
 - launch or stop a target app, including catalog runtime profiles
 - apply simple headset development settings
 - start a display cast through `scrcpy`
+- capture bounded broker H.264 camera payloads and decode preview frames when
+  FFmpeg is available
 - send and receive generic OSC UDP probe messages
 - launch and probe the public Rusty XR Quest broker proof-of-concept from a
   sibling source checkout

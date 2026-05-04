@@ -1,5 +1,7 @@
 using System.Collections.ObjectModel;
 using System.IO;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using Microsoft.Win32;
 using RustyXr.Companion.Core;
@@ -74,6 +76,25 @@ public sealed class MainViewModel : ObservableObject
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "RustyXrCompanion",
         "media-stream");
+    private string _h264PreviewPayloadPath = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        "RustyXrCompanion",
+        "previews",
+        "broker-camera.h264");
+    private string _h264PreviewOutputPath = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        "RustyXrCompanion",
+        "previews",
+        "h264-preview.png");
+    private string _ffmpegPath = string.Empty;
+    private string _brokerH264CameraId = string.Empty;
+    private string _brokerH264PreferredWidth = BrokerAppCameraH264StreamSessionDefaults.PreferredWidth.ToString();
+    private string _brokerH264PreferredHeight = BrokerAppCameraH264StreamSessionDefaults.PreferredHeight.ToString();
+    private string _brokerH264CaptureMilliseconds = BrokerAppCameraH264StreamSessionDefaults.CaptureMilliseconds.ToString();
+    private string _brokerH264MaxPackets = BrokerAppCameraH264StreamSessionDefaults.MaxPackets.ToString();
+    private string _brokerH264BitrateBps = BrokerAppCameraH264StreamSessionDefaults.BitrateBps.ToString();
+    private bool _brokerH264LiveStream;
+    private ImageSource? _h264PreviewImage;
     private QuestSessionCatalog? _catalog;
     private QuestAppTarget? _selectedCatalogApp;
     private RuntimeProfile? _selectedRuntimeProfile;
@@ -91,6 +112,7 @@ public sealed class MainViewModel : ObservableObject
 
         RefreshToolsCommand = new AsyncRelayCommand(RefreshToolsAsync);
         InstallToolingCommand = new AsyncRelayCommand(InstallToolingAsync);
+        InstallMediaToolingCommand = new AsyncRelayCommand(InstallMediaToolingAsync);
         RefreshDevicesCommand = new AsyncRelayCommand(RefreshDevicesAsync);
         ConnectCommand = new AsyncRelayCommand(ConnectAsync);
         EnableWifiAdbCommand = new AsyncRelayCommand(EnableWifiAdbAsync, HasSerial);
@@ -110,6 +132,8 @@ public sealed class MainViewModel : ObservableObject
         StartCastCommand = new AsyncRelayCommand(StartCastAsync, HasSerial);
         ReverseMediaPortCommand = new AsyncRelayCommand(ReverseMediaPortAsync, HasSerial);
         ReceiveMediaOnceCommand = new AsyncRelayCommand(ReceiveMediaOnceAsync);
+        CaptureBrokerH264PreviewCommand = new AsyncRelayCommand(CaptureBrokerH264PreviewAsync, HasSerial);
+        DecodeH264PreviewCommand = new AsyncRelayCommand(DecodeH264PreviewAsync);
         CaptureScreenshotCommand = new AsyncRelayCommand(CaptureScreenshotAsync, HasSerial);
         KeepAwakeCommand = new AsyncRelayCommand(KeepAwakeAsync, HasSerial);
         RestoreProximityCommand = new AsyncRelayCommand(RestoreProximityAsync, HasSerial);
@@ -416,6 +440,7 @@ public sealed class MainViewModel : ObservableObject
 
     public AsyncRelayCommand RefreshToolsCommand { get; }
     public AsyncRelayCommand InstallToolingCommand { get; }
+    public AsyncRelayCommand InstallMediaToolingCommand { get; }
     public AsyncRelayCommand RefreshDevicesCommand { get; }
     public AsyncRelayCommand ConnectCommand { get; }
     public AsyncRelayCommand EnableWifiAdbCommand { get; }
@@ -435,6 +460,8 @@ public sealed class MainViewModel : ObservableObject
     public AsyncRelayCommand StartCastCommand { get; }
     public AsyncRelayCommand ReverseMediaPortCommand { get; }
     public AsyncRelayCommand ReceiveMediaOnceCommand { get; }
+    public AsyncRelayCommand CaptureBrokerH264PreviewCommand { get; }
+    public AsyncRelayCommand DecodeH264PreviewCommand { get; }
     public AsyncRelayCommand CaptureScreenshotCommand { get; }
     public AsyncRelayCommand KeepAwakeCommand { get; }
     public AsyncRelayCommand RestoreProximityCommand { get; }
@@ -454,6 +481,72 @@ public sealed class MainViewModel : ObservableObject
     {
         get => _mediaOutputRoot;
         set => SetProperty(ref _mediaOutputRoot, value);
+    }
+
+    public string H264PreviewPayloadPath
+    {
+        get => _h264PreviewPayloadPath;
+        set => SetProperty(ref _h264PreviewPayloadPath, value);
+    }
+
+    public string H264PreviewOutputPath
+    {
+        get => _h264PreviewOutputPath;
+        set => SetProperty(ref _h264PreviewOutputPath, value);
+    }
+
+    public string FfmpegPath
+    {
+        get => _ffmpegPath;
+        set => SetProperty(ref _ffmpegPath, value);
+    }
+
+    public string BrokerH264CameraId
+    {
+        get => _brokerH264CameraId;
+        set => SetProperty(ref _brokerH264CameraId, value);
+    }
+
+    public string BrokerH264PreferredWidth
+    {
+        get => _brokerH264PreferredWidth;
+        set => SetProperty(ref _brokerH264PreferredWidth, value);
+    }
+
+    public string BrokerH264PreferredHeight
+    {
+        get => _brokerH264PreferredHeight;
+        set => SetProperty(ref _brokerH264PreferredHeight, value);
+    }
+
+    public string BrokerH264CaptureMilliseconds
+    {
+        get => _brokerH264CaptureMilliseconds;
+        set => SetProperty(ref _brokerH264CaptureMilliseconds, value);
+    }
+
+    public string BrokerH264MaxPackets
+    {
+        get => _brokerH264MaxPackets;
+        set => SetProperty(ref _brokerH264MaxPackets, value);
+    }
+
+    public string BrokerH264BitrateBps
+    {
+        get => _brokerH264BitrateBps;
+        set => SetProperty(ref _brokerH264BitrateBps, value);
+    }
+
+    public bool BrokerH264LiveStream
+    {
+        get => _brokerH264LiveStream;
+        set => SetProperty(ref _brokerH264LiveStream, value);
+    }
+
+    public ImageSource? H264PreviewImage
+    {
+        get => _h264PreviewImage;
+        private set => SetProperty(ref _h264PreviewImage, value);
     }
 
     public async Task InitializeAsync()
@@ -544,6 +637,22 @@ public sealed class MainViewModel : ObservableObject
         {
             using var service = new OfficialQuestToolingService();
             var progress = new Progress<OfficialQuestToolingProgress>(item =>
+            {
+                Status = $"{item.Status} ({item.PercentComplete}%)";
+                AddLog($"{item.Status}: {item.Detail}");
+            });
+            var result = await service.InstallOrUpdateAsync(progress).ConfigureAwait(true);
+            AddLog($"{result.Summary} {result.Detail}");
+            await RefreshToolsAsync().ConfigureAwait(true);
+        }).ConfigureAwait(true);
+    }
+
+    private async Task InstallMediaToolingAsync()
+    {
+        await RunUiActionAsync("Installing managed media runtime...", async () =>
+        {
+            using var service = new ManagedMediaToolingService();
+            var progress = new Progress<ManagedMediaToolingProgress>(item =>
             {
                 Status = $"{item.Status} ({item.PercentComplete}%)";
                 AddLog($"{item.Status}: {item.Detail}");
@@ -940,6 +1049,111 @@ public sealed class MainViewModel : ObservableObject
                 $"Port: {result.Port}{Environment.NewLine}" +
                 $"Output: {result.OutputDirectory}{Environment.NewLine}" +
                 $"Latest: {result.Frames.LastOrDefault()?.PayloadPath ?? "none"}";
+        }).ConfigureAwait(true);
+    }
+
+    private async Task DecodeH264PreviewAsync()
+    {
+        await RunUiActionAsync("Decoding H.264 preview frame...", async () =>
+        {
+            var report = await new FfmpegPreviewFrameDecoderService()
+                .DecodeAsync(new FfmpegPreviewFrameDecodeOptions(
+                    H264PreviewPayloadPath,
+                    H264PreviewOutputPath,
+                    FfmpegPath: FfmpegPath))
+                .ConfigureAwait(true);
+
+            LastVisualProof =
+                $"H.264 preview: {(report.Succeeded ? "decoded" : "failed")}{Environment.NewLine}" +
+                $"Payload: {report.PayloadPath}{Environment.NewLine}" +
+                $"Output: {report.OutputPath}{Environment.NewLine}" +
+                $"FFmpeg: {report.FfmpegPath}{Environment.NewLine}" +
+                $"Bytes: {report.OutputByteCount}{Environment.NewLine}" +
+                $"Detail: {(string.IsNullOrWhiteSpace(report.Error) ? "Preview frame ready." : report.Error)}";
+
+            if (report.Succeeded)
+            {
+                H264PreviewImage = LoadPreviewImage(report.OutputPath);
+                AddLog($"Decoded H.264 preview frame to {report.OutputPath}.");
+            }
+            else
+            {
+                AddLog($"H.264 preview decode failed: {report.Error}");
+            }
+        }).ConfigureAwait(true);
+    }
+
+    private async Task CaptureBrokerH264PreviewAsync()
+    {
+        await RunUiActionAsync("Capturing broker H.264 preview stream...", async () =>
+        {
+            var payloadPath = string.IsNullOrWhiteSpace(H264PreviewPayloadPath)
+                ? DefaultH264PreviewPayloadPath()
+                : H264PreviewPayloadPath;
+            H264PreviewPayloadPath = payloadPath;
+
+            var session = await new BrokerAppCameraH264StreamSessionService()
+                .RunAsync(new BrokerAppCameraH264StreamSessionOptions(
+                    SelectedSerial,
+                    CameraId: BrokerH264CameraId,
+                    PreferredWidth: ParsePositiveOrDefault(
+                        BrokerH264PreferredWidth,
+                        BrokerAppCameraH264StreamSessionDefaults.PreferredWidth),
+                    PreferredHeight: ParsePositiveOrDefault(
+                        BrokerH264PreferredHeight,
+                        BrokerAppCameraH264StreamSessionDefaults.PreferredHeight),
+                    CaptureMilliseconds: ParsePositiveOrDefault(
+                        BrokerH264CaptureMilliseconds,
+                        BrokerAppCameraH264StreamSessionDefaults.CaptureMilliseconds),
+                    MaxPackets: ParsePositiveOrDefault(
+                        BrokerH264MaxPackets,
+                        BrokerAppCameraH264StreamSessionDefaults.MaxPackets),
+                    BitrateBps: ParsePositiveOrDefault(
+                        BrokerH264BitrateBps,
+                        BrokerAppCameraH264StreamSessionDefaults.BitrateBps),
+                    LiveStream: BrokerH264LiveStream,
+                    PayloadOutputPath: payloadPath))
+                .ConfigureAwait(true);
+
+            var streamArtifact = session.Stream?.PayloadArtifact?.Path ?? payloadPath;
+            LastVisualProof =
+                $"Broker H.264 stream: {(session.Succeeded ? "captured" : "failed")}{Environment.NewLine}" +
+                $"Camera: {(string.IsNullOrWhiteSpace(BrokerH264CameraId) ? "default" : BrokerH264CameraId)}{Environment.NewLine}" +
+                $"Packets: {session.Stream?.PacketCount.ToString() ?? "0"}{Environment.NewLine}" +
+                $"Artifact: {streamArtifact}{Environment.NewLine}" +
+                $"Detail: {(string.IsNullOrWhiteSpace(session.Error) ? "Stream artifact ready." : session.Error)}";
+
+            if (!session.Succeeded)
+            {
+                AddLog($"Broker H.264 preview capture failed: {session.Error}");
+                return;
+            }
+
+            AddLog($"Broker H.264 preview stream saved to {streamArtifact}.");
+
+            var decode = await new FfmpegPreviewFrameDecoderService()
+                .DecodeAsync(new FfmpegPreviewFrameDecodeOptions(
+                    streamArtifact,
+                    H264PreviewOutputPath,
+                    FfmpegPath: FfmpegPath))
+                .ConfigureAwait(true);
+
+            LastVisualProof +=
+                $"{Environment.NewLine}{Environment.NewLine}" +
+                $"Preview decode: {(decode.Succeeded ? "decoded" : "failed")}{Environment.NewLine}" +
+                $"Output: {decode.OutputPath}{Environment.NewLine}" +
+                $"FFmpeg: {decode.FfmpegPath}{Environment.NewLine}" +
+                $"Decode detail: {(string.IsNullOrWhiteSpace(decode.Error) ? "Preview frame ready." : decode.Error)}";
+
+            if (decode.Succeeded)
+            {
+                H264PreviewImage = LoadPreviewImage(decode.OutputPath);
+                AddLog($"Decoded broker H.264 preview frame to {decode.OutputPath}.");
+            }
+            else
+            {
+                AddLog($"Broker H.264 preview decode failed: {decode.Error}");
+            }
         }).ConfigureAwait(true);
     }
 
@@ -1592,6 +1806,28 @@ public sealed class MainViewModel : ObservableObject
             : $"{milliseconds.Value}ms";
     }
 
+    private static ImageSource LoadPreviewImage(string path)
+    {
+        using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+        var image = new BitmapImage();
+        image.BeginInit();
+        image.CacheOption = BitmapCacheOption.OnLoad;
+        image.StreamSource = stream;
+        image.EndInit();
+        image.Freeze();
+        return image;
+    }
+
+    private static string DefaultH264PreviewPayloadPath() =>
+        Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "RustyXrCompanion",
+            "previews",
+            "broker-camera.h264");
+
+    private static int ParsePositiveOrDefault(string value, int fallback) =>
+        int.TryParse(value, out var parsed) && parsed > 0 ? parsed : fallback;
+
     private void RaiseCommandStates()
     {
         EnableWifiAdbCommand.RaiseCanExecuteChanged();
@@ -1606,6 +1842,7 @@ public sealed class MainViewModel : ObservableObject
         ApplyProfileCommand.RaiseCanExecuteChanged();
         StartCastCommand.RaiseCanExecuteChanged();
         ReverseMediaPortCommand.RaiseCanExecuteChanged();
+        CaptureBrokerH264PreviewCommand.RaiseCanExecuteChanged();
         CaptureScreenshotCommand.RaiseCanExecuteChanged();
         KeepAwakeCommand.RaiseCanExecuteChanged();
         RestoreProximityCommand.RaiseCanExecuteChanged();

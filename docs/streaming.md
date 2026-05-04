@@ -18,6 +18,38 @@ dotnet run --project src/RustyXr.Companion.Cli -- cast --serial <serial> --max-s
 
 The WPF app exposes this as **Start Display Cast**.
 
+## Broker H.264 Preview Decode
+
+The broker app-camera H.264 path is a bounded diagnostic lane for validating
+encoded camera payload transport before a target OpenXR app owns decode-to-texture
+and layer submission. The companion can start the broker stream, save the
+elementary H.264 payload, summarize the RXYRVID1 packet framing, and decode a
+single PNG preview frame when FFmpeg is available.
+
+Install the optional media runtime when `ffmpeg.exe` is not already on `PATH`:
+
+```powershell
+dotnet run --project src\RustyXr.Companion.Cli -- tooling install-media
+dotnet run --project src\RustyXr.Companion.Cli -- tooling media-status --latest
+```
+
+The installer downloads a Windows x64 LGPL shared FFmpeg build into the
+managed LocalAppData cache, verifies SHA-256, records metadata, and classifies
+`ffmpeg -version` output for GPL/nonfree flags. The app and CLI release zips
+do not bundle FFmpeg binaries.
+
+Capture and decode a preview:
+
+```powershell
+dotnet run --project src\RustyXr.Companion.Cli -- broker app-camera-h264-probe --serial <serial> --camera-id <id> --capture-ms 900 --max-packets 12 --payload-out .\artifacts\broker-app-camera\camera.h264 --json
+dotnet run --project src\RustyXr.Companion.Cli -- media decode-h264-preview --payload .\artifacts\broker-app-camera\camera.h264 --out .\artifacts\broker-app-camera\camera-preview.png --json
+```
+
+The WPF **Streams** tab exposes the same flow through **Capture H.264 Preview**
+and **Decode H.264 Preview**. Leave the FFmpeg path field blank for managed
+runtime or `PATH` discovery, or set it to an explicit user-supplied
+`ffmpeg.exe`.
+
 ## MediaProjection Frame Receiver
 
 Examples that stream final display-composite frames can use the built-in

@@ -4,7 +4,9 @@ public enum ToolKind
 {
     Adb,
     Hzdb,
-    Scrcpy
+    Scrcpy,
+    Ffmpeg,
+    Ffprobe
 }
 
 public sealed record ToolStatus(

@@ -14,12 +14,16 @@ public sealed class ToolLocator
         var adbPath = FindAdb();
         var hzdbPath = FindHzdb();
         var scrcpyPath = FindScrcpy();
+        var ffmpegPath = FindFfmpeg();
+        var ffprobePath = FindFfprobe();
 
         return new[]
         {
             await BuildToolStatusAsync(ToolKind.Adb, "Android Debug Bridge", adbPath, "version", cancellationToken).ConfigureAwait(false),
             await BuildToolStatusAsync(ToolKind.Hzdb, "Meta Quest hzdb", hzdbPath, "--version", cancellationToken).ConfigureAwait(false),
-            await BuildToolStatusAsync(ToolKind.Scrcpy, "scrcpy display cast", scrcpyPath, "--version", cancellationToken).ConfigureAwait(false)
+            await BuildToolStatusAsync(ToolKind.Scrcpy, "scrcpy display cast", scrcpyPath, "--version", cancellationToken).ConfigureAwait(false),
+            await BuildToolStatusAsync(ToolKind.Ffmpeg, "FFmpeg media sidecar", ffmpegPath, "-version", cancellationToken).ConfigureAwait(false),
+            await BuildToolStatusAsync(ToolKind.Ffprobe, "FFprobe media sidecar", ffprobePath, "-version", cancellationToken).ConfigureAwait(false)
         };
     }
 
@@ -66,6 +70,36 @@ public sealed class ToolLocator
         return candidates.FirstOrDefault(static path => !string.IsNullOrWhiteSpace(path) && File.Exists(path));
     }
 
+    public string? FindFfmpeg()
+    {
+        var candidates = new[]
+        {
+            Environment.GetEnvironmentVariable("RUSTYXR_FFMPEG_EXE"),
+            Environment.GetEnvironmentVariable("RUSTY_XR_FFMPEG_EXE"),
+            ManagedMediaToolingLayout.FfmpegExecutablePath,
+            FindManagedTool("ffmpeg", "ffmpeg.exe"),
+            FindOnPath("ffmpeg.exe"),
+            FindOnPath("ffmpeg")
+        };
+
+        return candidates.FirstOrDefault(static path => !string.IsNullOrWhiteSpace(path) && File.Exists(path));
+    }
+
+    public string? FindFfprobe()
+    {
+        var candidates = new[]
+        {
+            Environment.GetEnvironmentVariable("RUSTYXR_FFPROBE_EXE"),
+            Environment.GetEnvironmentVariable("RUSTY_XR_FFPROBE_EXE"),
+            ManagedMediaToolingLayout.FfprobeExecutablePath,
+            FindManagedTool("ffmpeg", "ffprobe.exe"),
+            FindOnPath("ffprobe.exe"),
+            FindOnPath("ffprobe")
+        };
+
+        return candidates.FirstOrDefault(static path => !string.IsNullOrWhiteSpace(path) && File.Exists(path));
+    }
+
     private async Task<ToolStatus> BuildToolStatusAsync(
         ToolKind kind,
         string displayName,
@@ -82,12 +116,26 @@ public sealed class ToolLocator
         {
             var result = await _runner.RunAsync(path, versionArgs, TimeSpan.FromSeconds(5), cancellationToken).ConfigureAwait(false);
             var version = FirstNonEmptyLine(result.StandardOutput) ?? FirstNonEmptyLine(result.StandardError);
-            return new ToolStatus(kind, displayName, result.Succeeded, path, version, result.Succeeded ? "Available." : result.CondensedOutput);
+            var versionOutput = result.StandardOutput + Environment.NewLine + result.StandardError;
+            var detail = result.Succeeded
+                ? BuildAvailableDetail(kind, versionOutput)
+                : result.CondensedOutput;
+            return new ToolStatus(kind, displayName, result.Succeeded, path, version, detail);
         }
         catch (Exception exception)
         {
             return new ToolStatus(kind, displayName, false, path, null, exception.Message);
         }
+    }
+
+    private static string BuildAvailableDetail(ToolKind kind, string versionOutput)
+    {
+        if (kind is ToolKind.Ffmpeg or ToolKind.Ffprobe)
+        {
+            return FfmpegRuntimeClassifier.ClassifyVersionOutput(versionOutput).Detail;
+        }
+
+        return "Available.";
     }
 
     private static string? FindManagedTool(string toolFolder, string executable)

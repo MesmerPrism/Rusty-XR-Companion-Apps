@@ -520,6 +520,78 @@ public sealed class CoreModelTests
     }
 
     [Fact]
+    public void ManagedMediaToolingServiceParsesPreferredFfmpegReleaseAsset()
+    {
+        var json = """
+            {
+              "html_url": "https://github.com/BtbN/FFmpeg-Builds/releases/tag/latest",
+              "assets": [
+                {
+                  "name": "ffmpeg-master-latest-win64-lgpl-shared.zip",
+                  "browser_download_url": "https://example.invalid/master.zip",
+                  "digest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+                },
+                {
+                  "name": "ffmpeg-n7.1-latest-win64-lgpl-shared-7.1.zip",
+                  "browser_download_url": "https://example.invalid/7.1.zip",
+                  "digest": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+                },
+                {
+                  "name": "ffmpeg-n8.1-latest-win64-lgpl-shared-8.1.zip",
+                  "browser_download_url": "https://example.invalid/8.1.zip",
+                  "digest": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+                },
+                {
+                  "name": "checksums.sha256",
+                  "browser_download_url": "https://example.invalid/checksums.sha256"
+                }
+              ]
+            }
+            """;
+
+        var release = ManagedMediaToolingService.ParseFfmpegReleaseMetadataJson(json);
+
+        Assert.Equal("ffmpeg-n8.1-latest-win64-lgpl-shared-8.1.zip", release.AssetName);
+        Assert.Equal("https://example.invalid/8.1.zip", release.DownloadUri);
+        Assert.Equal("3333333333333333333333333333333333333333333333333333333333333333", release.ChecksumSha256);
+        Assert.Equal("8.1-latest+sha.333333333333", release.Version);
+        Assert.Equal("https://example.invalid/checksums.sha256", release.Sha256SumsUri);
+    }
+
+    [Fact]
+    public void ManagedMediaToolingServiceParsesFfmpegChecksumsFile()
+    {
+        var checksum = ManagedMediaToolingService.ParseSha256SumsFile(
+            """
+            aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa *ffmpeg-master-latest-win64-gpl-shared.zip
+            bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb *ffmpeg-n8.1-latest-win64-lgpl-shared-8.1.zip
+            """,
+            "ffmpeg-n8.1-latest-win64-lgpl-shared-8.1.zip");
+
+        Assert.Equal("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", checksum);
+    }
+
+    [Theory]
+    [InlineData("configuration: --enable-shared --disable-libx264 --disable-libx265", "LGPL-compatible", true, false, false)]
+    [InlineData("configuration: --enable-shared --enable-gpl --disable-nonfree", "GPL", false, true, false)]
+    [InlineData("configuration: --enable-shared --enable-nonfree", "nonfree", false, false, true)]
+    [InlineData("ffmpeg version n8.1", "unknown", false, false, false)]
+    public void FfmpegRuntimeClassifierClassifiesConfigureFlags(
+        string versionOutput,
+        string licenseClass,
+        bool approved,
+        bool enableGpl,
+        bool enableNonfree)
+    {
+        var classification = FfmpegRuntimeClassifier.ClassifyVersionOutput(versionOutput);
+
+        Assert.Equal(licenseClass, classification.LicenseClass);
+        Assert.Equal(approved, classification.ApprovedForDefaultUse);
+        Assert.Equal(enableGpl, classification.EnableGpl);
+        Assert.Equal(enableNonfree, classification.EnableNonfree);
+    }
+
+    [Fact]
     public void SourceWorkspaceGuideDetectsSiblingReposAndApkOutputs()
     {
         var root = Path.Combine(Path.GetTempPath(), $"rusty-xr-workspace-{Guid.NewGuid():N}");

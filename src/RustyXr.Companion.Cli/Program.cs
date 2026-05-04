@@ -316,7 +316,7 @@ internal static class CliProgram
     {
         if (args.Length == 0)
         {
-            return Fail("Use: media <reverse|receive|inspect-h264|inspect-raw-luma> [options]");
+            return Fail("Use: media <reverse|receive|inspect-h264|decode-h264-preview|inspect-raw-luma> [options]");
         }
 
         var subcommand = args[0].ToLowerInvariant();
@@ -381,6 +381,22 @@ internal static class CliProgram
                     return report.HasInspectableH264Structure ? 0 : 2;
                 }
 
+            case "decode-h264-preview":
+                {
+                    var report = await new FfmpegPreviewFrameDecoderService()
+                        .DecodeAsync(new FfmpegPreviewFrameDecodeOptions(
+                            Required(options, "--payload"),
+                            Required(options, "--out"),
+                            FfmpegPath: options.ValueOrNull("--ffmpeg") ?? string.Empty,
+                            TimeoutMilliseconds: ParseInt(
+                                options,
+                                "--timeout-ms",
+                                FfmpegPreviewFrameDecoderService.DefaultTimeoutMilliseconds)))
+                        .ConfigureAwait(false);
+                    WriteObject(report, options.Has("--json"));
+                    return report.Succeeded ? 0 : 2;
+                }
+
             case "inspect-raw-luma":
                 {
                     var report = await new RawLumaArtifactInspectionService()
@@ -396,7 +412,7 @@ internal static class CliProgram
                 }
 
             default:
-                return Fail("Use: media <reverse|receive|inspect-h264|inspect-raw-luma> [options]");
+                return Fail("Use: media <reverse|receive|inspect-h264|decode-h264-preview|inspect-raw-luma> [options]");
         }
     }
 
@@ -1257,105 +1273,54 @@ internal static class CliProgram
 
     private static async Task<int> BrokerAppCameraH264ProbeAsync(ArgOptions options)
     {
-        var serial = Required(options, "--serial");
-        var brokerHostPort = ParsePort(options, "--broker-host-port", BrokerClientService.DefaultPort);
-        var brokerDevicePort = ParsePort(options, "--broker-device-port", BrokerClientService.DefaultPort);
-        var binaryHostPort = ParsePort(options, "--host-port", 18879);
-        var binaryDevicePort = ParsePort(options, "--device-port", 8879);
-        var preferredWidth = ParseInt(options, "--preferred-width", 720);
-        var preferredHeight = ParseInt(options, "--preferred-height", 480);
-        var captureMs = ParseInt(options, "--capture-ms", 900);
-        var maxPackets = ParseInt(options, "--max-packets", 12);
-        var bitrateBps = ParseInt(options, "--bitrate-bps", 1_000_000);
-        var liveStream = options.Has("--live-stream");
-        var timeout = TimeSpan.FromMilliseconds(ParseInt(options, "--timeout-ms", 30000));
-        var adb = new QuestAdbService();
+        var report = await new BrokerAppCameraH264StreamSessionService()
+            .RunAsync(new BrokerAppCameraH264StreamSessionOptions(
+                Required(options, "--serial"),
+                BrokerHost: options.ValueOrNull("--broker-host") ?? BrokerClientService.DefaultHost,
+                BrokerHostPort: ParsePort(options, "--broker-host-port", BrokerClientService.DefaultPort),
+                BrokerDevicePort: ParsePort(options, "--broker-device-port", BrokerClientService.DefaultPort),
+                ReceiverHost: options.ValueOrNull("--receiver-host") ?? BrokerClientService.DefaultHost,
+                StreamHostPort: ParsePort(
+                    options,
+                    "--host-port",
+                    BrokerAppCameraH264StreamSessionDefaults.StreamHostPort),
+                StreamDevicePort: ParsePort(
+                    options,
+                    "--device-port",
+                    BrokerAppCameraH264StreamSessionDefaults.StreamDevicePort),
+                CameraId: options.ValueOrNull("--camera-id") ?? string.Empty,
+                PreferredWidth: ParseInt(
+                    options,
+                    "--preferred-width",
+                    BrokerAppCameraH264StreamSessionDefaults.PreferredWidth),
+                PreferredHeight: ParseInt(
+                    options,
+                    "--preferred-height",
+                    BrokerAppCameraH264StreamSessionDefaults.PreferredHeight),
+                CaptureMilliseconds: ParseInt(
+                    options,
+                    "--capture-ms",
+                    BrokerAppCameraH264StreamSessionDefaults.CaptureMilliseconds),
+                MaxPackets: ParseInt(
+                    options,
+                    "--max-packets",
+                    BrokerAppCameraH264StreamSessionDefaults.MaxPackets),
+                BitrateBps: ParseInt(
+                    options,
+                    "--bitrate-bps",
+                    BrokerAppCameraH264StreamSessionDefaults.BitrateBps),
+                LiveStream: options.Has("--live-stream"),
+                RequestId: options.ValueOrNull("--request-id") ?? string.Empty,
+                ClientId: options.ValueOrNull("--client-id") ??
+                          BrokerAppCameraH264StreamSessionDefaults.ClientId,
+                AppVersion: AppBuildIdentity.Detect().DisplayLabel,
+                PayloadOutputPath: options.ValueOrNull("--payload-out"),
+                ReceiveTimeoutMilliseconds: ParseInt(
+                    options,
+                    "--timeout-ms",
+                    BrokerAppCameraH264StreamSessionDefaults.ReceiveTimeoutMilliseconds)))
+            .ConfigureAwait(false);
 
-        var brokerForward = await adb.ForwardTcpAsync(serial, brokerHostPort, brokerDevicePort).ConfigureAwait(false);
-        BrokerWebSocketProbeResult? command = null;
-        BrokerShellHelperBinaryStreamReport? stream = null;
-        string error = string.Empty;
-        CommandResult? binaryForward = null;
-        if (brokerForward.Succeeded)
-        {
-            binaryForward = await adb.ForwardTcpAsync(serial, binaryHostPort, binaryDevicePort).ConfigureAwait(false);
-        }
-
-        try
-        {
-            if (!brokerForward.Succeeded)
-            {
-                error = $"Broker ADB forward failed: {brokerForward.CondensedOutput}";
-            }
-            else if (binaryForward is null || !binaryForward.Succeeded)
-            {
-                error = $"Binary ADB forward failed: {binaryForward?.CondensedOutput ?? "not attempted"}";
-            }
-            else
-            {
-                var parameters = new JsonObject
-                {
-                    ["device_port"] = binaryDevicePort,
-                    ["host_port"] = binaryHostPort,
-                    ["preferred_width"] = preferredWidth,
-                    ["preferred_height"] = preferredHeight,
-                    ["capture_ms"] = captureMs,
-                    ["max_packets"] = maxPackets,
-                    ["bitrate_bps"] = bitrateBps,
-                    ["live_stream"] = liveStream
-                };
-                var cameraId = options.ValueOrNull("--camera-id");
-                if (!string.IsNullOrWhiteSpace(cameraId))
-                {
-                    parameters["camera_id"] = cameraId;
-                }
-
-                command = await new BrokerClientService()
-                    .SendCommandAsync(
-                        BrokerClientService.CreateEventsUri(
-                            explicitUrl: null,
-                            options.ValueOrNull("--broker-host") ?? BrokerClientService.DefaultHost,
-                            brokerHostPort),
-                        new BrokerCommandRequest(
-                            "camera_provider.start_app_camera_h264_stream",
-                            options.ValueOrNull("--request-id") ?? $"app-camera-h264-{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}",
-                            options.ValueOrNull("--client-id") ?? "rusty-xr-companion-cli",
-                            "Rusty XR Companion CLI",
-                            AppBuildIdentity.Detect().DisplayLabel,
-                            Parameters: parameters),
-                        TimeSpan.Zero,
-                        maxMessages: 16,
-                        replyTimeout: TimeSpan.FromSeconds(10))
-                    .ConfigureAwait(false);
-
-                if (!command.HasAcceptedAck)
-                {
-                    error = "Broker did not accept camera_provider.start_app_camera_h264_stream.";
-                }
-                else
-                {
-                    stream = await BrokerShellHelperService.ReceiveSyntheticBinaryStreamAsync(
-                            options.ValueOrNull("--receiver-host") ?? BrokerClientService.DefaultHost,
-                            binaryHostPort,
-                            timeout,
-                            options.ValueOrNull("--payload-out"),
-                            CancellationToken.None)
-                        .ConfigureAwait(false);
-                }
-            }
-        }
-        catch (Exception exception)
-        {
-            error = exception.Message;
-        }
-
-        var report = new BrokerAppCameraH264ProbeReport(
-            DateTimeOffset.Now,
-            brokerForward,
-            binaryForward,
-            command,
-            stream,
-            error);
         WriteObject(report, options.Has("--json"));
         return report.Succeeded ? 0 : 2;
     }
@@ -1591,16 +1556,16 @@ internal static class CliProgram
     {
         if (args.Length == 0)
         {
-            return Fail("Use: tooling <status|install-official> [--json]");
+            return Fail("Use: tooling <status|install-official|media-status|install-media> [--json]");
         }
 
-        using var service = new OfficialQuestToolingService();
         var subcommand = args[0].ToLowerInvariant();
         var options = ArgOptions.Parse(args.Skip(1));
         switch (subcommand)
         {
             case "status":
                 {
+                    using var service = new OfficialQuestToolingService();
                     var status = options.Has("--latest")
                         ? await service.GetStatusAsync().ConfigureAwait(false)
                         : service.GetLocalStatus();
@@ -1610,6 +1575,7 @@ internal static class CliProgram
 
             case "install-official":
                 {
+                    using var service = new OfficialQuestToolingService();
                     var progress = new InlineProgress<OfficialQuestToolingProgress>(item =>
                         Console.Error.WriteLine($"[{item.PercentComplete,3}%] {item.Status}: {item.Detail}"));
                     var result = await service.InstallOrUpdateAsync(progress).ConfigureAwait(false);
@@ -1617,8 +1583,28 @@ internal static class CliProgram
                     return result.Status.IsReady ? 0 : 2;
                 }
 
+            case "media-status":
+                {
+                    using var service = new ManagedMediaToolingService();
+                    var status = options.Has("--latest")
+                        ? await service.GetStatusAsync().ConfigureAwait(false)
+                        : service.GetLocalStatus();
+                    WriteObject(status, options.Has("--json"));
+                    return status.IsMediaRuntimeReady ? 0 : 2;
+                }
+
+            case "install-media":
+                {
+                    using var service = new ManagedMediaToolingService();
+                    var progress = new InlineProgress<ManagedMediaToolingProgress>(item =>
+                        Console.Error.WriteLine($"[{item.PercentComplete,3}%] {item.Status}: {item.Detail}"));
+                    var result = await service.InstallOrUpdateAsync(progress).ConfigureAwait(false);
+                    WriteObject(result, options.Has("--json"));
+                    return result.Status.IsMediaRuntimeReady ? 0 : 2;
+                }
+
             default:
-                return Fail("Use: tooling <status|install-official> [--json]");
+                return Fail("Use: tooling <status|install-official|media-status|install-media> [--json]");
         }
     }
 
@@ -2204,6 +2190,7 @@ internal static class CliProgram
           media reverse --serial <serial> [--device-port <n>] [--host-port <n>]
           media receive [--host 127.0.0.1] [--port <n>] [--out <folder>] [--once] [--timeout-ms <n>] [--json]
           media inspect-h264 --payload <file.h264> [--decode] [--ffmpeg <path>] [--timeout-ms <n>] [--json]
+          media decode-h264-preview --payload <file.h264> --out <frame.png> [--ffmpeg <path>] [--timeout-ms <n>] [--json]
           media inspect-raw-luma --payload <file.raw> --width <n> --height <n> [--contact-sheet <file.pgm>] [--max-frames <n>] [--json]
           osc send [--host <host>] [--port <n>] [--address /path] [--arg kind:value] [--json]
           osc receive [--host 0.0.0.0] [--port <n>] [--count <n>] [--timeout-ms <n>] [--json]
@@ -2228,6 +2215,8 @@ internal static class CliProgram
           broker shell-helper binary-probe --serial <serial> [--rusty-xr-root <folder>] [--helper-jar <path>] [--no-build] [--probe-cameras] [--probe-camera-open] [--camera-open-id <id>] [--mediacodec-synthetic|--screenrecord-source] [--host-port <n>] [--device-port <n>] [--binary-video-packets <1-30>] [--binary-video-packet-bytes <1-65536>] [--encoded-video-frames <1-60>] [--encoded-video-width <n>] [--encoded-video-height <n>] [--encoded-video-bitrate <bps>] [--screenrecord-time-limit <1-3>] [--payload-out <file.h264>] [--timeout-ms <n>] [--json]
           tooling status [--latest] [--json]
           tooling install-official [--json]
+          tooling media-status [--latest] [--json]
+          tooling install-media [--json]
           workspace guide [--root <folder>] [--json]
           catalog list [--path <catalog.json>] [--json]
           catalog install --path <catalog.json> --app <id> --serial <serial> [--apk <path-or-url>] [--apk-cache <folder>] [--refresh-apk-download]
@@ -2311,23 +2300,6 @@ internal static class CliProgram
             Command?.HasAcceptedAck == true &&
             Stream is not null &&
             string.Equals(Stream.Codec, "raw_luma8", StringComparison.Ordinal) &&
-            string.IsNullOrWhiteSpace(Error);
-    }
-
-    private sealed record BrokerAppCameraH264ProbeReport(
-        DateTimeOffset CapturedAt,
-        CommandResult BrokerForwardResult,
-        CommandResult? BinaryForwardResult,
-        BrokerWebSocketProbeResult? Command,
-        BrokerShellHelperBinaryStreamReport? Stream,
-        string Error)
-    {
-        public bool Succeeded =>
-            BrokerForwardResult.Succeeded &&
-            (BinaryForwardResult?.Succeeded ?? false) &&
-            Command?.HasAcceptedAck == true &&
-            Stream is not null &&
-            string.Equals(Stream.Codec, "h264", StringComparison.Ordinal) &&
             string.IsNullOrWhiteSpace(Error);
     }
 

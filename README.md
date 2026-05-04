@@ -30,7 +30,8 @@ packets on the host. Saved raw-luma artifacts can be inspected for frame
 alignment, hashes, luma statistics, and optional PGM contact sheets without
 bundling media codecs. The CLI can also start the broker app-context
 Camera2-to-platform-H.264 side-channel probe and receive the bounded encoded
-packets with the existing H.264 structure summary. A broker-local
+packets with the existing H.264 structure summary, then decode a preview frame
+through an optional managed FFmpeg media runtime. A broker-local
 `broker app-camera-h264-decode-probe` command verifies Android platform
 MediaCodec can consume those H.264 packets before the full XR texture path is
 attempted.
@@ -64,8 +65,8 @@ on one visible button.
   wake state, foreground app, and proximity sensor state
 - public sample catalog metadata aligned with the Rusty XR core
   `quest-app-catalog` schema
-- managed LocalAppData tool cache for Meta `hzdb`, Android platform-tools, and
-  `scrcpy`
+- managed LocalAppData tool cache for Meta `hzdb`, Android platform-tools,
+  `scrcpy`, and optional FFmpeg media preview tooling
 - source-workspace guide for sibling Rusty XR and Companion checkouts
 - installed `agent-onboarding\` docs in the app and CLI release zips
 - GitHub Pages docs and onboarding

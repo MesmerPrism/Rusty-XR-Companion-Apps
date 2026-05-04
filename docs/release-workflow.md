@@ -27,8 +27,9 @@ The GitHub workflow:
 10. validates the copied uninstall helper with the same signing check when a
    preview certificate is configured
 11. creates app and CLI zips
-12. writes `SHA256SUMS.txt`
-13. uploads release assets
+12. writes `RELEASE_MANIFEST.json`
+13. writes `SHA256SUMS.txt`
+14. uploads release assets
 
 The published WPF app and CLI receive the release version during `dotnet
 publish`. Release-channel installs compare that version to the latest GitHub
@@ -53,6 +54,19 @@ The portable app zip also includes:
 
 The CLI zip includes the same `agent-onboarding/` folder so a local agent can
 start from the command-line-only release too.
+
+Both app and CLI zips include `LICENSE` and `THIRD_PARTY_NOTICES.md`. The
+GitHub release also uploads `RELEASE_MANIFEST.json`,
+`THIRD_PARTY_NOTICES.md`, and `SHA256SUMS.txt` beside the executable assets.
+The manifest records the release commit/tag, asset hashes, bundled public APK
+metadata, and the managed-tool download sources/license summaries.
+
+The optional FFmpeg media runtime follows the same explicit managed-tool
+pattern as `scrcpy`: it is not bundled into the app or CLI zip, but users can
+install it into LocalAppData through `tooling install-media` or the desktop
+**Install / Update Media Runtime** button. The installer selects a Windows x64
+LGPL shared FFmpeg build, verifies SHA-256, records source/version/hash/license
+metadata, and classifies `ffmpeg -version` for GPL/nonfree flags.
 
 The WPF app auto-loads this catalog on startup and defaults to the accepted
 `camera-stereo-gpu-composite` runtime profile. The catalog also includes OSC

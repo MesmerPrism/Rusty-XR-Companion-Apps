@@ -274,7 +274,7 @@ internal sealed class InstallerForm : Form
         };
 
         _status.Text = "Install Rusty XR Companion";
-        _detail.Text = "This helper installs the latest portable Windows release, refreshes the managed Quest tooling cache, and creates a Start Menu launcher. For source work, keep Rusty-XR and Rusty-XR-Companion-Apps as sibling folders and use the CLI workspace guide.";
+        _detail.Text = "This helper installs the latest portable Windows release, refreshes the managed Quest tooling cache, and creates a Start Menu launcher. Install the optional FFmpeg media runtime from the app when H.264 preview decode is needed.";
         _location.Text =
             $"Install folder:{Environment.NewLine}{PortableInstallLayout.ReleaseInstallRoot()}{Environment.NewLine}" +
             $"Launcher icon:{Environment.NewLine}{PortableInstallLayout.ReleaseShortcutDisplayPath()}";
