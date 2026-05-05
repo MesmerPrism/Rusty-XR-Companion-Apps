@@ -636,6 +636,8 @@ public sealed class CoreModelTests
         Assert.Equal(CompanionOperationSurface.SchemaVersion, catalog.SchemaVersion);
         Assert.Contains(catalog.Operations, operation => operation.Id == "workspace.guide");
         Assert.Contains(catalog.Operations, operation => operation.Id == "android.agent_command");
+        Assert.Contains(catalog.Operations, operation => operation.Id == "broker.h264_proxy_probe");
+        Assert.Contains(catalog.Operations, operation => operation.Id == "broker.h264_proxy_start");
         Assert.All(catalog.Operations, operation =>
         {
             Assert.StartsWith("rusty_xr_", operation.McpToolName, StringComparison.Ordinal);
@@ -669,6 +671,11 @@ public sealed class CoreModelTests
             tool => tool.Name == "rusty_xr_workspace_guide" &&
                     tool.Annotations.ReadOnlyHint &&
                     tool.InputSchema["properties"]?["root"]?["type"]?.GetValue<string>() == "string");
+        Assert.Contains(
+            tools.Tools,
+            tool => tool.Name == "rusty_xr_broker_h264_proxy_probe" &&
+                    tool.Annotations.DestructiveHint &&
+                    tool.InputSchema["properties"]?["packetCount"]?["type"]?.GetValue<string>() == "integer");
     }
 
     [Fact]
@@ -710,6 +717,68 @@ public sealed class CoreModelTests
         Assert.Contains("--install", blocked.Arguments);
         Assert.True(allowed.Allowed);
         Assert.Contains("runner-level confirmation", allowed.GateReason);
+    }
+
+    [Fact]
+    public void CompanionOperationPlannerBuildsH264ProxyCommands()
+    {
+        var probe = CompanionOperationPlanner.CreatePlan(
+            "broker.h264_proxy_probe",
+            new Dictionary<string, string>
+            {
+                ["serial"] = "ABC123",
+                ["packetCount"] = "4",
+                ["packetBytes"] = "96",
+                ["timeoutMs"] = "10000"
+            });
+
+        Assert.False(probe.Allowed);
+        Assert.True(probe.RequiresSideEffectOptIn);
+        Assert.Equal(
+            new[]
+            {
+                "broker",
+                "h264-proxy-probe",
+                "--serial",
+                "ABC123",
+                "--packet-count",
+                "4",
+                "--packet-bytes",
+                "96",
+                "--timeout-ms",
+                "10000",
+                "--json"
+            },
+            probe.Arguments);
+
+        var start = CompanionOperationPlanner.CreatePlan(
+            "broker.h264_proxy_start",
+            new Dictionary<string, string>
+            {
+                ["remoteHost"] = "192.168.1.25",
+                ["remotePort"] = "8879",
+                ["localBindHost"] = "0.0.0.0",
+                ["localLanEnabled"] = "true"
+            },
+            allowSideEffects: true);
+
+        Assert.True(start.Allowed);
+        Assert.Contains("--local-lan-enabled", start.Arguments);
+        Assert.Equal(
+            new[]
+            {
+                "broker",
+                "h264-proxy-start",
+                "--remote-host",
+                "192.168.1.25",
+                "--remote-port",
+                "8879",
+                "--local-bind-host",
+                "0.0.0.0",
+                "--local-lan-enabled",
+                "--json"
+            },
+            start.Arguments);
     }
 
     [Fact]

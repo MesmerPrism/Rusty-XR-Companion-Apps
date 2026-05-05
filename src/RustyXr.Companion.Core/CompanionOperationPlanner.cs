@@ -187,6 +187,38 @@ public static class CompanionOperationPlanner
                 Add(arguments, "--json");
                 break;
 
+            case "broker.h264_proxy_probe":
+                Add(arguments, "broker", "h264-proxy-probe");
+                AddOption(arguments, "--serial", ValueOrNull(inputs, "serial"));
+                AddOption(arguments, "--broker-host", ValueOrNull(inputs, "brokerHost"));
+                AddOption(arguments, "--broker-host-port", ValueOrNull(inputs, "brokerHostPort"));
+                AddOption(arguments, "--broker-device-port", ValueOrNull(inputs, "brokerDevicePort"));
+                AddOption(arguments, "--packet-count", ValueOrNull(inputs, "packetCount"));
+                AddOption(arguments, "--packet-bytes", ValueOrNull(inputs, "packetBytes"));
+                AddOption(arguments, "--width", ValueOrNull(inputs, "width"));
+                AddOption(arguments, "--height", ValueOrNull(inputs, "height"));
+                AddOption(arguments, "--timeout-ms", ValueOrNull(inputs, "timeoutMs"));
+                Add(arguments, "--json");
+                break;
+
+            case "broker.h264_proxy_start":
+                Add(arguments, "broker", "h264-proxy-start");
+                AddOption(arguments, "--remote-host", Required(inputs, "remoteHost"));
+                AddOption(arguments, "--serial", ValueOrNull(inputs, "serial"));
+                AddOption(arguments, "--broker-host", ValueOrNull(inputs, "brokerHost"));
+                AddOption(arguments, "--broker-host-port", ValueOrNull(inputs, "brokerHostPort"));
+                AddOption(arguments, "--broker-device-port", ValueOrNull(inputs, "brokerDevicePort"));
+                AddOption(arguments, "--remote-port", ValueOrNull(inputs, "remotePort"));
+                AddOption(arguments, "--local-port", ValueOrNull(inputs, "localPort"));
+                AddOption(arguments, "--local-host-port", ValueOrNull(inputs, "localHostPort"));
+                AddOption(arguments, "--local-bind-host", ValueOrNull(inputs, "localBindHost"));
+                AddFlag(arguments, "--local-lan-enabled", TryGetBoolean(inputs, "localLanEnabled"));
+                AddOption(arguments, "--connect-timeout-ms", ValueOrNull(inputs, "connectTimeoutMs"));
+                AddOption(arguments, "--accept-timeout-ms", ValueOrNull(inputs, "acceptTimeoutMs"));
+                AddOption(arguments, "--timeout-ms", ValueOrNull(inputs, "timeoutMs"));
+                Add(arguments, "--json");
+                break;
+
             case "media.inspect_h264":
                 Add(arguments, "media", "inspect-h264");
                 AddOption(arguments, "--payload", Required(inputs, "payload"));

@@ -192,6 +192,19 @@ dotnet run --project .\src\RustyXr.Companion.Cli -- broker app-camera-h264-decod
 dotnet run --project .\src\RustyXr.Companion.Cli -- broker status --json
 ```
 
+For broker-to-broker H.264 relay experiments, use the bounded proxy probe
+first. It creates an in-process synthetic `RXYRVID1` source and consumer inside
+the broker command path, then verifies that the TCP proxy relays the declared
+packets and payload checksum. Starting a proxy against another broker is a
+separate explicit action. Non-loopback local binds require
+`--local-lan-enabled` and the source broker must have launched its H.264 stream
+with LAN payload binding enabled.
+
+```powershell
+dotnet run --project .\src\RustyXr.Companion.Cli -- broker h264-proxy-probe --serial <serial> --json
+dotnet run --project .\src\RustyXr.Companion.Cli -- broker h264-proxy-start --serial <serial> --remote-host <source-broker-lan-ip> --remote-port 8879 --local-port 8879 --json
+```
+
 After the broker-local decode probe succeeds, the composite-layer APK can run
 a separate cross-app consumer probe. Launch the composite example with its own
 camera path disabled and `rustyxr.brokerH264Consumer=true`; the app sends the

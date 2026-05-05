@@ -483,7 +483,7 @@ internal static class CliProgram
     {
         if (args.Length == 0)
         {
-            return Fail("Use: broker <forward|status|command|capabilities|streams|subscribe|unsubscribe|sample|verify|compare|bio-simulate|app-camera-luma-probe|app-camera-h264-probe|app-camera-h264-decode-probe|shell-helper> [options]");
+            return Fail("Use: broker <forward|status|command|capabilities|streams|subscribe|unsubscribe|sample|verify|compare|bio-simulate|app-camera-luma-probe|app-camera-h264-probe|app-camera-h264-decode-probe|h264-proxy-start|h264-proxy-probe|shell-helper> [options]");
         }
 
         var subcommand = args[0].ToLowerInvariant();
@@ -509,7 +509,9 @@ internal static class CliProgram
             "app-camera-luma-probe" => await BrokerAppCameraLumaProbeAsync(options).ConfigureAwait(false),
             "app-camera-h264-probe" => await BrokerAppCameraH264ProbeAsync(options).ConfigureAwait(false),
             "app-camera-h264-decode-probe" => await BrokerAppCameraH264DecodeProbeAsync(options).ConfigureAwait(false),
-            _ => Fail("Use: broker <forward|status|command|capabilities|streams|subscribe|unsubscribe|sample|verify|compare|bio-simulate|app-camera-luma-probe|app-camera-h264-probe|app-camera-h264-decode-probe|shell-helper> [options]")
+            "h264-proxy-start" => await BrokerH264ProxyStartAsync(options).ConfigureAwait(false),
+            "h264-proxy-probe" => await BrokerH264ProxyProbeAsync(options).ConfigureAwait(false),
+            _ => Fail("Use: broker <forward|status|command|capabilities|streams|subscribe|unsubscribe|sample|verify|compare|bio-simulate|app-camera-luma-probe|app-camera-h264-probe|app-camera-h264-decode-probe|h264-proxy-start|h264-proxy-probe|shell-helper> [options]")
         };
     }
 
@@ -1418,6 +1420,169 @@ internal static class CliProgram
         return report.Succeeded ? 0 : 2;
     }
 
+    private static async Task<int> BrokerH264ProxyProbeAsync(ArgOptions options)
+    {
+        var brokerHost = options.ValueOrNull("--broker-host") ?? options.ValueOrNull("--host") ?? BrokerClientService.DefaultHost;
+        var brokerHostPort = ParseBrokerHostPort(options);
+        var brokerDevicePort = ParsePort(options, "--broker-device-port", BrokerClientService.DefaultPort);
+        var timeoutMs = ParseInt(options, "--timeout-ms", 10000);
+        CommandResult? brokerForward = null;
+        BrokerWebSocketProbeResult? command = null;
+        JsonElement? proxyProbe = null;
+        var probeSucceeded = false;
+        var error = string.Empty;
+
+        try
+        {
+            if (options.TryGet("--serial", out var serial))
+            {
+                brokerForward = await new QuestAdbService()
+                    .ForwardTcpAsync(serial, brokerHostPort, brokerDevicePort)
+                    .ConfigureAwait(false);
+                if (!brokerForward.Succeeded)
+                {
+                    error = $"Broker ADB forward failed: {brokerForward.CondensedOutput}";
+                }
+            }
+
+            if (string.IsNullOrWhiteSpace(error))
+            {
+                var parameters = new JsonObject
+                {
+                    ["packet_count"] = ParseInt(options, "--packet-count", 4),
+                    ["packet_bytes"] = ParseInt(options, "--packet-bytes", 96),
+                    ["width"] = ParseInt(options, "--width", 64),
+                    ["height"] = ParseInt(options, "--height", 64),
+                    ["timeout_ms"] = timeoutMs
+                };
+
+                command = await new BrokerClientService()
+                    .SendCommandAsync(
+                        BrokerClientService.CreateEventsUri(options.ValueOrNull("--events-url") ?? options.ValueOrNull("--url"), brokerHost, brokerHostPort),
+                        new BrokerCommandRequest(
+                            "media.run_h264_tcp_proxy_probe",
+                            options.ValueOrNull("--request-id") ?? $"h264-proxy-probe-{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}",
+                            options.ValueOrNull("--client-id") ?? "rusty-xr-companion-cli",
+                            "Rusty XR Companion CLI",
+                            AppBuildIdentity.Detect().DisplayLabel,
+                            Parameters: parameters),
+                        TimeSpan.Zero,
+                        maxMessages: 16,
+                        replyTimeout: TimeSpan.FromMilliseconds(timeoutMs + 5000))
+                    .ConfigureAwait(false);
+
+                proxyProbe = ExtractBrokerCommandResultChild(command, "proxy_probe");
+                probeSucceeded = JsonPropertyBool(proxyProbe, "succeeded");
+                if (command?.HasAcceptedAck != true)
+                {
+                    error = "Broker did not accept media.run_h264_tcp_proxy_probe.";
+                }
+                else if (!probeSucceeded)
+                {
+                    error = JsonPropertyString(proxyProbe, "last_error");
+                    if (string.IsNullOrWhiteSpace(error))
+                    {
+                        error = "Broker H.264 TCP proxy probe did not report success.";
+                    }
+                }
+            }
+        }
+        catch (Exception exception)
+        {
+            error = exception.Message;
+        }
+
+        var report = new BrokerH264TcpProxyProbeReport(
+            DateTimeOffset.Now,
+            brokerForward,
+            command,
+            proxyProbe,
+            probeSucceeded,
+            error);
+        WriteObject(report, options.Has("--json"));
+        return report.Succeeded ? 0 : 2;
+    }
+
+    private static async Task<int> BrokerH264ProxyStartAsync(ArgOptions options)
+    {
+        var remoteHost = Required(options, "--remote-host");
+        var brokerHost = options.ValueOrNull("--broker-host") ?? options.ValueOrNull("--host") ?? BrokerClientService.DefaultHost;
+        var brokerHostPort = ParseBrokerHostPort(options);
+        var brokerDevicePort = ParsePort(options, "--broker-device-port", BrokerClientService.DefaultPort);
+        var timeoutMs = ParseInt(options, "--timeout-ms", 30000);
+        CommandResult? brokerForward = null;
+        BrokerWebSocketProbeResult? command = null;
+        JsonElement? proxyStart = null;
+        var error = string.Empty;
+
+        try
+        {
+            if (options.TryGet("--serial", out var serial))
+            {
+                brokerForward = await new QuestAdbService()
+                    .ForwardTcpAsync(serial, brokerHostPort, brokerDevicePort)
+                    .ConfigureAwait(false);
+                if (!brokerForward.Succeeded)
+                {
+                    error = $"Broker ADB forward failed: {brokerForward.CondensedOutput}";
+                }
+            }
+
+            if (string.IsNullOrWhiteSpace(error))
+            {
+                var parameters = new JsonObject
+                {
+                    ["remote_host"] = remoteHost,
+                    ["remote_port"] = ParsePort(options, "--remote-port", 8879),
+                    ["local_port"] = ParsePort(options, "--local-port", 8879),
+                    ["host_port"] = ParsePort(options, "--local-host-port", 18879),
+                    ["connect_timeout_ms"] = ParseInt(options, "--connect-timeout-ms", 15000),
+                    ["accept_timeout_ms"] = ParseInt(options, "--accept-timeout-ms", 30000),
+                    ["local_lan_enabled"] = options.Has("--local-lan-enabled")
+                };
+                var localBindHost = options.ValueOrNull("--local-bind-host");
+                if (!string.IsNullOrWhiteSpace(localBindHost))
+                {
+                    parameters["local_bind_host"] = localBindHost;
+                }
+
+                command = await new BrokerClientService()
+                    .SendCommandAsync(
+                        BrokerClientService.CreateEventsUri(options.ValueOrNull("--events-url") ?? options.ValueOrNull("--url"), brokerHost, brokerHostPort),
+                        new BrokerCommandRequest(
+                            "media.start_h264_tcp_proxy",
+                            options.ValueOrNull("--request-id") ?? $"h264-proxy-start-{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}",
+                            options.ValueOrNull("--client-id") ?? "rusty-xr-companion-cli",
+                            "Rusty XR Companion CLI",
+                            AppBuildIdentity.Detect().DisplayLabel,
+                            Parameters: parameters),
+                        TimeSpan.Zero,
+                        maxMessages: 16,
+                        replyTimeout: TimeSpan.FromMilliseconds(timeoutMs))
+                    .ConfigureAwait(false);
+
+                proxyStart = ExtractBrokerCommandResultChild(command, "proxy_start");
+                if (command?.HasAcceptedAck != true)
+                {
+                    error = "Broker did not accept media.start_h264_tcp_proxy.";
+                }
+            }
+        }
+        catch (Exception exception)
+        {
+            error = exception.Message;
+        }
+
+        var report = new BrokerH264TcpProxyStartReport(
+            DateTimeOffset.Now,
+            brokerForward,
+            command,
+            proxyStart,
+            error);
+        WriteObject(report, options.Has("--json"));
+        return report.Succeeded ? 0 : 2;
+    }
+
     private static async Task<BrokerShellHelperStatusProbe> ProbeBrokerShellHelperStatusAsync(
         ArgOptions options,
         string? forwardSerial,
@@ -1485,6 +1650,15 @@ internal static class CliProgram
             "Rusty XR Companion CLI",
             AppBuildIdentity.Detect().DisplayLabel,
             stream);
+
+    private static int ParseBrokerHostPort(ArgOptions options) =>
+        ParsePort(
+            options,
+            "--broker-host-port",
+            ParsePort(
+                options,
+                "--host-port",
+                ParsePort(options, "--port", BrokerClientService.DefaultPort)));
 
     private static JsonElement? ExtractBrokerCommandResultChild(BrokerWebSocketProbeResult? result, string childName)
     {
@@ -2344,6 +2518,8 @@ internal static class CliProgram
           broker app-camera-luma-probe --serial <serial> [--camera-id <id>] [--frame-count <1-6>] [--preferred-width <n>] [--preferred-height <n>] [--host-port <n>] [--device-port <n>] [--payload-out <file.raw>] [--timeout-ms <n>] [--json]
           broker app-camera-h264-probe --serial <serial> [--camera-id <id>] [--live-stream] [--capture-ms <n>] [--max-packets <1-600>] [--preferred-width <n>] [--preferred-height <n>] [--bitrate-bps <n>] [--host-port <n>] [--device-port <n>] [--payload-out <file.h264>] [--timeout-ms <n>] [--json]
           broker app-camera-h264-decode-probe --serial <serial> [--camera-id <id>] [--capture-ms <n>] [--max-packets <1-30>] [--preferred-width <n>] [--preferred-height <n>] [--bitrate-bps <n>] [--decode-timeout-ms <n>] [--json]
+          broker h264-proxy-probe [--serial <serial>] [--packet-count <n>] [--packet-bytes <n>] [--width <n>] [--height <n>] [--timeout-ms <n>] [--json]
+          broker h264-proxy-start --remote-host <host> [--serial <serial>] [--remote-port <n>] [--local-port <n>] [--local-bind-host <host>] [--local-lan-enabled] [--json]
           broker shell-helper build [--rusty-xr-root <folder>] [--android-player-root <folder>] [--json]
           broker shell-helper start --serial <serial> [--rusty-xr-root <folder>] [--helper-jar <path>] [--no-build] [--probe-codecs] [--probe-cameras] [--probe-camera-open] [--camera-open-id <id>] [--emit-synthetic-video-metadata] [--synthetic-video-samples <0-30>] [--emit-synthetic-video-binary] [--emit-mediacodec-synthetic-video] [--emit-screenrecord-video] [--binary-video-port <n>] [--binary-video-packets <1-30>] [--binary-video-packet-bytes <1-65536>] [--encoded-video-frames <1-60>] [--encoded-video-width <n>] [--encoded-video-height <n>] [--encoded-video-bitrate <bps>] [--screenrecord-time-limit <1-3>] [--host-port <n>] [--device-port <n>] [--broker-host 127.0.0.1] [--broker-port <n>] [--skip-status] [--json]
           broker shell-helper stop --serial <serial> [--rusty-xr-root <folder>] [--helper-jar <path>] [--no-build] [--json]
@@ -2453,6 +2629,35 @@ internal static class CliProgram
             BrokerForwardResult.Succeeded &&
             Command?.HasAcceptedAck == true &&
             DecodeSucceeded &&
+            string.IsNullOrWhiteSpace(Error);
+    }
+
+    private sealed record BrokerH264TcpProxyProbeReport(
+        DateTimeOffset CapturedAt,
+        CommandResult? BrokerForwardResult,
+        BrokerWebSocketProbeResult? Command,
+        JsonElement? ProxyProbe,
+        bool ProbeSucceeded,
+        string Error)
+    {
+        public bool Succeeded =>
+            (BrokerForwardResult?.Succeeded ?? true) &&
+            Command?.HasAcceptedAck == true &&
+            ProbeSucceeded &&
+            string.IsNullOrWhiteSpace(Error);
+    }
+
+    private sealed record BrokerH264TcpProxyStartReport(
+        DateTimeOffset CapturedAt,
+        CommandResult? BrokerForwardResult,
+        BrokerWebSocketProbeResult? Command,
+        JsonElement? ProxyStart,
+        string Error)
+    {
+        public bool Succeeded =>
+            (BrokerForwardResult?.Succeeded ?? true) &&
+            Command?.HasAcceptedAck == true &&
+            ProxyStart.HasValue &&
             string.IsNullOrWhiteSpace(Error);
     }
 

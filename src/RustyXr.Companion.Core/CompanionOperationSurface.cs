@@ -175,6 +175,56 @@ public static class CompanionOperationSurface
                     },
                     new[] { "BrokerComparisonReport" }),
                 new CompanionOperation(
+                    "broker.h264_proxy_probe",
+                    WindowsOwner,
+                    "Broker H.264 TCP proxy probe",
+                    "Runs a bounded broker-local synthetic RXYRVID1 H.264 TCP proxy probe and reports forwarding metrics.",
+                    "BrokerClientService.SendCommandAsync(media.run_h264_tcp_proxy_probe)",
+                    "broker h264-proxy-probe [--serial <serial>] [--packet-count <n>] [--packet-bytes <n>] [--width <n>] [--height <n>] [--timeout-ms <n>] --json",
+                    "rusty_xr_broker_h264_proxy_probe",
+                    "device-commanding",
+                    new[]
+                    {
+                        Parameter("serial", "string", required: false, "ADB device serial for forwarding before the probe.", "ABC123"),
+                        Parameter("brokerHost", "string", required: false, "Forwarded broker host.", "127.0.0.1"),
+                        Parameter("brokerHostPort", "integer", required: false, "Host-side forwarded broker port.", "8765"),
+                        Parameter("brokerDevicePort", "integer", required: false, "Device-side broker port.", "8765"),
+                        Parameter("packetCount", "integer", required: false, "Synthetic packet count.", "4"),
+                        Parameter("packetBytes", "integer", required: false, "Synthetic payload bytes per packet.", "96"),
+                        Parameter("width", "integer", required: false, "Synthetic encoded stream width.", "64"),
+                        Parameter("height", "integer", required: false, "Synthetic encoded stream height.", "64"),
+                        Parameter("timeoutMs", "integer", required: false, "Probe timeout in milliseconds.", "10000")
+                    },
+                    new[] { "rusty.xr.broker.h264_tcp_proxy_probe.v1" },
+                    "This opens bounded loopback sockets on the broker device and should remain an explicit diagnostic action."),
+                new CompanionOperation(
+                    "broker.h264_proxy_start",
+                    WindowsOwner,
+                    "Start broker H.264 TCP proxy",
+                    "Commands a broker to subscribe to a remote RXYRVID1 H.264 TCP stream and republish it on a local endpoint.",
+                    "BrokerClientService.SendCommandAsync(media.start_h264_tcp_proxy)",
+                    "broker h264-proxy-start --remote-host <host> [--serial <serial>] [--remote-port <n>] [--local-port <n>] [--local-bind-host <host>] [--local-lan-enabled] --json",
+                    "rusty_xr_broker_h264_proxy_start",
+                    "device-commanding",
+                    new[]
+                    {
+                        Parameter("remoteHost", "string", required: true, "Remote broker H.264 stream host.", "192.168.1.25"),
+                        Parameter("serial", "string", required: false, "ADB device serial for forwarding before the command.", "ABC123"),
+                        Parameter("brokerHost", "string", required: false, "Forwarded broker control host.", "127.0.0.1"),
+                        Parameter("brokerHostPort", "integer", required: false, "Host-side forwarded broker control port.", "8765"),
+                        Parameter("brokerDevicePort", "integer", required: false, "Device-side broker control port.", "8765"),
+                        Parameter("remotePort", "integer", required: false, "Remote broker H.264 stream port.", "8879"),
+                        Parameter("localPort", "integer", required: false, "Local broker republished stream port.", "8879"),
+                        Parameter("localHostPort", "integer", required: false, "Host-side port metadata for the local stream.", "18879"),
+                        Parameter("localBindHost", "string", required: false, "Local bind host; non-loopback requires localLanEnabled.", "127.0.0.1"),
+                        Parameter("localLanEnabled", "boolean", required: false, "Allow a non-loopback local bind for LAN experiments.", "false"),
+                        Parameter("connectTimeoutMs", "integer", required: false, "Remote connect timeout in milliseconds.", "15000"),
+                        Parameter("acceptTimeoutMs", "integer", required: false, "Local consumer accept timeout in milliseconds.", "30000"),
+                        Parameter("timeoutMs", "integer", required: false, "Command reply timeout in milliseconds.", "30000")
+                    },
+                    new[] { "rusty.xr.broker.h264_tcp_proxy_start.v1" },
+                    "This is a network-listener diagnostic. Non-loopback local binds must be explicitly opted in."),
+                new CompanionOperation(
                     "media.inspect_h264",
                     WindowsOwner,
                     "Inspect H.264 artifact",
@@ -282,7 +332,7 @@ public static class CompanionOperationSurface
         builder.AppendLine();
         builder.AppendLine($"Schema: `{catalog.SchemaVersion}`");
         builder.AppendLine();
-        builder.AppendLine("This catalog is the shared naming layer for the reusable API surface, the human CLI, and the future MCP server wrapper.");
+        builder.AppendLine("This catalog is the shared naming layer for the reusable API surface, the human CLI, and the MCP server wrapper.");
         builder.AppendLine();
 
         foreach (var operation in catalog.Operations)

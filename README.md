@@ -34,7 +34,9 @@ packets with the existing H.264 structure summary, then decode a preview frame
 through an optional managed FFmpeg media runtime. A broker-local
 `broker app-camera-h264-decode-probe` command verifies Android platform
 MediaCodec can consume those H.264 packets before the full XR texture path is
-attempted.
+attempted. The CLI also exposes bounded broker H.264 TCP proxy commands for
+smoke-testing a broker-to-broker `RXYRVID1` relay and starting an opt-in LAN
+stream proxy when both broker endpoints are explicitly configured.
 
 This repo is designed to work alongside the public
 [Rusty XR](https://github.com/MesmerPrism/Rusty-XR) core workspace. Rusty XR
@@ -96,6 +98,8 @@ on one visible button.
   app-context Camera2-to-platform-H.264 payload delivery over ADB-forwarded TCP
 - source-workspace `broker app-camera-h264-decode-probe` diagnostics for
   broker-local Android MediaCodec H.264 consumption with byte-buffer output
+- source-workspace `broker h264-proxy-probe` and `broker h264-proxy-start`
+  diagnostics for bounded broker-to-broker H.264 TCP relay experiments
 - source-workspace `launch-composite-broker-h264-consumer` diagnostics for
   composite-app broker H.264 consumption through a decoder `SurfaceTexture`
   external texture
@@ -197,6 +201,7 @@ dotnet run --project src/RustyXr.Companion.Cli -- broker app-camera-luma-probe -
 dotnet run --project src/RustyXr.Companion.Cli -- media inspect-raw-luma --payload .\artifacts\broker-app-camera\luma.raw --width 720 --height 480 --contact-sheet .\artifacts\broker-app-camera\luma.pgm --json
 dotnet run --project src/RustyXr.Companion.Cli -- broker app-camera-h264-probe --serial <serial> --camera-id <id> --capture-ms 900 --max-packets 12 --payload-out .\artifacts\broker-app-camera\camera.h264 --json
 dotnet run --project src/RustyXr.Companion.Cli -- broker app-camera-h264-decode-probe --serial <serial> --camera-id <id> --capture-ms 900 --max-packets 12 --json
+dotnet run --project src/RustyXr.Companion.Cli -- broker h264-proxy-probe --serial <serial> --json
 dotnet run --project src/RustyXr.Companion.Cli -- media inspect-h264 --payload .\artifacts\broker-app-camera\camera.h264 --json
 dotnet run --project src/RustyXr.Companion.Cli -- broker shell-helper start --serial <serial> --rusty-xr-root ..\Rusty-XR --probe-codecs --emit-synthetic-video-metadata --json
 dotnet run --project src/RustyXr.Companion.Cli -- broker shell-helper start --serial <serial> --rusty-xr-root ..\Rusty-XR --probe-cameras --json

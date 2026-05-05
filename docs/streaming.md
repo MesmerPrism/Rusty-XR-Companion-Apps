@@ -45,6 +45,17 @@ dotnet run --project src\RustyXr.Companion.Cli -- broker app-camera-h264-probe -
 dotnet run --project src\RustyXr.Companion.Cli -- media decode-h264-preview --payload .\artifacts\broker-app-camera\camera.h264 --out .\artifacts\broker-app-camera\camera-preview.png --json
 ```
 
+For broker-to-broker payload relay work, keep the proxy path separate from the
+camera capture and preview decode path. The synthetic proxy probe validates the
+`RXYRVID1` TCP relay without camera permission or a second headset. Starting a
+real proxy subscribes to a remote broker H.264 TCP stream and republishes it on
+the local broker endpoint; LAN binds remain explicit opt-ins.
+
+```powershell
+dotnet run --project src\RustyXr.Companion.Cli -- broker h264-proxy-probe --serial <serial> --json
+dotnet run --project src\RustyXr.Companion.Cli -- broker h264-proxy-start --serial <serial> --remote-host <source-broker-lan-ip> --remote-port 8879 --local-port 8879 --json
+```
+
 The WPF **Streams** tab exposes the same flow through **Capture H.264 Preview**
 and **Decode H.264 Preview**. Leave the FFmpeg path field blank for managed
 runtime or `PATH` discovery, or set it to an explicit user-supplied
