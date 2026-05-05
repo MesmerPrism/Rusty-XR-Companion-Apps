@@ -129,6 +129,8 @@ dotnet build RustyXr.Companion.slnx
 dotnet test RustyXr.Companion.slnx
 dotnet run --project src/RustyXr.Companion.Cli -- doctor
 dotnet run --project src/RustyXr.Companion.Cli -- workspace guide
+dotnet run --project src/RustyXr.Companion.Cli -- api surface --mcp-tools
+dotnet run --project src/RustyXr.Companion.Mcp
 dotnet run --project src/RustyXr.Companion.App
 ```
 
@@ -173,6 +175,10 @@ dotnet run --project src/RustyXr.Companion.Cli -- hzdb proximity keep-awake --se
 dotnet run --project src/RustyXr.Companion.Cli -- hzdb screenshot --serial <serial> --out .\artifacts\screenshots
 dotnet run --project src/RustyXr.Companion.Cli -- doctor --snapshots --out .\artifacts\diagnostics
 dotnet run --project src/RustyXr.Companion.Cli -- workspace guide --root <workspace>
+dotnet run --project src/RustyXr.Companion.Cli -- api surface --json
+dotnet run --project src/RustyXr.Companion.Cli -- api surface --mcp-tools
+dotnet run --project src/RustyXr.Companion.Cli -- api plan --operation broker.status --host 127.0.0.1 --port 8765
+dotnet run --project src/RustyXr.Companion.Mcp
 dotnet run --project src/RustyXr.Companion.Cli -- catalog verify --path samples\quest-session-kit\apk-catalog.example.json --app rusty-xr-quest-minimal --serial <serial> --launch --device-profile perf-smoke-test --out .\artifacts\verify
 dotnet run --project src/RustyXr.Companion.Cli -- catalog verify --path samples\quest-session-kit\apk-catalog.example.json --app rusty-xr-quest-composite-layer --serial <serial> --stop-catalog-apps --install --launch --device-profile xr-composite-smoke-test --runtime-profile camera-diagnostic-cpu-copy --settle-ms 7000 --logcat-lines 1000 --out .\artifacts\verify
 dotnet run --project src/RustyXr.Companion.Cli -- catalog verify --path samples\quest-session-kit\apk-catalog.example.json --app rusty-xr-quest-composite-layer --serial <serial> --stop-catalog-apps --install --launch --device-profile xr-composite-smoke-test --runtime-profile camera-stereo-gpu-composite --settle-ms 9000 --logcat-lines 1400 --out .\artifacts\verify
@@ -213,7 +219,9 @@ dotnet run --project src/RustyXr.Companion.Cli -- osc send --host <quest-lan-ip>
 - [Getting started](docs/getting-started.md)
 - [Quest connection](docs/quest-connection.md)
 - [APK install and launch](docs/apk-install-launch.md)
+  - includes the normal headset launcher vs ADB shell-helper boundary
 - [Source workspace](docs/source-workspace.md)
+- [API, CLI, and MCP](docs/api-cli-mcp.md)
 - [Streaming](docs/streaming.md)
 - [Diagnostics](docs/diagnostics.md)
 - [Release workflow](docs/release-workflow.md)
@@ -228,6 +236,7 @@ The current release workflow publishes:
 - `RustyXrCompanion-Setup.exe`
 - `RustyXrCompanion-win-x64.zip`
 - `rusty-xr-companion-cli-win-x64.zip`
+- `rusty-xr-companion-mcp-win-x64.zip`
 - `SHA256SUMS.txt`
 
 The setup helper installs the portable app under the user's LocalAppData
@@ -243,7 +252,7 @@ Quest camera composite-layer and broker APKs under `catalogs\apks\`. On first
 launch the WPF app auto-loads that catalog so the composite-layer and broker
 examples are already in the APK list for install and launch on a connected
 Quest.
-Both the app zip and CLI zip include `agent-onboarding\AGENTS.md` plus
+The app, CLI, and MCP zips include `agent-onboarding\AGENTS.md` plus
 `agent-onboarding\source-workspace.md` so local agents can start from a
 released install even before the source repos are checked out.
 

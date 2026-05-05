@@ -18,11 +18,15 @@ Use it when you need to:
 - read headset battery, controller batteries, wake state, and proximity state
 - install a local APK
 - launch or stop a target app, including catalog runtime profiles
+- understand the difference between normal headset app launching and
+  ADB-backed enhanced launch/diagnostic mode
 - apply simple headset development settings
 - start a display cast through `scrcpy`
 - capture bounded broker H.264 camera payloads and decode preview frames when
   FFmpeg is available
 - send and receive generic OSC UDP probe messages
+- print a shared API/CLI/MCP operation surface and run the stdio MCP server for
+  local agents
 - launch and probe the public Rusty XR Quest broker proof-of-concept from a
   sibling source checkout
 - capture headset screenshots and toggle proximity keep-awake state
@@ -47,7 +51,8 @@ on one visible button.
 3. [Quest connection](quest-connection.md)
 4. [APK install and launch](apk-install-launch.md)
 5. [Source workspace](source-workspace.md)
-6. [Diagnostics](diagnostics.md)
-7. [Rusty XR core contracts](rusty-xr-core-contracts.md)
-8. [Download and release workflow](download.md)
-9. [Dev and release channels](dev-release-channels.md)
+6. [API, CLI, and MCP](api-cli-mcp.md)
+7. [Diagnostics](diagnostics.md)
+8. [Rusty XR core contracts](rusty-xr-core-contracts.md)
+9. [Download and release workflow](download.md)
+10. [Dev and release channels](dev-release-channels.md)

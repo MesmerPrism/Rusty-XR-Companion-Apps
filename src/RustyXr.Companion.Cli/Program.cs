@@ -54,6 +54,7 @@ internal static class CliProgram
                 "broker" => await BrokerAsync(args.Skip(1).ToArray()).ConfigureAwait(false),
                 "tooling" => await ToolingAsync(args.Skip(1).ToArray()).ConfigureAwait(false),
                 "catalog" => await CatalogAsync(args.Skip(1).ToArray()).ConfigureAwait(false),
+                "api" => Api(args.Skip(1).ToArray()),
                 "workspace" => Workspace(args.Skip(1).ToArray()),
                 _ => Fail($"Unknown command '{command}'. Run --help for commands.")
             };
@@ -1655,6 +1656,141 @@ internal static class CliProgram
         return subcommand == "status" && !workspaceReady ? 2 : 0;
     }
 
+    private static int Api(string[] args)
+    {
+        var subcommand = args.Length == 0 || args[0].StartsWith("--", StringComparison.Ordinal)
+            ? "surface"
+            : args[0].ToLowerInvariant();
+        if (subcommand is not ("surface" or "plan"))
+        {
+            return Fail("Use: api <surface|plan> [options]");
+        }
+
+        var options = ArgOptions.Parse(args.Length > 0 && !args[0].StartsWith("--", StringComparison.Ordinal)
+            ? args.Skip(1)
+            : args);
+        if (subcommand == "plan")
+        {
+            var operationId = Required(options, "--operation");
+            var operation = CompanionOperationSurface.Create().Operations.FirstOrDefault(candidate =>
+                string.Equals(candidate.Id, operationId, StringComparison.OrdinalIgnoreCase));
+            if (operation is null)
+            {
+                return Fail($"Unknown operation '{operationId}'. Run api surface --json for operation ids.");
+            }
+
+            var plan = CompanionOperationPlanner.CreatePlan(
+                operationId,
+                ParseOperationInputs(options, operation),
+                options.Has("--allow-side-effects"));
+            if (options.Has("--json"))
+            {
+                WriteObject(plan, json: true);
+            }
+            else
+            {
+                Console.WriteLine(CompanionOperationPlanner.ToMarkdown(plan));
+            }
+
+            return 0;
+        }
+
+        var owner = options.ValueOrNull("--owner") ?? options.ValueOrNull("--platform");
+        var catalog = CompanionOperationSurface.Filter(CompanionOperationSurface.Create(), owner);
+        if (options.Has("--mcp-tools"))
+        {
+            WriteObject(CompanionOperationSurface.ToMcpToolList(catalog), json: true);
+        }
+        else if (options.Has("--json"))
+        {
+            WriteObject(catalog, json: true);
+        }
+        else
+        {
+            Console.WriteLine(CompanionOperationSurface.ToMarkdown(catalog));
+        }
+
+        return 0;
+    }
+
+    private static IReadOnlyDictionary<string, string> ParseOperationInputs(
+        ArgOptions options,
+        CompanionOperation operation)
+    {
+        var inputs = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var parameter in operation.Parameters)
+        {
+            var directOption = "--" + parameter.Name;
+            var kebabOption = "--" + ToKebabCase(parameter.Name);
+            if (TryReadOperationOption(options, directOption, parameter.Kind, out var directValue))
+            {
+                inputs[parameter.Name] = directValue;
+            }
+            else if (!string.Equals(directOption, kebabOption, StringComparison.Ordinal) &&
+                     TryReadOperationOption(options, kebabOption, parameter.Kind, out var kebabValue))
+            {
+                inputs[parameter.Name] = kebabValue;
+            }
+        }
+
+        foreach (var raw in options.Values("--arg"))
+        {
+            var parts = raw.Split('=', 2);
+            if (parts.Length != 2 || string.IsNullOrWhiteSpace(parts[0]))
+            {
+                throw new ArgumentException("--arg values must use key=value.");
+            }
+
+            inputs[parts[0].Trim()] = parts[1].Trim();
+        }
+
+        return inputs;
+    }
+
+    private static bool TryReadOperationOption(
+        ArgOptions options,
+        string name,
+        string kind,
+        out string value)
+    {
+        if (options.TryGet(name, out value))
+        {
+            return true;
+        }
+
+        if (kind == "boolean" && options.Has(name))
+        {
+            value = "true";
+            return true;
+        }
+
+        value = string.Empty;
+        return false;
+    }
+
+    private static string ToKebabCase(string value)
+    {
+        var builder = new StringBuilder();
+        foreach (var character in value)
+        {
+            if (char.IsUpper(character))
+            {
+                if (builder.Length > 0)
+                {
+                    builder.Append('-');
+                }
+
+                builder.Append(char.ToLowerInvariant(character));
+            }
+            else
+            {
+                builder.Append(character);
+            }
+        }
+
+        return builder.ToString();
+    }
+
     private static async Task<int> CatalogListAsync(ArgOptions options)
     {
         var path = CatalogPath(options);
@@ -2217,6 +2353,8 @@ internal static class CliProgram
           tooling install-official [--json]
           tooling media-status [--latest] [--json]
           tooling install-media [--json]
+          api surface [--owner <windows|android|core|all>] [--json|--mcp-tools]
+          api plan --operation <id> [--arg key=value] [--allow-side-effects] [--json]
           workspace guide [--root <folder>] [--json]
           catalog list [--path <catalog.json>] [--json]
           catalog install --path <catalog.json> --app <id> --serial <serial> [--apk <path-or-url>] [--apk-cache <folder>] [--refresh-apk-download]

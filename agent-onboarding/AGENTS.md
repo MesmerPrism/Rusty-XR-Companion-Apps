@@ -24,6 +24,7 @@ The released app and CLI provide:
 - APK install, launch, stop, catalog runtime-profile launch, and verification.
 - diagnostics bundles, logcat capture, screenshots, and media receiver output.
 - `workspace guide` and `workspace status` CLI commands.
+- `api surface` for the shared API/CLI/MCP operation catalog.
 
 The release does not ship Rust/Cargo, Android SDK/NDK/JDK, OpenXR loader
 binaries, signing identity, or source checkouts. Those are required only when a
@@ -73,6 +74,15 @@ verification commands for the public Rusty XR examples.
 .\RustyXr.Companion.Cli.exe tooling install-official
 .\RustyXr.Companion.Cli.exe devices
 .\RustyXr.Companion.Cli.exe workspace guide --root <workspace>
+.\RustyXr.Companion.Cli.exe api surface --mcp-tools
+.\RustyXr.Companion.Cli.exe api plan --operation broker.status --host 127.0.0.1 --port 8765
 .\RustyXr.Companion.Cli.exe catalog list --path <catalog.json>
 .\RustyXr.Companion.Cli.exe catalog verify --path <catalog.json> --app <id> --serial <serial> --install --launch --out <output-folder>
+```
+
+For MCP-compatible agent clients, run the stdio server from the source tree or
+published app folder:
+
+```powershell
+.\RustyXr.Companion.Mcp.exe
 ```

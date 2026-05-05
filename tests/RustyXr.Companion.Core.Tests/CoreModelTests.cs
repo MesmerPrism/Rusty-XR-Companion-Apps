@@ -629,6 +629,150 @@ public sealed class CoreModelTests
     }
 
     [Fact]
+    public void CompanionOperationSurfaceMapsApiCliAndMcpNames()
+    {
+        var catalog = CompanionOperationSurface.Create();
+
+        Assert.Equal(CompanionOperationSurface.SchemaVersion, catalog.SchemaVersion);
+        Assert.Contains(catalog.Operations, operation => operation.Id == "workspace.guide");
+        Assert.Contains(catalog.Operations, operation => operation.Id == "android.agent_command");
+        Assert.All(catalog.Operations, operation =>
+        {
+            Assert.StartsWith("rusty_xr_", operation.McpToolName, StringComparison.Ordinal);
+            Assert.DoesNotContain(" ", operation.McpToolName, StringComparison.Ordinal);
+            Assert.False(string.IsNullOrWhiteSpace(operation.CliTemplate));
+            Assert.False(string.IsNullOrWhiteSpace(operation.ApiSurface));
+        });
+    }
+
+    [Fact]
+    public void CompanionOperationSurfaceFiltersAndroidOwner()
+    {
+        var androidCatalog = CompanionOperationSurface.Filter(CompanionOperationSurface.Create(), "android");
+
+        var operation = Assert.Single(androidCatalog.Operations);
+        Assert.Equal("android.agent_command", operation.Id);
+        Assert.Equal("phone-agent-gated", operation.Safety);
+    }
+
+    [Fact]
+    public void CompanionOperationSurfaceExportsMcpToolList()
+    {
+        var windowsCatalog = CompanionOperationSurface.Filter(CompanionOperationSurface.Create(), "windows");
+        var tools = CompanionOperationSurface.ToMcpToolList(windowsCatalog);
+
+        Assert.Equal(CompanionOperationSurface.McpToolsSchemaVersion, tools.SchemaVersion);
+        Assert.DoesNotContain(tools.Tools, tool => tool.Binding.Owner == "android-companion");
+        Assert.Contains(tools.Tools, tool => tool.Name == "rusty_xr_verify_catalog" && tool.Annotations.DestructiveHint);
+        Assert.Contains(
+            tools.Tools,
+            tool => tool.Name == "rusty_xr_workspace_guide" &&
+                    tool.Annotations.ReadOnlyHint &&
+                    tool.InputSchema["properties"]?["root"]?["type"]?.GetValue<string>() == "string");
+    }
+
+    [Fact]
+    public void CompanionOperationPlannerPlansReadOnlyBrokerStatus()
+    {
+        var plan = CompanionOperationPlanner.CreatePlan(
+            "broker.status",
+            new Dictionary<string, string>
+            {
+                ["host"] = "127.0.0.1",
+                ["port"] = "8765"
+            });
+
+        Assert.Equal(CompanionOperationPlanner.SchemaVersion, plan.SchemaVersion);
+        Assert.True(plan.Allowed);
+        Assert.False(plan.RequiresSideEffectOptIn);
+        Assert.Equal("rusty-xr-companion", plan.Executable);
+        Assert.Equal(
+            new[] { "broker", "status", "--host", "127.0.0.1", "--port", "8765", "--json" },
+            plan.Arguments);
+    }
+
+    [Fact]
+    public void CompanionOperationPlannerGatesStateChangingCatalogVerify()
+    {
+        var inputs = new Dictionary<string, string>
+        {
+            ["path"] = "catalog.json",
+            ["app"] = "broker",
+            ["serial"] = "ABC123",
+            ["install"] = "true"
+        };
+
+        var blocked = CompanionOperationPlanner.CreatePlan("catalog.verify", inputs);
+        var allowed = CompanionOperationPlanner.CreatePlan("catalog.verify", inputs, allowSideEffects: true);
+
+        Assert.False(blocked.Allowed);
+        Assert.True(blocked.RequiresSideEffectOptIn);
+        Assert.Contains("--install", blocked.Arguments);
+        Assert.True(allowed.Allowed);
+        Assert.Contains("runner-level confirmation", allowed.GateReason);
+    }
+
+    [Fact]
+    public void CompanionOperationPlannerBuildsAndroidAgentCommand()
+    {
+        var plan = CompanionOperationPlanner.CreatePlan(
+            "android.agent_command",
+            new Dictionary<string, string>
+            {
+                ["phoneSerial"] = "PHONE123",
+                ["command"] = "quest-launch",
+                ["endpoint"] = "192.168.1.25:5555",
+                ["packageId"] = "com.example.target",
+                ["runtimeExtras"] = "{\"rustyxr.profile\":\"smoke\"}",
+                ["allowDevSession"] = "true"
+            },
+            allowSideEffects: true);
+
+        Assert.True(plan.Allowed);
+        Assert.Equal("adb", plan.Executable);
+        Assert.Equal(
+            new[]
+            {
+                "-s",
+                "PHONE123",
+                "shell",
+                "am",
+                "start",
+                "-a",
+                "io.github.mesmerprism.rustyxr.companion.android.RUN_AGENT_COMMAND",
+                "-n",
+                "io.github.mesmerprism.rustyxr.companion.android/.agent.AgentCommandActivity",
+                "--es",
+                "command",
+                "quest-launch",
+                "--es",
+                "endpoint",
+                "192.168.1.25:5555",
+                "--es",
+                "package_id",
+                "com.example.target",
+                "--es",
+                "extras_json",
+                "{\"rustyxr.profile\":\"smoke\"}",
+                "--ez",
+                "allow_dev_session",
+                "true"
+            },
+            plan.Arguments);
+    }
+
+    [Fact]
+    public void CompanionOperationPlannerRejectsUnknownInputs()
+    {
+        var exception = Assert.Throws<ArgumentException>(() =>
+            CompanionOperationPlanner.CreatePlan(
+                "broker.status",
+                new Dictionary<string, string> { ["privatePackage"] = "example" }));
+
+        Assert.Contains("does not accept input", exception.Message);
+    }
+
+    [Fact]
     public void RuntimeProfileLogValidatorRequiresRealGpuProjectionForFinalProfile()
     {
         var probeProfile = new RuntimeProfile(

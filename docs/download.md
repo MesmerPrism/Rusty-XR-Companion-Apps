@@ -26,10 +26,10 @@ composite-layer APK and catalog. On first launch, the app auto-loads that
 catalog so the APK target is already present for install and launch on a
 connected Quest.
 
-Both the portable app zip and CLI zip include an `agent-onboarding\` folder.
-Use `agent-onboarding\AGENTS.md` as the installed-app instruction file for a
-local agent. It is available even when the source repos have not been checked
-out yet.
+The portable app, CLI, and MCP zips include an `agent-onboarding\` folder. Use
+`agent-onboarding\AGENTS.md` as the installed-app instruction file for a local
+agent. It is available even when the source repos have not been checked out
+yet.
 
 The setup window also points source builders toward the recommended sibling
 workspace shape:
@@ -69,6 +69,7 @@ checkbox only when you also want to remove that local cache.
 
 - [Portable app zip](https://github.com/MesmerPrism/Rusty-XR-Companion-Apps/releases/latest/download/RustyXrCompanion-win-x64.zip)
 - [CLI zip](https://github.com/MesmerPrism/Rusty-XR-Companion-Apps/releases/latest/download/rusty-xr-companion-cli-win-x64.zip)
+- [MCP server zip](https://github.com/MesmerPrism/Rusty-XR-Companion-Apps/releases/latest/download/rusty-xr-companion-mcp-win-x64.zip)
 - [Release manifest](https://github.com/MesmerPrism/Rusty-XR-Companion-Apps/releases/latest/download/RELEASE_MANIFEST.json)
 - [Third-party notices](https://github.com/MesmerPrism/Rusty-XR-Companion-Apps/releases/latest/download/THIRD_PARTY_NOTICES.md)
 - [Checksums](https://github.com/MesmerPrism/Rusty-XR-Companion-Apps/releases/latest/download/SHA256SUMS.txt)

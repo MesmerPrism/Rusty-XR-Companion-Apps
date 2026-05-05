@@ -14,6 +14,19 @@ WPF app / CLI
   -> ADB, optional Quest tooling, optional casting tools
 ```
 
+The shared operation catalog and dispatch planner sit in Companion Core so the
+CLI and MCP server use the same operation ids, input names, and safety labels:
+
+```text
+CompanionOperationSurface
+  -> CLI api surface
+  -> MCP tools/list
+CompanionOperationPlanner
+  -> CLI api plan
+  -> MCP tools/call safety gate
+  -> direct core-service bindings
+```
+
 ## Projects
 
 - `RustyXr.Companion.Core`
@@ -24,6 +37,7 @@ WPF app / CLI
   - ADB command services
   - `hzdb` wake, proximity, and screenshot helpers
   - catalog loading
+  - API/CLI/MCP operation surface metadata
   - scrcpy launch wrapper
   - broker H.264 packet receive and optional preview decode services
 - `RustyXr.Companion.Diagnostics`
@@ -31,6 +45,8 @@ WPF app / CLI
   - diagnostics bundle writer
 - `RustyXr.Companion.Cli`
   - scriptable command surface
+- `RustyXr.Companion.Mcp`
+  - stdio MCP server for read-only operation calls and blocked dispatch plans
 - `RustyXr.Companion.App`
   - WPF operator app
 - `RustyXr.Companion.PreviewInstaller`

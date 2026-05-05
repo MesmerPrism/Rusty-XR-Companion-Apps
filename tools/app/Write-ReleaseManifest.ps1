@@ -14,6 +14,9 @@ param(
     [string]$CliPublishRoot,
 
     [Parameter(Mandatory = $true)]
+    [string]$McpPublishRoot,
+
+    [Parameter(Mandatory = $true)]
     [string]$Version,
 
     [Parameter(Mandatory = $true)]
@@ -70,6 +73,7 @@ function Read-MetadataFile {
 $resolvedReleaseRoot = (Resolve-Path $ReleaseRoot).Path
 $resolvedAppRoot = (Resolve-Path $AppPublishRoot).Path
 $resolvedCliRoot = (Resolve-Path $CliPublishRoot).Path
+$resolvedMcpRoot = (Resolve-Path $McpPublishRoot).Path
 if ([string]::IsNullOrWhiteSpace($OutputPath)) {
     $OutputPath = Join-Path $resolvedReleaseRoot 'RELEASE_MANIFEST.json'
 }
@@ -78,6 +82,7 @@ $releaseAssets = @(
     Get-OptionalFileRecord (Join-Path $resolvedReleaseRoot 'RustyXrCompanion-Setup.exe')
     Get-OptionalFileRecord (Join-Path $resolvedReleaseRoot 'RustyXrCompanion-win-x64.zip')
     Get-OptionalFileRecord (Join-Path $resolvedReleaseRoot 'rusty-xr-companion-cli-win-x64.zip')
+    Get-OptionalFileRecord (Join-Path $resolvedReleaseRoot 'rusty-xr-companion-mcp-win-x64.zip')
 ) | Where-Object { $null -ne $_ }
 
 $apkMetadata = @()
@@ -163,10 +168,13 @@ $manifest = [ordered]@{
     payloads = [ordered]@{
         appPublishRoot = 'RustyXrCompanion-win-x64.zip'
         cliPublishRoot = 'rusty-xr-companion-cli-win-x64.zip'
+        mcpPublishRoot = 'rusty-xr-companion-mcp-win-x64.zip'
         includesLicense = (Test-Path -LiteralPath (Join-Path $resolvedAppRoot 'LICENSE') -PathType Leaf) -and
-            (Test-Path -LiteralPath (Join-Path $resolvedCliRoot 'LICENSE') -PathType Leaf)
+            (Test-Path -LiteralPath (Join-Path $resolvedCliRoot 'LICENSE') -PathType Leaf) -and
+            (Test-Path -LiteralPath (Join-Path $resolvedMcpRoot 'LICENSE') -PathType Leaf)
         includesThirdPartyNotices = (Test-Path -LiteralPath (Join-Path $resolvedAppRoot 'THIRD_PARTY_NOTICES.md') -PathType Leaf) -and
-            (Test-Path -LiteralPath (Join-Path $resolvedCliRoot 'THIRD_PARTY_NOTICES.md') -PathType Leaf)
+            (Test-Path -LiteralPath (Join-Path $resolvedCliRoot 'THIRD_PARTY_NOTICES.md') -PathType Leaf) -and
+            (Test-Path -LiteralPath (Join-Path $resolvedMcpRoot 'THIRD_PARTY_NOTICES.md') -PathType Leaf)
         bundledQuestApks = $apkMetadata
     }
     managedTools = $managedTools

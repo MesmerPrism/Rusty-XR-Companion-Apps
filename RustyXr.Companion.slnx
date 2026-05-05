@@ -4,6 +4,7 @@
     <Project Path="src/RustyXr.Companion.Cli/RustyXr.Companion.Cli.csproj" />
     <Project Path="src/RustyXr.Companion.Core/RustyXr.Companion.Core.csproj" />
     <Project Path="src/RustyXr.Companion.Diagnostics/RustyXr.Companion.Diagnostics.csproj" />
+    <Project Path="src/RustyXr.Companion.Mcp/RustyXr.Companion.Mcp.csproj" />
     <Project Path="src/RustyXr.Companion.PreviewInstaller/RustyXr.Companion.PreviewInstaller.csproj" />
     <Project Path="src/RustyXr.Companion.Windows/RustyXr.Companion.Windows.csproj" />
   </Folder>

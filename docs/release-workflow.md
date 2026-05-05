@@ -18,18 +18,19 @@ The GitHub workflow:
 2. builds the GitHub Pages site
 3. publishes the WPF app as a self-contained win-x64 app
 4. publishes the CLI as a self-contained win-x64 app
-5. downloads and validates the public Rusty XR composite-layer and broker APKs
-6. copies those APKs into `artifacts/app-win-x64/catalogs/apks`
-7. publishes the guided setup helper
-8. signs the setup helper when signing secrets are configured
-9. copies the setup helper into the app payload as
+5. publishes the MCP stdio server as a self-contained win-x64 app
+6. downloads and validates the public Rusty XR composite-layer and broker APKs
+7. copies those APKs into `artifacts/app-win-x64/catalogs/apks`
+8. publishes the guided setup helper
+9. signs the setup helper when signing secrets are configured
+10. copies the setup helper into the app payload as
    `RustyXrCompanion-Uninstall.exe`
-10. validates the copied uninstall helper with the same signing check when a
+11. validates the copied uninstall helper with the same signing check when a
    preview certificate is configured
-11. creates app and CLI zips
-12. writes `RELEASE_MANIFEST.json`
-13. writes `SHA256SUMS.txt`
-14. uploads release assets
+12. creates app, CLI, and MCP zips
+13. writes `RELEASE_MANIFEST.json`
+14. writes `SHA256SUMS.txt`
+15. uploads release assets
 
 The published WPF app and CLI receive the release version during `dotnet
 publish`. Release-channel installs compare that version to the latest GitHub
@@ -52,10 +53,10 @@ The portable app zip also includes:
 - `agent-onboarding/README.md`
 - `agent-onboarding/source-workspace.md`
 
-The CLI zip includes the same `agent-onboarding/` folder so a local agent can
-start from the command-line-only release too.
+The CLI and MCP zips include the same `agent-onboarding/` folder so a local
+agent can start from command-line-only or MCP-only release assets too.
 
-Both app and CLI zips include `LICENSE` and `THIRD_PARTY_NOTICES.md`. The
+The app, CLI, and MCP zips include `LICENSE` and `THIRD_PARTY_NOTICES.md`. The
 GitHub release also uploads `RELEASE_MANIFEST.json`,
 `THIRD_PARTY_NOTICES.md`, and `SHA256SUMS.txt` beside the executable assets.
 The manifest records the release commit/tag, asset hashes, bundled public APK

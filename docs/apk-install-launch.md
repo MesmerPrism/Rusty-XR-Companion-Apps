@@ -34,6 +34,34 @@ If you know the exact activity:
 dotnet run --project src/RustyXr.Companion.Cli -- launch --serial <serial> --package com.example.questapp --activity .MainActivity
 ```
 
+## Headset Launchers Vs ADB Launching
+
+A normal 2D app running on the headset can launch another installed app when
+the target exposes a normal front-door launch Activity. That is the right
+baseline for a headset-local side-loaded APK organizer: it can keep a curated
+library, show icons/tags/favorites, and launch packages through Android
+`PackageManager` APIs. Package visibility still affects discovery on modern
+Android, and an APK with no public launch Activity may not be launchable from
+normal app mode.
+
+The Companion uses ADB, so it has a different launch lane. ADB can call Android
+Activity Manager commands such as `am start`, and source-workspace tooling can
+also push/start a Rusty XR shell helper with `app_process`. That helper runs as
+Android `shell` only because the user authorized an external ADB host to start
+it. A normal headset APK cannot start that shell helper by itself and does not
+inherit shell privileges.
+
+Use this distinction when designing launch tools:
+
+- normal headset launcher mode: app organization and front-door package launch
+- Companion/ADB mode: install/update, explicit component launch, force-stop,
+  foreground checks, helper bootstrap, and diagnostics
+- enhanced shell-helper mode: optional Developer Mode session, started by
+  Companion, a phone companion, or a developer PC
+
+For the public Rusty XR core explanation, see
+[Quest App Launching And ADB Shell Helpers](https://mesmerprism.github.io/Rusty-XR/QUEST_APP_LAUNCHING_AND_SHELL_HELPERS.md).
+
 ## Stop
 
 ```powershell
