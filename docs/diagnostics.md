@@ -42,6 +42,16 @@ requires the per-eye grayscale depth visualizer draw state. Confidence is
 reported explicitly so a run can distinguish available confidence data from a
 runtime/API path that exposes no confidence payload.
 
+`environment-depth-mesh-overlay` and `environment-depth-particle-overlay` use
+the same provider validation, then require the matching mesh or particle draw
+line. Those checks confirm local-space surface projection, metric particle
+rasterization, and passthrough-visible rendering.
+
+`meta-hand-mesh-particles` validates the live OpenXR hand-mesh path. It
+requires OpenXR hand-mesh particle logs with active runtime hand data plus a
+`Rusty XR hand mesh particle draw` line with nonzero particles, nonzero
+billboard vertices, the public sampler name, and passthrough-visible rendering.
+
 The `osc-udp-listener` runtime profile enables the Rusty XR generic diagnostic
 HUD in headset. The HUD displays listener state, local bind address, packet
 count, last peer, last packet summary, and HUD command state. Use

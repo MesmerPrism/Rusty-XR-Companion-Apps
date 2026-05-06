@@ -47,7 +47,10 @@ profile, a `quad-surface` A/B profile, native passthrough hotload profiles, and
 safety-gated strobe profiles. It also includes an environment-depth diagnostics
 profile that verifies OpenXR environment-depth provider startup, acquisition,
 runtime capture timestamp progression, update cadence, acquire cost, and
-confidence-state reporting from logcat. The OSC listener profile enables the
+confidence-state reporting from logcat, plus local-space depth mesh and
+particle overlay profiles for headset inspection over native passthrough. The
+same catalog exposes the proper Meta/OpenXR hand-mesh particle profile for
+runtime hand mesh validation. The OSC listener profile enables the
 headset diagnostic HUD by default, with a no-overlay companion profile for
 separating UDP ingress cost from HUD rendering cost. Strobing profiles are
 hazardous and should only be launched with explicit informed opt-in.
@@ -79,8 +82,8 @@ on one visible button.
 - catalog install/verify support for local APK paths and GitHub Release asset
   URLs
 - runtime-profile launch support for native passthrough style hotload,
-  environment-depth diagnostics, and strobe timing experiments published by
-  Rusty XR core
+  environment-depth diagnostics, depth mesh/particle overlays, Meta/OpenXR hand
+  mesh particles, and strobe timing experiments published by Rusty XR core
 - generic OSC UDP send/receive CLI utilities for companion-to-headset adapter
   smoke tests
 - clock-aligned `broker compare` diagnostics that write JSON, Markdown, and
@@ -188,6 +191,9 @@ dotnet run --project src/RustyXr.Companion.Cli -- catalog verify --path samples\
 dotnet run --project src/RustyXr.Companion.Cli -- catalog verify --path samples\quest-session-kit\apk-catalog.example.json --app rusty-xr-quest-composite-layer --serial <serial> --stop-catalog-apps --install --launch --device-profile xr-composite-smoke-test --runtime-profile camera-stereo-gpu-composite --settle-ms 9000 --logcat-lines 1400 --out .\artifacts\verify
 dotnet run --project src/RustyXr.Companion.Cli -- catalog verify --path samples\quest-session-kit\apk-catalog.example.json --app rusty-xr-quest-composite-layer --serial <serial> --stop-catalog-apps --install --launch --device-profile xr-composite-smoke-test --runtime-profile camera-stereo-gpu-composite-quad-surface --settle-ms 9000 --logcat-lines 1400 --out .\artifacts\verify
 dotnet run --project src/RustyXr.Companion.Cli -- catalog verify --path samples\quest-session-kit\apk-catalog.example.json --app rusty-xr-quest-composite-layer --serial <serial> --stop-catalog-apps --install --launch --device-profile xr-composite-smoke-test --runtime-profile environment-depth-diagnostics --settle-ms 9000 --logcat-lines 1400 --out .\artifacts\verify
+dotnet run --project src/RustyXr.Companion.Cli -- catalog verify --path samples\quest-session-kit\apk-catalog.example.json --app rusty-xr-quest-composite-layer --serial <serial> --stop-catalog-apps --install --launch --device-profile xr-composite-smoke-test --runtime-profile environment-depth-mesh-overlay --settle-ms 9000 --logcat-lines 1600 --out .\artifacts\verify
+dotnet run --project src/RustyXr.Companion.Cli -- catalog verify --path samples\quest-session-kit\apk-catalog.example.json --app rusty-xr-quest-composite-layer --serial <serial> --stop-catalog-apps --install --launch --device-profile xr-composite-smoke-test --runtime-profile environment-depth-particle-overlay --settle-ms 9000 --logcat-lines 1600 --out .\artifacts\verify
+dotnet run --project src/RustyXr.Companion.Cli -- catalog verify --path samples\quest-session-kit\apk-catalog.example.json --app rusty-xr-quest-composite-layer --serial <serial> --stop-catalog-apps --install --launch --device-profile xr-composite-smoke-test --runtime-profile meta-hand-mesh-particles --settle-ms 9000 --logcat-lines 1600 --out .\artifacts\verify
 dotnet run --project src/RustyXr.Companion.Cli -- catalog verify --path samples\quest-session-kit\apk-catalog.example.json --app rusty-xr-quest-composite-layer --serial <serial> --stop-catalog-apps --install --launch --device-profile xr-composite-smoke-test --runtime-profile media-projection-stream --media-receiver --settle-ms 7000 --logcat-lines 1000 --out .\artifacts\verify
 dotnet run --project src/RustyXr.Companion.Cli -- catalog verify --path samples\quest-session-kit\apk-catalog.example.json --app rusty-xr-quest-broker --serial <serial> --stop-catalog-apps --install --launch --device-profile broker-smoke-test --runtime-profile broker-osc-drive-ingress --settle-ms 5000 --logcat-lines 1000 --out .\artifacts\verify
 dotnet run --project src/RustyXr.Companion.Cli -- broker forward --serial <serial>

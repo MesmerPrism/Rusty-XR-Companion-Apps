@@ -336,20 +336,40 @@ public static class RuntimeProfileLogValidator
         }
 
         return profile.Values.TryGetValue("rustyxr.depth", out var depth) &&
-               (string.Equals(depth, "visualize", StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(depth, "diagnostic", StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(depth, "diagnostics", StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(depth, "status", StringComparison.OrdinalIgnoreCase));
+               IsEnvironmentDepthValidationMode(depth);
+    }
+
+    public static bool RequiresHandMeshParticles(RuntimeProfile? profile)
+    {
+        if (profile is null)
+        {
+            return false;
+        }
+
+        if (string.Equals(profile.Id, "meta-hand-mesh-particles", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        return profile.Values.TryGetValue("rustyxr.handParticles", out var mode) &&
+               IsOpenXrHandMeshMode(mode);
     }
 
     public static bool RequiresLogValidation(RuntimeProfile? profile) =>
-        RequiresAlignedGpuProjection(profile) || RequiresEnvironmentDepthDiagnostics(profile);
+        RequiresAlignedGpuProjection(profile) ||
+        RequiresEnvironmentDepthDiagnostics(profile) ||
+        RequiresHandMeshParticles(profile);
 
     public static RuntimeProfileLogValidation Validate(RuntimeProfile? profile, string? logcatText)
     {
         if (RequiresEnvironmentDepthDiagnostics(profile))
         {
-            return ValidateEnvironmentDepthDiagnostics(logcatText);
+            return ValidateEnvironmentDepthDiagnostics(profile, logcatText);
+        }
+
+        if (RequiresHandMeshParticles(profile))
+        {
+            return ValidateHandMeshParticles(profile, logcatText);
         }
 
         if (!RequiresAlignedGpuProjection(profile))
@@ -470,7 +490,9 @@ public static class RuntimeProfileLogValidator
             $"Runtime profile requires real stereo GPU projection; observed activeTier={observedTier} alignedProjection={observedAlignment}; missing {string.Join(", ", missing)}.");
     }
 
-    private static RuntimeProfileLogValidation ValidateEnvironmentDepthDiagnostics(string? logcatText)
+    private static RuntimeProfileLogValidation ValidateEnvironmentDepthDiagnostics(
+        RuntimeProfile? profile,
+        string? logcatText)
     {
         if (string.IsNullOrWhiteSpace(logcatText))
         {
@@ -487,6 +509,11 @@ public static class RuntimeProfileLogValidator
                 "Runtime profile requires a `Rusty XR environment depth status` log line.");
         }
 
+        var mode = profile is not null && profile.Values.TryGetValue("rustyxr.depth", out var rawMode)
+            ? rawMode
+            : string.Empty;
+        var requiresMeshOverlay = IsEnvironmentDepthMeshOverlayMode(mode);
+        var requiresParticleOverlay = IsEnvironmentDepthParticleOverlayMode(mode);
         var hasEnabled = statusLine.Contains("depthEnabled=true", StringComparison.Ordinal);
         var hasExtension = statusLine.Contains("extensionAvailable=true", StringComparison.Ordinal);
         var hasSupported = statusLine.Contains("supported=true", StringComparison.Ordinal);
@@ -523,6 +550,24 @@ public static class RuntimeProfileLogValidator
             visualizerDrawLine.Contains("depthTextureFormat=VK_FORMAT_D16_UNORM", StringComparison.Ordinal) &&
             visualizerDrawLine.Contains("grayscale=linear-d16-meters-infinity-white", StringComparison.Ordinal) &&
             visualizerDrawLine.Contains("depthVisualTextureTransform=rotate0+flipY", StringComparison.Ordinal);
+        var meshOverlayDrawLine = FindLatestEnvironmentDepthMeshOverlayDrawLine(logcatText);
+        var hasMeshOverlayDraw =
+            !requiresMeshOverlay ||
+            (meshOverlayDrawLine is not null &&
+             meshOverlayDrawLine.Contains("projection=local-space-depth-surface", StringComparison.Ordinal) &&
+             meshOverlayDrawLine.Contains("rasterization=world-space-generated-grid", StringComparison.Ordinal) &&
+             meshOverlayDrawLine.Contains("dominantSurfaceGrid=true", StringComparison.Ordinal) &&
+             meshOverlayDrawLine.Contains("screenUvGrid=false", StringComparison.Ordinal) &&
+             meshOverlayDrawLine.Contains("passthroughVisible=true", StringComparison.Ordinal));
+        var particleOverlayDrawLine = FindLatestEnvironmentDepthParticleOverlayDrawLine(logcatText);
+        var hasParticleOverlayDraw =
+            !requiresParticleOverlay ||
+            (particleOverlayDrawLine is not null &&
+             particleOverlayDrawLine.Contains("projection=local-space-retained-particles", StringComparison.Ordinal) &&
+             particleOverlayDrawLine.Contains("rasterization=metric-billboard-particles", StringComparison.Ordinal) &&
+             particleOverlayDrawLine.Contains("particleCapacity=", StringComparison.Ordinal) &&
+             particleOverlayDrawLine.Contains("particleVertexCount=", StringComparison.Ordinal) &&
+             particleOverlayDrawLine.Contains("passthroughVisible=true", StringComparison.Ordinal));
 
         if (hasEnabled &&
             hasExtension &&
@@ -542,11 +587,18 @@ public static class RuntimeProfileLogValidator
             hasDepthTextureFormat &&
             hasEyeMapping &&
             hasDepthTextureTransform &&
-            hasVisualizerDraw)
+            hasVisualizerDraw &&
+            hasMeshOverlayDraw &&
+            hasParticleOverlayDraw)
         {
+            var overlayDetail = requiresMeshOverlay
+                ? ", and local-space depth mesh overlay draw"
+                : requiresParticleOverlay
+                    ? ", and retained local-space particle overlay draw"
+                    : string.Empty;
             return new RuntimeProfileLogValidation(
                 true,
-                $"Runtime profile reported active environment-depth acquisition with {acquired} acquired frame(s), {uniqueCaptureTimes} unique capture timestamp(s), OpenXR frame {openXrFrameCount}, depth range metadata, explicit confidence state, and D16 grayscale visualizer draws.");
+                $"Runtime profile reported active environment-depth acquisition with {acquired} acquired frame(s), {uniqueCaptureTimes} unique capture timestamp(s), OpenXR frame {openXrFrameCount}, depth range metadata, explicit confidence state, D16 grayscale visualizer draws{overlayDetail}.");
         }
 
         var missing = new List<string>();
@@ -626,10 +678,96 @@ public static class RuntimeProfileLogValidator
         {
             missing.Add("environment depth visualizer draw");
         }
+        if (!hasMeshOverlayDraw)
+        {
+            missing.Add("local-space depth mesh overlay draw");
+        }
+        if (!hasParticleOverlayDraw)
+        {
+            missing.Add("retained local-space depth particle overlay draw");
+        }
 
         return new RuntimeProfileLogValidation(
             false,
             $"Runtime profile requires environment-depth acquisition diagnostics; missing {string.Join(", ", missing)}.");
+    }
+
+    private static RuntimeProfileLogValidation ValidateHandMeshParticles(
+        RuntimeProfile? profile,
+        string? logcatText)
+    {
+        if (string.IsNullOrWhiteSpace(logcatText))
+        {
+            return new RuntimeProfileLogValidation(
+                false,
+                "Runtime profile requires a hand-mesh particle draw line; capture logcat with --logcat-lines.");
+        }
+
+        var drawLine = FindLatestHandMeshParticleDrawLine(logcatText);
+        if (drawLine is null)
+        {
+            return new RuntimeProfileLogValidation(
+                false,
+                "Runtime profile requires a `Rusty XR hand mesh particle draw` log line.");
+        }
+
+        var particles = 0;
+        var vertexCount = 0;
+        var hasParticles = TryReadTokenInt(drawLine, "particles=", out particles) && particles > 0;
+        var hasVertexCount = TryReadTokenInt(drawLine, "vertexCount=", out vertexCount) && vertexCount > 0;
+        var hasSampler = drawLine.Contains("sampler=LiveHandMeshParticleSampler", StringComparison.Ordinal);
+        var hasPassthrough = drawLine.Contains("passthroughVisible=true", StringComparison.Ordinal);
+        var mode = LastTokenAfter(drawLine, "mode=") ?? "missing";
+        var requiresOpenXrHandMesh = RequiresOpenXrHandMesh(profile);
+        var openXrLine = FindLatestOpenXrHandMeshParticleLine(logcatText);
+        var activeHands = 0;
+        var hasOpenXrHandMesh =
+            !requiresOpenXrHandMesh ||
+            (openXrLine is not null &&
+             TryReadTokenInt(openXrLine, "activeHands=", out activeHands) &&
+             activeHands > 0 &&
+             openXrLine.Contains("skinning=cpu-linear-blend", StringComparison.Ordinal) &&
+             openXrLine.Contains("bindMesh=XR_FB_hand_tracking_mesh", StringComparison.Ordinal));
+
+        if (hasParticles &&
+            hasVertexCount &&
+            hasSampler &&
+            hasPassthrough &&
+            hasOpenXrHandMesh)
+        {
+            var sourceDetail = requiresOpenXrHandMesh
+                ? $" from {activeHands} OpenXR hand mesh hand(s)"
+                : string.Empty;
+            return new RuntimeProfileLogValidation(
+                true,
+                $"Runtime profile reported {particles} hand-mesh particle(s), {vertexCount} billboard vertices, stable Rusty XR sampler output, and passthrough-visible rendering{sourceDetail}.");
+        }
+
+        var missing = new List<string>();
+        if (!hasParticles)
+        {
+            missing.Add("particles>0");
+        }
+        if (!hasVertexCount)
+        {
+            missing.Add("vertexCount>0");
+        }
+        if (!hasSampler)
+        {
+            missing.Add("sampler=LiveHandMeshParticleSampler");
+        }
+        if (!hasPassthrough)
+        {
+            missing.Add("passthroughVisible=true");
+        }
+        if (!hasOpenXrHandMesh)
+        {
+            missing.Add("OpenXR XR_FB_hand_tracking_mesh activeHands>0");
+        }
+
+        return new RuntimeProfileLogValidation(
+            false,
+            $"Runtime profile requires active hand-mesh particle rendering; observed mode={mode}; missing {string.Join(", ", missing)}.");
     }
 
     private static string? FindLatestProjectionStatusLine(string text)
@@ -658,6 +796,112 @@ public static class RuntimeProfileLogValidator
         var lines = text.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
         return lines.LastOrDefault(line =>
             line.Contains("Rusty XR environment depth visualizer draw", StringComparison.Ordinal));
+    }
+
+    private static string? FindLatestEnvironmentDepthMeshOverlayDrawLine(string text)
+    {
+        var lines = text.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
+        return lines.LastOrDefault(line =>
+            line.Contains("Rusty XR environment depth mesh overlay draw", StringComparison.Ordinal));
+    }
+
+    private static string? FindLatestEnvironmentDepthParticleOverlayDrawLine(string text)
+    {
+        var lines = text.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
+        return lines.LastOrDefault(line =>
+            line.Contains("Rusty XR environment depth particle overlay draw", StringComparison.Ordinal));
+    }
+
+    private static string? FindLatestHandMeshParticleDrawLine(string text)
+    {
+        var lines = text.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
+        return lines.LastOrDefault(line =>
+            line.Contains("Rusty XR hand mesh particle draw", StringComparison.Ordinal));
+    }
+
+    private static string? FindLatestOpenXrHandMeshParticleLine(string text)
+    {
+        var lines = text.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
+        return lines.LastOrDefault(line =>
+            line.Contains("Rusty XR OpenXR hand mesh particles", StringComparison.Ordinal));
+    }
+
+    private static bool IsEnvironmentDepthValidationMode(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return false;
+        }
+
+        return value.Trim().ToLowerInvariant() switch
+        {
+            "status" or "diagnostic" or "diagnostics" or "on" or "true" or "1" or
+            "visualize" or "visualise" or "visual" or "debug-visual" or
+            "mesh" or "mesh-overlay" or "depth-mesh" or "debug-mesh" or "wire-mesh" or
+            "particles" or "particle-overlay" or "depth-particles" or "surface-particles" => true,
+            _ => false
+        };
+    }
+
+    private static bool IsEnvironmentDepthMeshOverlayMode(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return false;
+        }
+
+        return value.Trim().ToLowerInvariant() switch
+        {
+            "mesh" or "mesh-overlay" or "depth-mesh" or "debug-mesh" or "wire-mesh" => true,
+            _ => false
+        };
+    }
+
+    private static bool IsEnvironmentDepthParticleOverlayMode(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return false;
+        }
+
+        return value.Trim().ToLowerInvariant() switch
+        {
+            "particles" or "particle-overlay" or "depth-particles" or "surface-particles" => true,
+            _ => false
+        };
+    }
+
+    private static bool RequiresOpenXrHandMesh(RuntimeProfile? profile)
+    {
+        if (profile is null)
+        {
+            return false;
+        }
+
+        if (string.Equals(profile.Id, "meta-hand-mesh-particles", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        return profile.Values.TryGetValue("rustyxr.handParticles", out var mode) &&
+               IsOpenXrHandMeshMode(mode);
+    }
+
+    private static bool IsOpenXrHandMeshMode(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return false;
+        }
+
+        return value.Trim().ToLowerInvariant() switch
+        {
+            "hand-mesh" or "on" or "true" or "1" or "meta" or "meta-hand" or
+            "meta-hand-mesh" or "openxr" or "openxr-hand" or "openxr-hand-mesh" or
+            "runtime" or "runtime-hand" or "runtime-hand-mesh" or "real" or "real-hand" or
+            "real-hand-mesh" => true,
+            _ => false
+        };
     }
 
     private static string? LastTokenAfter(string text, string prefix)

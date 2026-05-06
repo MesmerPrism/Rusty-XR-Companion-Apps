@@ -245,7 +245,22 @@ public static class SourceWorkspaceGuide
                 "verify-environment-depth",
                 "Install, launch, and validate OpenXR environment-depth acquisition diagnostics.",
                 companionPath,
-                @"dotnet run --project .\src\RustyXr.Companion.Cli -- catalog verify --path ..\Rusty-XR\examples\quest-composite-layer-apk\catalog\rusty-xr-quest-composite-layer.catalog.json --app rusty-xr-quest-composite-layer --serial <serial> --stop-catalog-apps --install --launch --device-profile xr-composite-smoke-test --runtime-profile environment-depth-diagnostics --settle-ms 9000 --logcat-lines 1400 --out .\artifacts\verify")
+                @"dotnet run --project .\src\RustyXr.Companion.Cli -- catalog verify --path ..\Rusty-XR\examples\quest-composite-layer-apk\catalog\rusty-xr-quest-composite-layer.catalog.json --app rusty-xr-quest-composite-layer --serial <serial> --stop-catalog-apps --install --launch --device-profile xr-composite-smoke-test --runtime-profile environment-depth-diagnostics --settle-ms 9000 --logcat-lines 1400 --out .\artifacts\verify"),
+            new SourceWorkspaceCommand(
+                "verify-environment-depth-mesh-overlay",
+                "Install, launch, and validate the local-space OpenXR environment-depth mesh overlay.",
+                companionPath,
+                @"dotnet run --project .\src\RustyXr.Companion.Cli -- catalog verify --path ..\Rusty-XR\examples\quest-composite-layer-apk\catalog\rusty-xr-quest-composite-layer.catalog.json --app rusty-xr-quest-composite-layer --serial <serial> --stop-catalog-apps --install --launch --device-profile xr-composite-smoke-test --runtime-profile environment-depth-mesh-overlay --settle-ms 9000 --logcat-lines 1600 --out .\artifacts\verify"),
+            new SourceWorkspaceCommand(
+                "verify-environment-depth-particle-overlay",
+                "Install, launch, and validate the retained local-space OpenXR environment-depth particle overlay.",
+                companionPath,
+                @"dotnet run --project .\src\RustyXr.Companion.Cli -- catalog verify --path ..\Rusty-XR\examples\quest-composite-layer-apk\catalog\rusty-xr-quest-composite-layer.catalog.json --app rusty-xr-quest-composite-layer --serial <serial> --stop-catalog-apps --install --launch --device-profile xr-composite-smoke-test --runtime-profile environment-depth-particle-overlay --settle-ms 9000 --logcat-lines 1600 --out .\artifacts\verify"),
+            new SourceWorkspaceCommand(
+                "verify-meta-hand-mesh-particles",
+                "Install, launch, and validate Meta/OpenXR hand-mesh particle rendering.",
+                companionPath,
+                @"dotnet run --project .\src\RustyXr.Companion.Cli -- catalog verify --path ..\Rusty-XR\examples\quest-composite-layer-apk\catalog\rusty-xr-quest-composite-layer.catalog.json --app rusty-xr-quest-composite-layer --serial <serial> --stop-catalog-apps --install --launch --device-profile xr-composite-smoke-test --runtime-profile meta-hand-mesh-particles --settle-ms 9000 --logcat-lines 1600 --out .\artifacts\verify")
         };
 
         return new SourceWorkspaceStatus(

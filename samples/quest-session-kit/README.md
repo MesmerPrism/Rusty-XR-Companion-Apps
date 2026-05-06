@@ -31,7 +31,8 @@ for `synthetic-composite-layer`, `camera-source-diagnostics`,
 `camera-diagnostic-cpu-copy`, `camera-gpu-buffer-probe`,
 `camera-stereo-gpu-composite`,
 `camera-stereo-gpu-composite-quad-surface`, `environment-depth-diagnostics`,
-and optional `media-projection-stream`.
+`environment-depth-mesh-overlay`, `environment-depth-particle-overlay`,
+`meta-hand-mesh-particles`, and optional `media-projection-stream`.
 
 For the full sibling-repo flow, run:
 
@@ -71,6 +72,11 @@ The environment-depth diagnostics profile starts only the OpenXR
 environment-depth path. Companion validation checks the latest
 `Rusty XR environment depth status` log line for provider support, swapchain
 creation, acquired frames, runtime capture timestamp progression, near/far
-range metadata, observed depth cadence, average acquire CPU cost, and explicit
-confidence-source reporting. The first headset visual is a simple acquisition
-state color, not a false-color depth texture view.
+range metadata, observed depth cadence, average acquire CPU cost, explicit
+confidence-source reporting, and the D16 grayscale visualizer draw. The mesh
+and particle overlay profiles add log validation for local-space depth surface
+rendering over native passthrough.
+
+The Meta hand-mesh particle profile requests OpenXR hand tracking plus
+`XR_FB_hand_tracking_mesh` and validates that the public Rusty XR sampler emits
+nonzero passthrough-visible hand-mesh particles from runtime hand data.

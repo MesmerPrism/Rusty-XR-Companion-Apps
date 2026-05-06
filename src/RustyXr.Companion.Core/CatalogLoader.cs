@@ -141,6 +141,27 @@ public sealed class CatalogLoader
                     },
                     "Runs the OpenXR layer without camera or screen capture for lifecycle and renderer isolation."),
                 new RuntimeProfile(
+                    "meta-hand-mesh-particles",
+                    "Meta hand mesh particles",
+                    new Dictionary<string, string>
+                    {
+                        ["rustyxr.example"] = "quest-composite-layer-apk",
+                        ["rustyxr.cameraTier"] = "synthetic",
+                        ["rustyxr.camera"] = "false",
+                        ["rustyxr.mediaProjection"] = "false",
+                        ["rustyxr.source"] = "meta-hand-mesh-particles",
+                        ["rustyxr.depth"] = "off",
+                        ["rustyxr.handParticles"] = "meta",
+                        ["rustyxr.openxrPassthroughProbe"] = "underlay",
+                        ["rustyxr.passthroughStyleMode"] = "none",
+                        ["rustyxr.passthroughOpacity"] = "1.0",
+                        ["rustyxr.projectionLayerVisible"] = "true",
+                        ["rustyxr.xrColorFormat"] = "rgba8-unorm",
+                        ["rustyxr.xrRenderScale"] = "0.75",
+                        ["rustyxr.xrFixedFoveationLevel"] = "0"
+                    },
+                    "Requests OpenXR hand tracking plus XR_FB_hand_tracking_mesh, skins runtime hand meshes from hand-joint poses, samples stable Rusty XR hand-particle coordinates, and renders them over native passthrough."),
+                new RuntimeProfile(
                     "osc-udp-listener",
                     "OSC UDP listener",
                     new Dictionary<string, string>
@@ -200,10 +221,71 @@ public sealed class CatalogLoader
                         ["rustyxr.source"] = "environment-depth",
                         ["rustyxr.depth"] = "visualize",
                         ["rustyxr.depthHandRemoval"] = "false",
+                        ["rustyxr.openxrPassthroughProbe"] = "underlay",
+                        ["rustyxr.passthroughStyleMode"] = "none",
+                        ["rustyxr.passthroughOpacity"] = "1.0",
                         ["rustyxr.xrRenderScale"] = "0.75",
                         ["rustyxr.xrFixedFoveationLevel"] = "0"
                     },
                     "Starts the OpenXR environment-depth provider only for this diagnostic profile, logs depth resolution, near/far, runtime capture timestamps, acquire cost, update cadence, and confidence availability, and renders the current stereo depth texture in headset as a per-eye D16 grayscale diagnostic."),
+                new RuntimeProfile(
+                    "environment-depth-mesh-overlay",
+                    "Environment depth mesh overlay",
+                    new Dictionary<string, string>
+                    {
+                        ["rustyxr.example"] = "quest-composite-layer-apk",
+                        ["rustyxr.cameraTier"] = "synthetic",
+                        ["rustyxr.camera"] = "false",
+                        ["rustyxr.mediaProjection"] = "false",
+                        ["rustyxr.source"] = "environment-depth",
+                        ["rustyxr.depth"] = "mesh-overlay",
+                        ["rustyxr.depthHandRemoval"] = "false",
+                        ["rustyxr.openxrPassthroughProbe"] = "underlay",
+                        ["rustyxr.passthroughStyleMode"] = "none",
+                        ["rustyxr.passthroughOpacity"] = "1.0",
+                        ["rustyxr.xrRenderScale"] = "0.75",
+                        ["rustyxr.xrFixedFoveationLevel"] = "0"
+                    },
+                    "Starts the OpenXR environment-depth provider and renders a transparent generated local-space depth-grid surface over the native passthrough underlay for headset inspection."),
+                new RuntimeProfile(
+                    "environment-depth-particle-overlay",
+                    "Environment depth particle overlay",
+                    new Dictionary<string, string>
+                    {
+                        ["rustyxr.example"] = "quest-composite-layer-apk",
+                        ["rustyxr.cameraTier"] = "synthetic",
+                        ["rustyxr.camera"] = "false",
+                        ["rustyxr.mediaProjection"] = "false",
+                        ["rustyxr.source"] = "environment-depth",
+                        ["rustyxr.depth"] = "particle-overlay",
+                        ["rustyxr.depthHandRemoval"] = "false",
+                        ["rustyxr.openxrPassthroughProbe"] = "underlay",
+                        ["rustyxr.passthroughStyleMode"] = "none",
+                        ["rustyxr.passthroughOpacity"] = "1.0",
+                        ["rustyxr.xrRenderScale"] = "0.75",
+                        ["rustyxr.xrFixedFoveationLevel"] = "0"
+                    },
+                    "Starts the OpenXR environment-depth provider and renders retained local-space metric billboard particles from accepted depth samples over native passthrough."),
+                new RuntimeProfile(
+                    "passthrough-only-layer-probe",
+                    "Passthrough only layer probe",
+                    new Dictionary<string, string>
+                    {
+                        ["rustyxr.example"] = "quest-composite-layer-apk",
+                        ["rustyxr.cameraTier"] = "synthetic",
+                        ["rustyxr.camera"] = "false",
+                        ["rustyxr.mediaProjection"] = "false",
+                        ["rustyxr.source"] = "platform-passthrough",
+                        ["rustyxr.depth"] = "off",
+                        ["rustyxr.openxrPassthroughProbe"] = "underlay",
+                        ["rustyxr.passthroughStyleMode"] = "none",
+                        ["rustyxr.passthroughOpacity"] = "1.0",
+                        ["rustyxr.projectionLayerVisible"] = "false",
+                        ["rustyxr.xrColorFormat"] = "rgba8-unorm",
+                        ["rustyxr.xrRenderScale"] = "0.75",
+                        ["rustyxr.xrFixedFoveationLevel"] = "0"
+                    },
+                    "Submits the native passthrough composition layer without the OpenXR projection layer so passthrough visibility can be isolated from overlay rendering."),
                 new RuntimeProfile(
                     "camera-diagnostic-cpu-copy",
                     "Camera diagnostic CPU copy",

@@ -35,8 +35,9 @@ Use it when you need to:
 The app is intentionally generic. It does not bundle a private runtime. The
 published Windows install includes the public Rusty XR camera composite-layer
 example, including the diagnostic HUD, OSC listener profiles, passthrough
-hotload profiles, and safety-gated strobe profiles. It still supports local APK
-paths, public catalog files, and the CLI.
+hotload profiles, environment-depth mesh/particle overlays, Meta/OpenXR
+hand-mesh particles, and safety-gated strobe profiles. It still supports local
+APK paths, public catalog files, and the CLI.
 The source-workspace path also covers the public broker APK proof for localhost
 WebSocket samples, optional LSL forwarding, and OSC drive events. The matching
 public Unity Quest example is

@@ -124,6 +124,27 @@ That profile validates provider support, swapchain metadata, acquisition
 cadence, runtime depth timestamps, acquire CPU cost, confidence availability,
 and the stereo grayscale depth visualizer state.
 
+Use `environment-depth-mesh-overlay` or
+`environment-depth-particle-overlay` with the same command shape when you need
+the live passthrough-backed local-space depth surface checks:
+
+```powershell
+dotnet run --project .\src\RustyXr.Companion.Cli -- catalog verify --path ..\Rusty-XR\examples\quest-composite-layer-apk\catalog\rusty-xr-quest-composite-layer.catalog.json --app rusty-xr-quest-composite-layer --serial <serial> --stop-catalog-apps --install --launch --device-profile xr-composite-smoke-test --runtime-profile environment-depth-mesh-overlay --settle-ms 9000 --logcat-lines 1600 --out .\artifacts\verify
+
+dotnet run --project .\src\RustyXr.Companion.Cli -- catalog verify --path ..\Rusty-XR\examples\quest-composite-layer-apk\catalog\rusty-xr-quest-composite-layer.catalog.json --app rusty-xr-quest-composite-layer --serial <serial> --stop-catalog-apps --install --launch --device-profile xr-composite-smoke-test --runtime-profile environment-depth-particle-overlay --settle-ms 9000 --logcat-lines 1600 --out .\artifacts\verify
+```
+
+For the live hand-mesh path, use the Meta/OpenXR hand-mesh particle profile:
+
+```powershell
+dotnet run --project .\src\RustyXr.Companion.Cli -- catalog verify --path ..\Rusty-XR\examples\quest-composite-layer-apk\catalog\rusty-xr-quest-composite-layer.catalog.json --app rusty-xr-quest-composite-layer --serial <serial> --stop-catalog-apps --install --launch --device-profile xr-composite-smoke-test --runtime-profile meta-hand-mesh-particles --settle-ms 9000 --logcat-lines 1600 --out .\artifacts\verify
+```
+
+The hand-mesh validator checks for `Rusty XR OpenXR hand mesh particles` and
+`Rusty XR hand mesh particle draw` log lines that report active runtime hand
+mesh input, `LiveHandMeshParticleSampler`, nonzero particles, and passthrough-
+visible rendering.
+
 For a generic OSC adapter smoke test, launch the listener profile and send a
 probe to the Quest's LAN IP. Use `osc-udp-listener-no-overlay` instead when
 you want the same UDP listener without drawing the headset diagnostic HUD:

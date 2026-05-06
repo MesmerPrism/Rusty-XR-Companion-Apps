@@ -136,6 +136,29 @@ public sealed class CoreModelTests
     }
 
     [Fact]
+    public async Task CatalogLoaderExampleIncludesCurrentHandMeshAndDepthProfiles()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"rusty-xr-catalog-{Guid.NewGuid():N}.json");
+
+        try
+        {
+            var loader = new CatalogLoader();
+            await loader.SaveExampleAsync(path);
+            var catalog = await loader.LoadAsync(path);
+
+            Assert.Contains(catalog.RuntimeProfiles, profile => profile.Id == "meta-hand-mesh-particles");
+            Assert.Contains(catalog.RuntimeProfiles, profile => profile.Id == "environment-depth-mesh-overlay");
+            Assert.Contains(catalog.RuntimeProfiles, profile => profile.Id == "environment-depth-particle-overlay");
+            Assert.Single(catalog.RuntimeProfiles, profile =>
+                profile.Id.Contains("hand-mesh", StringComparison.OrdinalIgnoreCase));
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
     public void CompanionContentLayoutPrefersBundledCatalogWhenPresent()
     {
         var root = Path.Combine(Path.GetTempPath(), $"rusty-xr-content-{Guid.NewGuid():N}");
@@ -919,6 +942,76 @@ public sealed class CoreModelTests
         Assert.Contains("acquiredFrames>0", result.Detail);
         Assert.Contains("runtime captureTimeNs", result.Detail);
         Assert.False(RuntimeProfileLogValidator.Validate(profile, null).Succeeded);
+    }
+
+    [Fact]
+    public void RuntimeProfileLogValidatorRequiresOverlayDrawForDepthOverlayProfiles()
+    {
+        var meshProfile = new RuntimeProfile(
+            "environment-depth-mesh-overlay",
+            "Environment depth mesh overlay",
+            new Dictionary<string, string>
+            {
+                ["rustyxr.depth"] = "mesh-overlay"
+            },
+            "Depth mesh overlay.");
+        var particleProfile = new RuntimeProfile(
+            "environment-depth-particle-overlay",
+            "Environment depth particle overlay",
+            new Dictionary<string, string>
+            {
+                ["rustyxr.depth"] = "particle-overlay"
+            },
+            "Depth particle overlay.");
+        var baseLog = string.Join(
+            Environment.NewLine,
+            "Rusty XR environment depth status frame=240 depthEnabled=true mode=mesh-overlay extensionAvailable=true supported=true providerCreated=true providerRunning=true swapchainCreated=true size=320x320 depthFormat=VK_FORMAT_D16_UNORM layerCount=2 swapchainIndex=1 openXrFrameCount=240 observedOpenXrFps=72.0 acquireAttempts=240 acquiredFrames=120 unavailableFrames=120 acquireErrors=0 uniqueCaptureTimes=30 repeatedCaptureTimes=90 observedAcquireHz=72.0 observedDepthHz=9.0 lastAcquireCpuMs=0.060 avgAcquireCpuMs=0.055 captureTimeNs=123456 nearZ=0.1 farZ=4 handRemovalSupported=true handRemovalEnabled=false confidenceSource=none confidencePayload=false confidenceStatus=not-exposed-by-XR_META_environment_depth visualizer=true depthVisualEncoding=linear-d16-meters-infinity-white depthVisualMaxMeters=20 depthVisualTextureTransform=rotate0+flipY depthVisualEyeMapping=left-layer-0-right-layer-1",
+            "Rusty XR environment depth visualizer draw frame=240 swapchainIndex=1 captureTimeNs=123456 renderTarget=1372x1512 depthTextureFormat=VK_FORMAT_D16_UNORM depthTextureLayers=2 grayscale=linear-d16-meters-infinity-white depthVisualMaxMeters=20 depthVisualTextureTransform=rotate0+flipY confidenceSource=none confidencePayload=false confidenceStatus=not-exposed-by-XR_META_environment_depth");
+        var meshDraw =
+            "Rusty XR environment depth mesh overlay draw frame=240 swapchainIndex=1 cellMeters=0.05 discontinuityMeters=0.2 distanceColorMaxMeters=3 distanceColorSource=environment-depth-meters captureTimeNs=123456 renderTarget=1372x1512 depthTexture=320x320 depthTextureFormat=VK_FORMAT_D16_UNORM depthTextureLayers=2 depthVisualTextureTransform=rotate0+flipY projection=local-space-depth-surface rasterization=world-space-generated-grid gridStridePixels=8 generatedVertexCount=3840 historyFramesDrawn=1 historyMaxAgeMs=0 dominantSurfaceGrid=true screenUvGrid=false passthroughVisible=true";
+        var particleDraw =
+            "Rusty XR environment depth particle overlay draw frame=240 swapchainIndex=1 distanceColorMaxMeters=3 distanceColorSource=environment-depth-meters captureTimeNs=123456 renderTarget=1372x1512 depthTexture=320x320 depthTextureFormat=VK_FORMAT_D16_UNORM depthTextureLayers=2 projection=local-space-retained-particles rasterization=metric-billboard-particles particleCapacity=8192 particleVertexCount=49152 sampleStridePixels=8 confidenceSource=depth-discontinuity confidenceThresholdMeters=0.2 passthroughVisible=true";
+
+        Assert.True(RuntimeProfileLogValidator.RequiresEnvironmentDepthDiagnostics(meshProfile));
+        Assert.True(RuntimeProfileLogValidator.Validate(meshProfile, $"{baseLog}{Environment.NewLine}{meshDraw}").Succeeded);
+        var missingMesh = RuntimeProfileLogValidator.Validate(meshProfile, baseLog);
+        Assert.False(missingMesh.Succeeded);
+        Assert.Contains("local-space depth mesh overlay draw", missingMesh.Detail);
+        Assert.True(RuntimeProfileLogValidator.Validate(particleProfile, $"{baseLog}{Environment.NewLine}{particleDraw}").Succeeded);
+    }
+
+    [Fact]
+    public void RuntimeProfileLogValidatorRequiresMetaHandMeshParticleLogs()
+    {
+        var profile = new RuntimeProfile(
+            "meta-hand-mesh-particles",
+            "Meta hand mesh particles",
+            new Dictionary<string, string>
+            {
+                ["rustyxr.handParticles"] = "meta"
+            },
+            "Meta hand mesh particles.");
+        var passingLog = string.Join(
+            Environment.NewLine,
+            "Rusty XR OpenXR hand mesh particles frame=240 activeHands=2 particles=128 leftStatus=Updated rightStatus=Updated firstTierNeighborLinks=512 secondTierNeighborLinks=512 crossHandNeighborLinks=64 crossHandMaxDistanceMeters=0.2 crossHandNeighborsPerPoint=2 skinning=cpu-linear-blend bindMesh=XR_FB_hand_tracking_mesh jointSource=xrLocateHandJointsEXT",
+            "Rusty XR hand mesh particle draw frame=240 mode=openxr-reference-space-skinned-fb-hand-mesh particles=128 vertexCount=768 projection=stereo-billboards sampler=LiveHandMeshParticleSampler passthroughVisible=true");
+
+        Assert.True(RuntimeProfileLogValidator.RequiresHandMeshParticles(profile));
+        Assert.True(RuntimeProfileLogValidator.RequiresLogValidation(profile));
+        Assert.True(RuntimeProfileLogValidator.Validate(profile, passingLog).Succeeded);
+        Assert.False(RuntimeProfileLogValidator.RequiresHandMeshParticles(new RuntimeProfile(
+            "legacy-procedural-hand-particles",
+            "Legacy procedural hand particles",
+            new Dictionary<string, string>
+            {
+                ["rustyxr.handParticles"] = "fixture"
+            },
+            "Removed iteration profile.")));
+        var missingRuntimeMesh = RuntimeProfileLogValidator.Validate(
+            profile,
+            "Rusty XR hand mesh particle draw frame=240 mode=openxr-reference-space-skinned-fb-hand-mesh particles=128 vertexCount=768 projection=stereo-billboards sampler=LiveHandMeshParticleSampler passthroughVisible=true");
+        Assert.False(missingRuntimeMesh.Succeeded);
+        Assert.Contains("OpenXR XR_FB_hand_tracking_mesh activeHands>0", missingRuntimeMesh.Detail);
     }
 
     [Fact]
