@@ -179,6 +179,7 @@ dotnet run --project src/RustyXr.Companion.Cli -- media receive --port 8787 --ou
 dotnet run --project src/RustyXr.Companion.Cli -- osc send --host <quest-lan-ip> --port 9000 --address /rusty-xr/probe --arg string:hello
 dotnet run --project src/RustyXr.Companion.Cli -- osc receive --port 9000 --count 1
 dotnet run --project src/RustyXr.Companion.Cli -- hzdb proximity keep-awake --serial <serial> --duration-ms 28800000
+dotnet run --project src/RustyXr.Companion.Cli -- hzdb wake --serial <serial>
 dotnet run --project src/RustyXr.Companion.Cli -- hzdb screenshot --serial <serial> --out .\artifacts\screenshots
 dotnet run --project src/RustyXr.Companion.Cli -- doctor --snapshots --out .\artifacts\diagnostics
 dotnet run --project src/RustyXr.Companion.Cli -- workspace guide --root <workspace>

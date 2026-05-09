@@ -28,6 +28,8 @@ public sealed class MainViewModel : ObservableObject
 
     private static readonly TimeSpan SnapshotFreshDuration = TimeSpan.FromSeconds(30);
     private static readonly TimeSpan AutoSnapshotInterval = TimeSpan.FromSeconds(30);
+    private static readonly TimeSpan MinimumProximityRestoreDuration = TimeSpan.FromMinutes(1);
+    private static readonly TimeSpan DefaultProximityRestoreDuration = TimeSpan.FromHours(8);
 
     private string _status = "Ready.";
     private string _buildLabel;
@@ -55,6 +57,9 @@ public sealed class MainViewModel : ObservableObject
     private DateTimeOffset? _lastSnapshotAttemptAt;
     private QuestSnapshot? _currentSnapshot;
     private QuestProximityStatus? _currentProximityStatus;
+    private string? _expectedProximityHoldSerial;
+    private DateTimeOffset? _expectedProximityHoldUntil;
+    private bool _proximityRestoreInFlight;
     private string _selectedSerial = string.Empty;
     private string _endpoint = "192.168.1.2:5555";
     private string _catalogPath = CompanionContentLayout.DefaultOrFallbackCatalogPath();
@@ -1257,6 +1262,17 @@ public sealed class MainViewModel : ObservableObject
                 var result = await _hzdbService
                     .SetProximityAsync(SelectedSerial, enableNormalProximity, enableNormalProximity ? null : durationMs)
                     .ConfigureAwait(true);
+                if (result.Succeeded)
+                {
+                    if (enableNormalProximity)
+                    {
+                        ClearExpectedProximityHold();
+                    }
+                    else
+                    {
+                        RememberExpectedProximityHold(SelectedSerial, DateTimeOffset.Now.AddMilliseconds(durationMs));
+                    }
+                }
                 AddLog(result.CondensedOutput.Length > 0
                     ? result.CondensedOutput
                     : enableNormalProximity
@@ -1480,9 +1496,21 @@ public sealed class MainViewModel : ObservableObject
 
         if (status.HoldActive)
         {
+            RememberExpectedProximityHold(
+                SelectedSerial,
+                status.HoldUntil ?? DateTimeOffset.Now.Add(DefaultProximityRestoreDuration));
             HeaderProximityStatus = "Proximity keep-awake";
             HeaderProximityStatusColor = StatusOkColor;
             OnPropertyChanged(nameof(HeaderProximityActionToolTip));
+            return;
+        }
+
+        if (ShouldRestoreExpectedProximityHold(status))
+        {
+            HeaderProximityStatus = "Proximity drift";
+            HeaderProximityStatusColor = StatusWarningColor;
+            OnPropertyChanged(nameof(HeaderProximityActionToolTip));
+            _ = RestoreExpectedProximityHoldAsync();
             return;
         }
 
@@ -1491,6 +1519,106 @@ public sealed class MainViewModel : ObservableObject
             : $"Proximity {FormatCompactState(status.HeadsetState)}";
         HeaderProximityStatusColor = StatusOkColor;
         OnPropertyChanged(nameof(HeaderProximityActionToolTip));
+    }
+
+    private void RememberExpectedProximityHold(string serial, DateTimeOffset holdUntil)
+    {
+        if (string.IsNullOrWhiteSpace(serial))
+        {
+            return;
+        }
+
+        _expectedProximityHoldSerial = serial;
+        _expectedProximityHoldUntil = holdUntil;
+    }
+
+    private void ClearExpectedProximityHold()
+    {
+        _expectedProximityHoldSerial = null;
+        _expectedProximityHoldUntil = null;
+    }
+
+    private bool ShouldRestoreExpectedProximityHold(QuestProximityStatus status)
+    {
+        if (_proximityRestoreInFlight ||
+            !status.Available ||
+            status.HoldActive ||
+            string.IsNullOrWhiteSpace(SelectedSerial) ||
+            string.IsNullOrWhiteSpace(_expectedProximityHoldSerial) ||
+            !string.Equals(SelectedSerial, _expectedProximityHoldSerial, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        var now = DateTimeOffset.Now;
+        if (_expectedProximityHoldUntil is not { } holdUntil || holdUntil <= now)
+        {
+            ClearExpectedProximityHold();
+            return false;
+        }
+
+        return true;
+    }
+
+    private async Task RestoreExpectedProximityHoldAsync()
+    {
+        if (_proximityRestoreInFlight ||
+            string.IsNullOrWhiteSpace(_expectedProximityHoldSerial) ||
+            _expectedProximityHoldUntil is not { } holdUntil)
+        {
+            return;
+        }
+
+        var now = DateTimeOffset.Now;
+        if (holdUntil <= now)
+        {
+            ClearExpectedProximityHold();
+            return;
+        }
+
+        var duration = holdUntil - now;
+        if (duration < MinimumProximityRestoreDuration)
+        {
+            duration = MinimumProximityRestoreDuration;
+        }
+
+        var durationMs = (int)Math.Min(duration.TotalMilliseconds, int.MaxValue);
+        var serial = _expectedProximityHoldSerial;
+        _proximityRestoreInFlight = true;
+        try
+        {
+            AddLog("Proximity keep-awake drift detected; reapplying the operator-requested hold.");
+            var result = await _hzdbService
+                .SetProximityAsync(serial, enableNormalProximity: false, durationMs)
+                .ConfigureAwait(true);
+            if (result.Succeeded)
+            {
+                RememberExpectedProximityHold(serial, DateTimeOffset.Now.AddMilliseconds(durationMs));
+                AddLog(result.CondensedOutput.Length > 0
+                    ? result.CondensedOutput
+                    : $"Keep-awake proximity hold reapplied for {durationMs} ms.");
+                await ReadProximityCoreAsync().ConfigureAwait(true);
+            }
+            else
+            {
+                HeaderProximityStatus = "Proximity drift";
+                HeaderProximityStatusColor = StatusErrorColor;
+                AddLog(result.CondensedOutput.Length > 0
+                    ? $"Proximity keep-awake reapply failed: {result.CondensedOutput}"
+                    : "Proximity keep-awake reapply failed.");
+            }
+        }
+        catch (Exception exception)
+        {
+            HeaderProximityStatus = "Proximity drift";
+            HeaderProximityStatusColor = StatusErrorColor;
+            AddLog($"Proximity keep-awake reapply failed: {exception.Message}");
+        }
+        finally
+        {
+            _proximityRestoreInFlight = false;
+            OnPropertyChanged(nameof(HeaderProximityActionToolTip));
+        }
     }
 
     private async Task RefreshSnapshotFromHeaderAsync(bool autoTriggered)

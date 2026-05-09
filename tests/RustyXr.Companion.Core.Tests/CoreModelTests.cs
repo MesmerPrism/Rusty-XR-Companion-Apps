@@ -477,6 +477,38 @@ public sealed class CoreModelTests
     }
 
     [Fact]
+    public async Task HzdbServiceWakeAddsShortKeepAwakeHold()
+    {
+        var tempRoot = Path.Combine(Path.GetTempPath(), $"rusty-xr-hzdb-{Guid.NewGuid():N}");
+        var hzdbPath = Path.Combine(tempRoot, "hzdb.exe");
+        Directory.CreateDirectory(tempRoot);
+        await File.WriteAllTextAsync(hzdbPath, string.Empty);
+        var previousHzdb = Environment.GetEnvironmentVariable("RUSTY_XR_HZDB");
+        Environment.SetEnvironmentVariable("RUSTY_XR_HZDB", hzdbPath);
+
+        try
+        {
+            var runner = new RecordingCommandRunner();
+            var service = new HzdbService(new ToolLocator(runner), runner: runner);
+
+            var result = await service.WakeDeviceAsync("SERIAL");
+
+            Assert.True(result.Succeeded);
+            Assert.Collection(
+                runner.Calls,
+                call => Assert.Contains("device wake --device \"SERIAL\"", call.Arguments),
+                call => Assert.Contains("device proximity --device \"SERIAL\" --disable --duration-ms 60000", call.Arguments));
+            Assert.Contains("device wake --device \"SERIAL\"", result.Arguments);
+            Assert.Contains("device proximity --device \"SERIAL\" --disable --duration-ms 60000", result.Arguments);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("RUSTY_XR_HZDB", previousHzdb);
+            Directory.Delete(tempRoot, recursive: true);
+        }
+    }
+
+    [Fact]
     public void HzdbServiceParsesKeepAwakeProximityStatus()
     {
         var observedAt = DateTimeOffset.UtcNow;
@@ -1123,11 +1155,16 @@ public sealed class CoreModelTests
 
     private sealed class RecordingCommandRunner : ICommandRunner
     {
+        public List<(string FileName, string Arguments)> Calls { get; } = new();
+
         public Task<CommandResult> RunAsync(
             string fileName,
             string arguments,
             TimeSpan timeout,
-            CancellationToken cancellationToken = default) =>
-            Task.FromResult(new CommandResult(fileName, arguments, 0, string.Empty, string.Empty, TimeSpan.Zero));
+            CancellationToken cancellationToken = default)
+        {
+            Calls.Add((fileName, arguments));
+            return Task.FromResult(new CommandResult(fileName, arguments, 0, string.Empty, string.Empty, TimeSpan.Zero));
+        }
     }
 }

@@ -100,3 +100,12 @@ sleep behavior is back in control:
 ```powershell
 dotnet run --project src/RustyXr.Companion.Cli -- hzdb proximity normal --serial <serial>
 ```
+
+The wake helper treats wake and keep-awake as linked operations for off-face
+development. `hzdb wake` first sends the Meta wake request, then applies a
+short keep-awake hold so the headset does not immediately fall back into a
+limbo or standby state. In the WPF app, snapshot auto-refresh also remembers an
+active keep-awake hold and reapplies it if a Horizon OS service restart or
+other device-side reset drops `Virtual proximity state` back to `DISABLED`
+before the expected hold expiry. Click **Proximity On / Normal** when you want
+the app to stop preserving that hold.

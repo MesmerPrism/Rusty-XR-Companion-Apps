@@ -110,6 +110,14 @@ not by itself mean capture failed.
 - use `hzdb status --serial <serial>` to read `dumpsys vrpowermanager`
 - use `hzdb screenshot --method screencap` first, then try `--method metacam`
 
+If an unattended run shows the headset moving from keep-awake to normal
+proximity after a system-service crash or Horizon OS restart, read
+`dumpsys vrpowermanager` first. A retained event log with no
+`automation_disable` command but a fresh `setInitialState` entry indicates that
+the virtual keep-awake override was lost when the service restarted. Reapply
+**Proximity Off / Keep Awake** or use `hzdb proximity keep-awake`; the WPF app's
+auto-refresh will preserve the hold after it has observed or requested one.
+
 ## Setup Helper Is Blocked
 
 The setup helper may be self-signed in preview releases. Some Windows security

@@ -6,6 +6,8 @@ namespace RustyXr.Companion.Core;
 
 public sealed class HzdbService
 {
+    private const int WakeProximityHoldDurationMs = 60_000;
+
     private static readonly Regex VrPowerManagerVirtualStateRegex = new(@"Virtual proximity state:\s*(.+)", RegexOptions.Compiled | RegexOptions.CultureInvariant);
     private static readonly Regex VrPowerManagerAutosleepDisabledRegex = new(@"isAutosleepDisabled:\s*(true|false)", RegexOptions.Compiled | RegexOptions.CultureInvariant);
     private static readonly Regex VrPowerManagerAutoSleepTimeRegex = new(@"AutoSleepTime:\s*(\d+)\s*ms", RegexOptions.Compiled | RegexOptions.CultureInvariant);
@@ -80,10 +82,23 @@ public sealed class HzdbService
                 Detail: "Quest vrpowermanager output did not contain a recognizable virtual proximity state.");
     }
 
-    public Task<CommandResult> WakeDeviceAsync(string serial, CancellationToken cancellationToken = default)
+    public async Task<CommandResult> WakeDeviceAsync(string serial, CancellationToken cancellationToken = default)
     {
         ValidateSerial(serial);
-        return RunHzdbAsync($"device wake --device \"{serial}\"", TimeSpan.FromSeconds(30), cancellationToken);
+        var wakeResult = await RunHzdbAsync($"device wake --device \"{serial}\"", TimeSpan.FromSeconds(30), cancellationToken)
+            .ConfigureAwait(false);
+        if (!wakeResult.Succeeded)
+        {
+            return wakeResult;
+        }
+
+        var proximityResult = await RunHzdbAsync(
+                $"device proximity --device \"{serial}\" --disable --duration-ms {WakeProximityHoldDurationMs}",
+                TimeSpan.FromSeconds(30),
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        return CombineCommandResults(wakeResult, proximityResult);
     }
 
     public Task<CommandResult> GetDeviceInfoAsync(string serial, CancellationToken cancellationToken = default)
@@ -217,6 +232,24 @@ public sealed class HzdbService
         }
 
         return await _runner.RunAsync(hzdb, arguments, timeout, cancellationToken).ConfigureAwait(false);
+    }
+
+    private static CommandResult CombineCommandResults(CommandResult first, CommandResult second)
+    {
+        static string JoinOutput(string left, string right)
+        {
+            return string.Join(
+                Environment.NewLine,
+                new[] { left.Trim(), right.Trim() }.Where(static value => value.Length > 0));
+        }
+
+        return new CommandResult(
+            first.FileName,
+            $"{first.Arguments} ; {second.Arguments}",
+            second.ExitCode,
+            JoinOutput(first.StandardOutput, second.StandardOutput),
+            JoinOutput(first.StandardError, second.StandardError),
+            first.Duration + second.Duration);
     }
 
     private async Task<QuestScreenshotCapture> CaptureScreenshotViaHzdbAsync(
