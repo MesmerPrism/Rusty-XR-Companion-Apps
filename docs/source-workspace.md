@@ -167,6 +167,13 @@ logs diagnostics, and supports OSC ingress/egress.
 
 Verify the broker launch from `Rusty-XR-Companion-Apps`:
 
+The catalog starts the sidecar through a no-display service starter activity so
+the broker can keep running while a Unity/OpenXR app owns the foreground. This
+is the expected long-term launch contract for the broker proof-of-concept. The
+visible console remains a human-facing Horizon 2D panel; focus may move back to
+Horizon shell or an XR app even when the broker process, foreground service,
+and localhost API are healthy.
+
 ```powershell
 dotnet run --project .\src\RustyXr.Companion.Cli -- catalog verify --path ..\Rusty-XR\examples\quest-broker-apk\catalog\rusty-xr-quest-broker.catalog.json --app rusty-xr-quest-broker --serial <serial> --stop-catalog-apps --install --launch --device-profile broker-smoke-test --runtime-profile broker-latency-websocket-lsl --settle-ms 5000 --logcat-lines 1000 --out .\artifacts\verify
 ```
