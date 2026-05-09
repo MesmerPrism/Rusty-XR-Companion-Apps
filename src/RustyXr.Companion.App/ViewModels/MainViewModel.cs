@@ -28,6 +28,7 @@ public sealed class MainViewModel : ObservableObject
 
     private static readonly TimeSpan SnapshotFreshDuration = TimeSpan.FromSeconds(30);
     private static readonly TimeSpan AutoSnapshotInterval = TimeSpan.FromSeconds(30);
+    private static readonly TimeSpan ProximityWatchdogSnapshotInterval = TimeSpan.FromSeconds(5);
     private static readonly TimeSpan MinimumProximityRestoreDuration = TimeSpan.FromMinutes(1);
     private static readonly TimeSpan DefaultProximityRestoreDuration = TimeSpan.FromHours(8);
 
@@ -1560,6 +1561,29 @@ public sealed class MainViewModel : ObservableObject
         return true;
     }
 
+    private bool HasActiveExpectedProximityHold()
+    {
+        if (string.IsNullOrWhiteSpace(SelectedSerial) ||
+            string.IsNullOrWhiteSpace(_expectedProximityHoldSerial) ||
+            !string.Equals(SelectedSerial, _expectedProximityHoldSerial, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        if (_expectedProximityHoldUntil is not { } holdUntil)
+        {
+            return false;
+        }
+
+        if (holdUntil > DateTimeOffset.Now)
+        {
+            return true;
+        }
+
+        ClearExpectedProximityHold();
+        return false;
+    }
+
     private async Task RestoreExpectedProximityHoldAsync()
     {
         if (_proximityRestoreInFlight ||
@@ -1666,7 +1690,10 @@ public sealed class MainViewModel : ObservableObject
 
         var now = DateTimeOffset.Now;
         var lastActivity = _lastSnapshotAt ?? _lastSnapshotAttemptAt;
-        if (lastActivity is not null && now - lastActivity.Value < AutoSnapshotInterval)
+        var refreshInterval = HasActiveExpectedProximityHold()
+            ? ProximityWatchdogSnapshotInterval
+            : AutoSnapshotInterval;
+        if (lastActivity is not null && now - lastActivity.Value < refreshInterval)
         {
             return;
         }
