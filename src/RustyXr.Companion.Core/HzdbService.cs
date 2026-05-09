@@ -6,7 +6,7 @@ namespace RustyXr.Companion.Core;
 
 public sealed class HzdbService
 {
-    private const int WakeProximityHoldDurationMs = 60_000;
+    private const int WakeProximityHoldDurationMs = 28_800_000;
 
     private static readonly Regex VrPowerManagerVirtualStateRegex = new(@"Virtual proximity state:\s*(.+)", RegexOptions.Compiled | RegexOptions.CultureInvariant);
     private static readonly Regex VrPowerManagerAutosleepDisabledRegex = new(@"isAutosleepDisabled:\s*(true|false)", RegexOptions.Compiled | RegexOptions.CultureInvariant);

@@ -477,7 +477,7 @@ public sealed class CoreModelTests
     }
 
     [Fact]
-    public async Task HzdbServiceWakeAddsShortKeepAwakeHold()
+    public async Task HzdbServiceWakeAddsKeepAwakeHold()
     {
         var tempRoot = Path.Combine(Path.GetTempPath(), $"rusty-xr-hzdb-{Guid.NewGuid():N}");
         var hzdbPath = Path.Combine(tempRoot, "hzdb.exe");
@@ -497,9 +497,9 @@ public sealed class CoreModelTests
             Assert.Collection(
                 runner.Calls,
                 call => Assert.Contains("device wake --device \"SERIAL\"", call.Arguments),
-                call => Assert.Contains("device proximity --device \"SERIAL\" --disable --duration-ms 60000", call.Arguments));
+                call => Assert.Contains("device proximity --device \"SERIAL\" --disable --duration-ms 28800000", call.Arguments));
             Assert.Contains("device wake --device \"SERIAL\"", result.Arguments);
-            Assert.Contains("device proximity --device \"SERIAL\" --disable --duration-ms 60000", result.Arguments);
+            Assert.Contains("device proximity --device \"SERIAL\" --disable --duration-ms 28800000", result.Arguments);
         }
         finally
         {
