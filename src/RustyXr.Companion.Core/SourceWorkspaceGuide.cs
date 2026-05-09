@@ -157,6 +157,11 @@ public static class SourceWorkspaceGuide
                 companionPath,
                 @"dotnet run --project .\src\RustyXr.Companion.Cli -- broker shell-helper binary-probe --serial <serial> --rusty-xr-root ..\Rusty-XR --screenrecord-source --encoded-video-width 320 --encoded-video-height 180 --encoded-video-bitrate 500000 --screenrecord-time-limit 1 --payload-out .\artifacts\broker-shell-helper\screenrecord.h264 --json"),
             new SourceWorkspaceCommand(
+                "start-broker-shell-helper-proximity-watchdog",
+                "Start the optional ADB shell helper proximity watchdog for autonomous Quest sessions.",
+                companionPath,
+                @"dotnet run --project .\src\RustyXr.Companion.Cli -- broker shell-helper start --serial <serial> --rusty-xr-root ..\Rusty-XR --proximity-watchdog --json"),
+            new SourceWorkspaceCommand(
                 "probe-broker-app-camera-luma",
                 "Forward, start, receive, and save a bounded broker app-context Camera2 raw-luma side-channel probe.",
                 companionPath,
@@ -213,7 +218,7 @@ public static class SourceWorkspaceGuide
                 @"dotnet run --project .\src\RustyXr.Companion.Cli -- media decode-h264-preview --payload .\artifacts\broker-app-camera\camera.h264 --out .\artifacts\broker-app-camera\camera-preview.png --json"),
             new SourceWorkspaceCommand(
                 "stop-broker-shell-helper",
-                "Run the helper in disconnect-report mode so the broker records shell-helper disconnected state.",
+                "Run the helper in disconnect-report mode, request any shell-side proximity watchdog to stop, and record disconnected state.",
                 companionPath,
                 @"dotnet run --project .\src\RustyXr.Companion.Cli -- broker shell-helper stop --serial <serial> --rusty-xr-root ..\Rusty-XR --no-build --json"),
             new SourceWorkspaceCommand(

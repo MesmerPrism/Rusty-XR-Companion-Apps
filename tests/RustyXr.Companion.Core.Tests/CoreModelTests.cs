@@ -548,6 +548,46 @@ public sealed class CoreModelTests
     }
 
     [Fact]
+    public void BrokerShellHelperCommandBuildsBackgroundProximityWatchdog()
+    {
+        var command = BrokerShellHelperService.BuildAppProcessShellCommand(
+            BrokerShellHelperDefaults.DeviceJarPath,
+            "127.0.0.1",
+            BrokerClientService.DefaultPort,
+            disconnect: false,
+            proximityWatchdog: true);
+
+        Assert.StartsWith("sh -c ", command, StringComparison.Ordinal);
+        Assert.Contains("--proximity-watchdog", command, StringComparison.Ordinal);
+        Assert.Contains("--proximity-watchdog-duration-ms 28800000", command, StringComparison.Ordinal);
+        Assert.Contains("--proximity-watchdog-hold-duration-ms 28800000", command, StringComparison.Ordinal);
+        Assert.Contains("--proximity-watchdog-interval-ms 5000", command, StringComparison.Ordinal);
+        Assert.Contains(BrokerShellHelperDefaults.ProximityWatchdogLogPath, command, StringComparison.Ordinal);
+        Assert.EndsWith("&'", command, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void BrokerShellHelperStopRequestsProximityWatchdogStop()
+    {
+        var options = new BrokerShellHelperRunOptions(
+                "SERIAL",
+                RustyXrRoot: Path.GetTempPath(),
+                BuildBeforeRun: false,
+                Disconnect: true)
+            .Normalize();
+        var command = BrokerShellHelperService.BuildAppProcessShellCommand(
+            options.DeviceJarPath,
+            options.BrokerHost,
+            options.BrokerPort,
+            options.Disconnect,
+            stopProximityWatchdog: options.StopProximityWatchdog);
+
+        Assert.Contains("--disconnect", command, StringComparison.Ordinal);
+        Assert.Contains("--stop-proximity-watchdog", command, StringComparison.Ordinal);
+        Assert.DoesNotContain("sh -c", command, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void OfficialQuestToolingServiceVerifiesChecksums()
     {
         var payload = Encoding.UTF8.GetBytes("rusty-xr-tooling");

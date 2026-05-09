@@ -94,7 +94,8 @@ on one visible button.
 - LSL runtime, local loopback, and broker latency round-trip diagnostics with
   PDF report output
 - source-workspace `broker shell-helper` commands for building and launching
-  the optional ADB shell-helper stub and checking broker helper status
+  the optional ADB shell-helper stub, checking broker helper status, and
+  starting a shell-side proximity watchdog for autonomous Quest sessions
 - source-workspace `broker app-camera-luma-probe` diagnostics for bounded
   app-context Camera2 luma payload delivery over ADB-forwarded TCP
 - source-workspace `broker app-camera-h264-probe` diagnostics for bounded
@@ -216,6 +217,7 @@ dotnet run --project src/RustyXr.Companion.Cli -- broker shell-helper start --se
 dotnet run --project src/RustyXr.Companion.Cli -- broker shell-helper binary-probe --serial <serial> --rusty-xr-root ..\Rusty-XR --json
 dotnet run --project src/RustyXr.Companion.Cli -- broker shell-helper binary-probe --serial <serial> --rusty-xr-root ..\Rusty-XR --mediacodec-synthetic --encoded-video-frames 4 --encoded-video-width 320 --encoded-video-height 180 --json
 dotnet run --project src/RustyXr.Companion.Cli -- broker shell-helper binary-probe --serial <serial> --rusty-xr-root ..\Rusty-XR --screenrecord-source --encoded-video-width 320 --encoded-video-height 180 --encoded-video-bitrate 500000 --screenrecord-time-limit 1 --payload-out .\artifacts\broker-shell-helper\screenrecord.h264 --json
+dotnet run --project src/RustyXr.Companion.Cli -- broker shell-helper start --serial <serial> --rusty-xr-root ..\Rusty-XR --proximity-watchdog --json
 dotnet run --project src/RustyXr.Companion.Cli -- media inspect-h264 --payload .\artifacts\broker-shell-helper\screenrecord.h264 --json
 dotnet run --project src/RustyXr.Companion.Cli -- broker shell-helper status --serial <serial> --json
 dotnet run --project src/RustyXr.Companion.Cli -- broker shell-helper stop --serial <serial> --rusty-xr-root ..\Rusty-XR --no-build --json

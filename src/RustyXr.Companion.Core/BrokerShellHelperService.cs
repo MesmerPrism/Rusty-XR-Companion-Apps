@@ -28,6 +28,12 @@ public static class BrokerShellHelperDefaults
     public const int ScreenrecordDefaultPacketBytes = 16 * 1024;
     public const int ScreenrecordDefaultTimeLimitSeconds = 1;
     public const int ScreenrecordMaxTimeLimitSeconds = 3;
+    public const int ProximityWatchdogDefaultDurationMs = 28_800_000;
+    public const int ProximityWatchdogDefaultHoldDurationMs = 28_800_000;
+    public const int ProximityWatchdogDefaultIntervalMs = 5_000;
+    public const int ProximityWatchdogMinIntervalMs = 1_000;
+    public const int ProximityWatchdogMaxIntervalMs = 60_000;
+    public const string ProximityWatchdogLogPath = "/data/local/tmp/rusty-xr-proximity-watchdog.log";
 }
 
 public sealed class BrokerShellHelperService
@@ -89,7 +95,12 @@ public sealed class BrokerShellHelperService
         int encodedVideoWidth = BrokerShellHelperDefaults.EncodedSyntheticDefaultWidth,
         int encodedVideoHeight = BrokerShellHelperDefaults.EncodedSyntheticDefaultHeight,
         int encodedVideoBitrateBps = BrokerShellHelperDefaults.EncodedSyntheticDefaultBitrateBps,
-        int screenrecordTimeLimitSeconds = BrokerShellHelperDefaults.ScreenrecordDefaultTimeLimitSeconds)
+        int screenrecordTimeLimitSeconds = BrokerShellHelperDefaults.ScreenrecordDefaultTimeLimitSeconds,
+        bool proximityWatchdog = false,
+        bool stopProximityWatchdog = false,
+        int proximityWatchdogDurationMs = BrokerShellHelperDefaults.ProximityWatchdogDefaultDurationMs,
+        int proximityWatchdogHoldDurationMs = BrokerShellHelperDefaults.ProximityWatchdogDefaultHoldDurationMs,
+        int proximityWatchdogIntervalMs = BrokerShellHelperDefaults.ProximityWatchdogDefaultIntervalMs)
     {
         if (string.IsNullOrWhiteSpace(deviceJarPath) || !deviceJarPath.StartsWith("/", StringComparison.Ordinal))
         {
@@ -135,6 +146,18 @@ public sealed class BrokerShellHelperService
         if (screenrecordTimeLimitSeconds is <= 0 or > BrokerShellHelperDefaults.ScreenrecordMaxTimeLimitSeconds)
         {
             throw new ArgumentOutOfRangeException(nameof(screenrecordTimeLimitSeconds), "Screenrecord time limit must be between 1 and 3 seconds.");
+        }
+        if (proximityWatchdogDurationMs < BrokerShellHelperDefaults.ProximityWatchdogMinIntervalMs)
+        {
+            throw new ArgumentOutOfRangeException(nameof(proximityWatchdogDurationMs), "Proximity watchdog duration must be at least 1000 ms.");
+        }
+        if (proximityWatchdogHoldDurationMs < BrokerShellHelperDefaults.ProximityWatchdogMinIntervalMs)
+        {
+            throw new ArgumentOutOfRangeException(nameof(proximityWatchdogHoldDurationMs), "Proximity watchdog hold duration must be at least 1000 ms.");
+        }
+        if (proximityWatchdogIntervalMs is < BrokerShellHelperDefaults.ProximityWatchdogMinIntervalMs or > BrokerShellHelperDefaults.ProximityWatchdogMaxIntervalMs)
+        {
+            throw new ArgumentOutOfRangeException(nameof(proximityWatchdogIntervalMs), "Proximity watchdog interval must be between 1000 and 60000 ms.");
         }
 
         var command =
@@ -207,6 +230,22 @@ public sealed class BrokerShellHelperService
             command += " --encoded-video-height " + encodedVideoHeight.ToString(CultureInfo.InvariantCulture);
             command += " --encoded-video-bitrate " + encodedVideoBitrateBps.ToString(CultureInfo.InvariantCulture);
             command += " --screenrecord-time-limit " + screenrecordTimeLimitSeconds.ToString(CultureInfo.InvariantCulture);
+        }
+        if (proximityWatchdog)
+        {
+            command += " --proximity-watchdog";
+            command += " --proximity-watchdog-duration-ms " + proximityWatchdogDurationMs.ToString(CultureInfo.InvariantCulture);
+            command += " --proximity-watchdog-hold-duration-ms " + proximityWatchdogHoldDurationMs.ToString(CultureInfo.InvariantCulture);
+            command += " --proximity-watchdog-interval-ms " + proximityWatchdogIntervalMs.ToString(CultureInfo.InvariantCulture);
+        }
+        if (stopProximityWatchdog)
+        {
+            command += " --stop-proximity-watchdog";
+        }
+        if (proximityWatchdog && !stopProximityWatchdog)
+        {
+            command = "sh -c " + ShellQuoteForDevice(
+                command + " > " + BrokerShellHelperDefaults.ProximityWatchdogLogPath + " 2>&1 &");
         }
 
         return command;
@@ -296,7 +335,12 @@ public sealed class BrokerShellHelperService
             normalized.EncodedVideoWidth,
             normalized.EncodedVideoHeight,
             normalized.EncodedVideoBitrateBps,
-            normalized.ScreenrecordTimeLimitSeconds);
+            normalized.ScreenrecordTimeLimitSeconds,
+            normalized.ProximityWatchdog,
+            normalized.StopProximityWatchdog,
+            normalized.ProximityWatchdogDurationMs,
+            normalized.ProximityWatchdogHoldDurationMs,
+            normalized.ProximityWatchdogIntervalMs);
         var launchResult = await _adbService
             .ShellAsync(normalized.Serial, shellCommand, cancellationToken)
             .ConfigureAwait(false);
@@ -553,6 +597,11 @@ public sealed record BrokerShellHelperRunOptions(
     int EncodedVideoHeight = BrokerShellHelperDefaults.EncodedSyntheticDefaultHeight,
     int EncodedVideoBitrateBps = BrokerShellHelperDefaults.EncodedSyntheticDefaultBitrateBps,
     int ScreenrecordTimeLimitSeconds = BrokerShellHelperDefaults.ScreenrecordDefaultTimeLimitSeconds,
+    bool ProximityWatchdog = false,
+    bool StopProximityWatchdog = false,
+    int ProximityWatchdogDurationMs = BrokerShellHelperDefaults.ProximityWatchdogDefaultDurationMs,
+    int ProximityWatchdogHoldDurationMs = BrokerShellHelperDefaults.ProximityWatchdogDefaultHoldDurationMs,
+    int ProximityWatchdogIntervalMs = BrokerShellHelperDefaults.ProximityWatchdogDefaultIntervalMs,
     string? AndroidPlayerRoot = null)
 {
     public BrokerShellHelperRunOptions Normalize()
@@ -601,7 +650,17 @@ public sealed record BrokerShellHelperRunOptions(
                 : BrokerShellHelperDefaults.EncodedSyntheticDefaultBitrateBps,
             ScreenrecordTimeLimitSeconds = ScreenrecordTimeLimitSeconds is > 0 and <= BrokerShellHelperDefaults.ScreenrecordMaxTimeLimitSeconds
                 ? ScreenrecordTimeLimitSeconds
-                : BrokerShellHelperDefaults.ScreenrecordDefaultTimeLimitSeconds
+                : BrokerShellHelperDefaults.ScreenrecordDefaultTimeLimitSeconds,
+            StopProximityWatchdog = StopProximityWatchdog || Disconnect,
+            ProximityWatchdogDurationMs = ProximityWatchdogDurationMs >= BrokerShellHelperDefaults.ProximityWatchdogMinIntervalMs
+                ? ProximityWatchdogDurationMs
+                : BrokerShellHelperDefaults.ProximityWatchdogDefaultDurationMs,
+            ProximityWatchdogHoldDurationMs = ProximityWatchdogHoldDurationMs >= BrokerShellHelperDefaults.ProximityWatchdogMinIntervalMs
+                ? ProximityWatchdogHoldDurationMs
+                : BrokerShellHelperDefaults.ProximityWatchdogDefaultHoldDurationMs,
+            ProximityWatchdogIntervalMs = ProximityWatchdogIntervalMs is >= BrokerShellHelperDefaults.ProximityWatchdogMinIntervalMs and <= BrokerShellHelperDefaults.ProximityWatchdogMaxIntervalMs
+                ? ProximityWatchdogIntervalMs
+                : BrokerShellHelperDefaults.ProximityWatchdogDefaultIntervalMs
         };
     }
 }

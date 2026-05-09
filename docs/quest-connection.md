@@ -110,3 +110,16 @@ device-side reset drops `Virtual proximity state` back to `DISABLED` before the
 expected hold expiry. While a hold is expected, the snapshot timer uses a short
 watchdog interval instead of the normal background refresh cadence. Click
 **Proximity On / Normal** when you want the app to stop preserving that hold.
+
+For broker workflows that already start the optional ADB shell helper, the
+helper can run an additional shell-side proximity watchdog:
+
+```powershell
+dotnet run --project src\RustyXr.Companion.Cli -- broker shell-helper start --serial <serial> --rusty-xr-root ..\Rusty-XR --proximity-watchdog --json
+dotnet run --project src\RustyXr.Companion.Cli -- broker shell-helper stop --serial <serial> --rusty-xr-root ..\Rusty-XR --no-build --json
+```
+
+The shell-side and WPF watchdogs are designed to be idempotent. Both preserve
+`Virtual proximity state: CLOSE`, and neither sends normal-proximity
+`automation_disable` while preserving a hold. Stop the shell helper before
+intentionally restoring normal wear-sensor behavior.
