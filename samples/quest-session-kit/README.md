@@ -30,6 +30,8 @@ for `synthetic-composite-layer`, `camera-source-diagnostics`,
 `osc-udp-listener`, `osc-udp-listener-no-overlay`,
 `camera-diagnostic-cpu-copy`, `camera-gpu-buffer-probe`,
 `camera-stereo-gpu-composite`,
+`camera-stereo-gpu-composite-fast075`,
+`broker-h264-stereo-live-openxr-projection-fast075-probe`,
 `camera-stereo-gpu-composite-quad-surface`, `environment-depth-diagnostics`,
 `environment-depth-mesh-overlay`, `environment-depth-particle-overlay`,
 `meta-hand-mesh-particles`, and optional `media-projection-stream`.

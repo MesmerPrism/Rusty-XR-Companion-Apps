@@ -114,7 +114,18 @@ public sealed class CatalogLoader
                         new DeviceProperty("debug.oculus.cpuLevel", "3"),
                         new DeviceProperty("debug.oculus.gpuLevel", "3")
                     },
-                    "Short Quest verification profile for the immersive composite-layer example.")
+                    "Short Quest verification profile for the immersive composite-layer example."),
+                new DeviceProfile(
+                    "xr-composite-comparison-level-4",
+                    "XR composite comparison level 4",
+                    new[]
+                    {
+                        new DeviceProperty("debug.oculus.cpuLevel", "4"),
+                        new DeviceProperty("debug.oculus.gpuLevel", "4"),
+                        new DeviceProperty("debug.oculus.foveation.dynamic", "0"),
+                        new DeviceProperty("debug.oculus.foveation.level", "0")
+                    },
+                    "Controlled Quest comparison profile for camera projection performance samples that need declared CPU/GPU levels.")
             },
             new[]
             {
@@ -390,6 +401,46 @@ public sealed class CatalogLoader
                         ["rustyxr.depth"] = "off"
                     },
                     "Final stereo profile. Verification fails unless one projection-status line reports paired left/right GPU buffers, platform or public estimated-profile pose, activeTier=gpu-projected, alignedProjection=true, and explicit manual visual acceptance."),
+                new RuntimeProfile(
+                    "camera-stereo-gpu-composite-fast075",
+                    "Camera stereo GPU composite, fast projection scale 0.75",
+                    new Dictionary<string, string>
+                    {
+                        ["rustyxr.example"] = "quest-composite-layer-apk",
+                        ["rustyxr.cameraTier"] = "gpu-projected",
+                        ["rustyxr.camera"] = "true",
+                        ["rustyxr.cameraWidth"] = "1280",
+                        ["rustyxr.cameraHeight"] = "1280",
+                        ["rustyxr.cameraPreferredSquare"] = "1280",
+                        ["rustyxr.cameraMaxDimension"] = "1920",
+                        ["rustyxr.cameraProjectionFovYDegrees"] = "92",
+                        ["rustyxr.cameraPreviewFovYDegrees"] = "60",
+                        ["rustyxr.cameraProjectionScale"] = "0.75",
+                        ["rustyxr.cameraTargetFps"] = "72",
+                        ["rustyxr.cameraPipelinePreset"] = "raw-projection-fast-unorm",
+                        ["rustyxr.cameraProjectionEffectMode"] = "raw-projection-fast",
+                        ["rustyxr.cameraColorMode"] = "external-rgb",
+                        ["rustyxr.cameraColorContrast"] = "1.0",
+                        ["rustyxr.cameraColorBrightness"] = "0.0",
+                        ["rustyxr.cameraColorSaturation"] = "1.0",
+                        ["rustyxr.cameraRawOverlayOverscan"] = "1.06",
+                        ["rustyxr.cameraFullViewOverlayOverscan"] = "2.10",
+                        ["rustyxr.cameraEdgeFade"] = "0.12",
+                        ["rustyxr.cameraSourceEyeMapping"] = "left-right",
+                        ["rustyxr.cameraOrientationDiagnosticMode"] = "off",
+                        ["rustyxr.visualReleaseAccepted"] = "false",
+                        ["rustyxr.visualAcceptanceToken"] = "visual-check-open",
+                        ["rustyxr.cameraStereoLayout"] = "separate",
+                        ["rustyxr.cameraStereoPairMaxDeltaNs"] = "5000000",
+                        ["rustyxr.xrRenderScale"] = "0.75",
+                        ["rustyxr.xrFixedFoveationLevel"] = "0",
+                        ["rustyxr.cameraAllowCpuFallback"] = "false",
+                        ["rustyxr.cameraCpuUploadHz"] = "0",
+                        ["rustyxr.mediaProjection"] = "false",
+                        ["rustyxr.source"] = "headset-camera",
+                        ["rustyxr.depth"] = "off"
+                    },
+                    "Direct in-app Camera2 stereo projection using the fast public raw-projection shader at render scale 0.75 for renderer-parity checks."),
                 new RuntimeProfile(
                     "camera-stereo-gpu-composite-quad-surface",
                     "Camera stereo GPU composite, quad-surface mode",

@@ -46,7 +46,8 @@ The broker has been validated with
 for localhost WebSocket samples, optional LSL forwarding, and OSC-driven Unity
 scene values.
 
-Recent Rusty XR catalog profiles include native passthrough hotload modes,
+Recent Rusty XR catalog profiles include fast direct and broker H.264 stereo
+projection diagnostics, native passthrough hotload modes,
 `XR_META_passthrough_color_lut` color-LUT flicker modes, and pure full-field
 red/black strobe modes that request 120 Hz display refresh. The strobe modes
 are intentional high-frequency visual stimuli and require explicit informed

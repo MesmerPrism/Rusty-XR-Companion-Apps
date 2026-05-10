@@ -61,6 +61,25 @@ and **Decode H.264 Preview**. Leave the FFmpeg path field blank for managed
 runtime or `PATH` discovery, or set it to an explicit user-supplied
 `ffmpeg.exe`.
 
+## Fast Stereo Projection Checks
+
+For headset-side renderer parity checks, use the sibling Rusty XR composite
+catalog profiles rather than hand-writing launch extras. The direct profile
+keeps in-app Camera2 capture and stereo mapping, while the broker profile keeps
+the H.264 encode/decode/import path and switches to the fast public
+raw-projection shader at render scale `0.75`.
+
+```powershell
+dotnet run --project .\src\RustyXr.Companion.Cli -- catalog verify --path ..\Rusty-XR\examples\quest-composite-layer-apk\catalog\rusty-xr-quest-composite-layer.catalog.json --app rusty-xr-quest-composite-layer --serial <serial> --stop-catalog-apps --install --launch --device-profile xr-composite-comparison-level-4 --runtime-profile camera-stereo-gpu-composite-fast075 --settle-ms 9000 --logcat-lines 1600 --out .\artifacts\verify
+dotnet run --project .\src\RustyXr.Companion.Cli -- catalog verify --path ..\Rusty-XR\examples\quest-composite-layer-apk\catalog\rusty-xr-quest-composite-layer.catalog.json --app rusty-xr-quest-composite-layer --serial <serial> --stop-catalog-apps --install --launch --device-profile xr-composite-comparison-level-4 --runtime-profile broker-h264-stereo-live-openxr-projection-fast075-probe --settle-ms 35000 --logcat-lines 2400 --out .\artifacts\verify
+```
+
+For the Quest custom stereo broker profiles, the public catalog pins Camera2
+IDs `50` and `51` for the outside front camera pair, uses square `1280x1280`
+broker frames, requests hardware-buffer decode, and reports pair/import/render
+timing for scorecards. Motion artifacts during head movement are tracked as a
+future compensation problem, not as a projection-orientation failure.
+
 ## MediaProjection Frame Receiver
 
 Examples that stream final display-composite frames can use the built-in

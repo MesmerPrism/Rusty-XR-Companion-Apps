@@ -59,5 +59,8 @@ Use the controls in this order:
 - **Camera diagnostic CPU copy** uses a throttled CPU camera-copy path for route and renderer isolation.
 - **Camera GPU buffer probe** checks Camera2 `PRIVATE` buffer availability without claiming final stereo alignment.
 - **Camera stereo GPU composite** is the accepted public paired-camera GPU projection profile.
+- **Camera stereo GPU composite, fast projection scale 0.75** keeps the same
+  direct Camera2 stereo source and selects the fast public raw-projection
+  renderer for performance parity checks.
 - **Camera stereo GPU composite, quad-surface mode** is a comparison mode for projection geometry and tone checks.
 - **MediaProjection stream** asks for headset screen-sharing consent and streams the final display-composite back to the Windows receiver.

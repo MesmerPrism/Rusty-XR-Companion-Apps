@@ -113,6 +113,15 @@ Verify from `Rusty-XR-Companion-Apps`:
 dotnet run --project .\src\RustyXr.Companion.Cli -- catalog verify --path ..\Rusty-XR\examples\quest-composite-layer-apk\catalog\rusty-xr-quest-composite-layer.catalog.json --app rusty-xr-quest-composite-layer --serial <serial> --stop-catalog-apps --install --launch --device-profile xr-composite-smoke-test --runtime-profile camera-stereo-gpu-composite --settle-ms 9000 --logcat-lines 1400 --out .\artifacts\verify
 ```
 
+Use the fast 0.75 direct profile when comparing the in-app Camera2 projection
+renderer against the broker H.264 Q2Q renderer-parity profile. It keeps direct
+capture, Quest custom stereo geometry, and GPU-buffer import unchanged while
+selecting the fast public raw-projection shader:
+
+```powershell
+dotnet run --project .\src\RustyXr.Companion.Cli -- catalog verify --path ..\Rusty-XR\examples\quest-composite-layer-apk\catalog\rusty-xr-quest-composite-layer.catalog.json --app rusty-xr-quest-composite-layer --serial <serial> --stop-catalog-apps --install --launch --device-profile xr-composite-comparison-level-4 --runtime-profile camera-stereo-gpu-composite-fast075 --settle-ms 9000 --logcat-lines 1600 --out .\artifacts\verify
+```
+
 For OpenXR environment-depth diagnostics, use the same APK with the explicit
 depth runtime profile:
 
@@ -268,9 +277,10 @@ result includes selected Camera2 metadata, the composite report should also log
 adb shell am start -a android.intent.action.MAIN -c com.oculus.intent.category.VR -n com.example.rustyxr.composite/.CompositeLayerActivity --ez rustyxr.camera false --es rustyxr.cameraTier gpu-buffer-probe --ez rustyxr.cameraAllowCpuFallback false --ei rustyxr.cameraCpuUploadHz 0 --ez rustyxr.mediaProjection false --ez rustyxr.brokerH264Consumer true --es rustyxr.brokerH264CameraId <id> --ei rustyxr.brokerH264Width 720 --ei rustyxr.brokerH264Height 480 --ei rustyxr.brokerH264CaptureMs 900 --ei rustyxr.brokerH264MaxPackets 12 --es rustyxr.brokerH264DecodeOutputMode hardware-buffer
 ```
 
-To find the stereo boundary, enable `rustyxr.brokerH264Stereo=true`, provide
-device-specific left/right camera IDs, and use the `gpu-projected` tier with
-explicit texture-transform provenance. The consumer starts two bounded broker
+To find the stereo boundary, enable `rustyxr.brokerH264Stereo=true`, use
+Camera2 IDs `50` and `51` for the Quest outside front camera pair, and use the
+`gpu-projected` tier with explicit texture-transform provenance. The consumer
+starts two bounded broker
 streams, decodes both through Android MediaCodec, pairs decoded hardware
 buffers by index, and records per-eye resolution, packet rate, decoded frame
 rate, payload bitrate, stereo pair acceptance, and timestamp deltas. Projection
@@ -278,18 +288,22 @@ is only claimed if logcat also shows `Rusty XR final projection status` with
 `alignedProjection=true`.
 
 ```powershell
-adb shell am start -a android.intent.action.MAIN -c com.oculus.intent.category.VR -n com.example.rustyxr.composite/.CompositeLayerActivity --ez rustyxr.camera false --es rustyxr.cameraTier gpu-projected --es rustyxr.cameraStereoLayout separate --ez rustyxr.cameraAllowCpuFallback false --ei rustyxr.cameraCpuUploadHz 0 --ez rustyxr.mediaProjection false --ez rustyxr.brokerH264Consumer true --ez rustyxr.brokerH264Stereo true --es rustyxr.brokerH264LeftCameraId <left-id> --es rustyxr.brokerH264RightCameraId <right-id> --ei rustyxr.brokerH264StreamPort 8879 --ei rustyxr.brokerH264RightStreamPort 8880 --ei rustyxr.brokerH264Width 720 --ei rustyxr.brokerH264Height 480 --ei rustyxr.brokerH264CaptureMs 900 --ei rustyxr.brokerH264MaxPackets 12 --es rustyxr.brokerH264DecodeOutputMode hardware-buffer --es rustyxr.cameraTextureTransformSource public-broker-h264-stereo-visual-check --es rustyxr.cameraTextureTransformReason visual-check --es rustyxr.leftCameraTextureTransformSource public-broker-h264-left-visual-check --es rustyxr.leftCameraTextureTransformReason visual-check --es rustyxr.rightCameraTextureTransformSource public-broker-h264-right-visual-check --es rustyxr.rightCameraTextureTransformReason visual-check --ez rustyxr.visualReleaseAccepted false
+adb shell am start -a android.intent.action.MAIN -c com.oculus.intent.category.VR -n com.example.rustyxr.composite/.CompositeLayerActivity --ez rustyxr.camera false --es rustyxr.cameraTier gpu-projected --es rustyxr.cameraStereoLayout separate --ez rustyxr.cameraAllowCpuFallback false --ei rustyxr.cameraCpuUploadHz 0 --ez rustyxr.mediaProjection false --ez rustyxr.brokerH264Consumer true --ez rustyxr.brokerH264Stereo true --es rustyxr.brokerH264LeftCameraId 50 --es rustyxr.brokerH264RightCameraId 51 --ei rustyxr.brokerH264StreamPort 8879 --ei rustyxr.brokerH264RightStreamPort 8880 --ei rustyxr.brokerH264Width 720 --ei rustyxr.brokerH264Height 480 --ei rustyxr.brokerH264CaptureMs 900 --ei rustyxr.brokerH264MaxPackets 12 --es rustyxr.brokerH264DecodeOutputMode hardware-buffer --es rustyxr.cameraTextureTransformSource public-broker-h264-stereo-visual-check --es rustyxr.cameraTextureTransformReason visual-check --es rustyxr.leftCameraTextureTransformSource public-broker-h264-left-visual-check --es rustyxr.leftCameraTextureTransformReason visual-check --es rustyxr.rightCameraTextureTransformSource public-broker-h264-right-visual-check --es rustyxr.rightCameraTextureTransformReason visual-check --ez rustyxr.visualReleaseAccepted false
 ```
 
 For provider-cadence work, add `rustyxr.brokerH264LiveStream=true` and use a
-larger bounded packet window. The broker accepts both binary stream sockets
-before Camera2 starts, writes schema-2 source timestamps while draining encoder
-output, and the composite app receives left/right streams concurrently. Check
-the compact stereo summary for source packet rate, wire packet rate, decoded
-frame rate, and native pair acceptance.
+larger bounded packet window. The current fast 0.75 renderer-parity shape uses
+Camera2 IDs `50` and `51` for the Quest outside front camera pair, square
+`1280x1280` broker frames, 6 Mbps H.264, hardware-buffer decode, frame-order
+live stereo pairing, and the fast public raw-projection shader. The broker
+accepts both binary stream sockets before Camera2 starts, writes schema-2 source
+timestamps while draining encoder output, and the composite app receives
+left/right streams concurrently. Check the compact stereo summary for source
+packet rate, wire packet rate, decoded frame rate, pair acceptance, queue
+drops, and native import timing.
 
 ```powershell
-adb shell am start -a android.intent.action.MAIN -c com.oculus.intent.category.VR -n com.example.rustyxr.composite/.CompositeLayerActivity --ez rustyxr.camera false --es rustyxr.cameraTier gpu-projected --es rustyxr.cameraStereoLayout separate --ez rustyxr.cameraAllowCpuFallback false --ei rustyxr.cameraCpuUploadHz 0 --ez rustyxr.mediaProjection false --ez rustyxr.brokerH264Consumer true --ez rustyxr.brokerH264Stereo true --ez rustyxr.brokerH264LiveStream true --es rustyxr.brokerH264LeftCameraId <left-id> --es rustyxr.brokerH264RightCameraId <right-id> --ei rustyxr.brokerH264StreamPort 8879 --ei rustyxr.brokerH264RightStreamPort 8880 --ei rustyxr.brokerH264Width 720 --ei rustyxr.brokerH264Height 480 --ei rustyxr.brokerH264CaptureMs 15000 --ei rustyxr.brokerH264MaxPackets 120 --ei rustyxr.brokerH264BitrateBps 2000000 --ei rustyxr.brokerH264StreamTimeoutMs 30000 --ei rustyxr.brokerH264DecodeTimeoutMs 20000 --es rustyxr.brokerH264DecodeOutputMode hardware-buffer --es rustyxr.cameraTextureTransformSource public-broker-h264-live-stereo-visual-check --es rustyxr.cameraTextureTransformReason visual-check --es rustyxr.leftCameraTextureTransformSource public-broker-h264-live-left-visual-check --es rustyxr.leftCameraTextureTransformReason visual-check --es rustyxr.rightCameraTextureTransformSource public-broker-h264-live-right-visual-check --es rustyxr.rightCameraTextureTransformReason visual-check --ez rustyxr.visualReleaseAccepted false
+adb shell am start -a android.intent.action.MAIN -c com.oculus.intent.category.VR -n com.example.rustyxr.composite/.CompositeLayerActivity --ez rustyxr.camera false --es rustyxr.cameraTier gpu-projected --es rustyxr.cameraStereoLayout separate --ez rustyxr.cameraAllowCpuFallback false --ei rustyxr.cameraCpuUploadHz 0 --ez rustyxr.mediaProjection false --ez rustyxr.brokerH264Consumer true --ez rustyxr.brokerH264Stereo true --ez rustyxr.brokerH264LiveStream true --ez rustyxr.brokerH264LiveDecode true --es rustyxr.brokerH264LeftCameraId 50 --es rustyxr.brokerH264RightCameraId 51 --ei rustyxr.brokerH264StreamPort 8879 --ei rustyxr.brokerH264RightStreamPort 8880 --ei rustyxr.brokerH264Width 1280 --ei rustyxr.brokerH264Height 1280 --ei rustyxr.brokerH264CaptureMs 15000 --ei rustyxr.brokerH264MaxPackets 120 --ei rustyxr.brokerH264BitrateBps 6000000 --ei rustyxr.brokerH264StreamTimeoutMs 30000 --ei rustyxr.brokerH264DecodeTimeoutMs 20000 --es rustyxr.brokerH264DecodeOutputMode hardware-buffer --es rustyxr.brokerH264StereoPairingMode frame-order --ei rustyxr.brokerH264LivePairQueueLimit 8 --ef rustyxr.xrRenderScale 0.75 --ei rustyxr.xrFixedFoveationLevel 0 --ef rustyxr.cameraProjectionFovYDegrees 92 --ef rustyxr.cameraPreviewFovYDegrees 60 --ef rustyxr.cameraProjectionScale 0.75 --es rustyxr.cameraPipelinePreset raw-projection-fast-unorm --es rustyxr.cameraProjectionEffectMode raw-projection-fast --es rustyxr.cameraColorMode external-rgb --es rustyxr.cameraTextureTransformSource public-broker-h264-live-stereo-fast075-visual-check --es rustyxr.cameraTextureTransformReason fast075-renderer-parity --es rustyxr.leftCameraTextureTransformSource public-broker-h264-live-fast075-left-visual-check --es rustyxr.leftCameraTextureTransformReason visual-check --es rustyxr.rightCameraTextureTransformSource public-broker-h264-live-fast075-right-visual-check --es rustyxr.rightCameraTextureTransformReason visual-check --ez rustyxr.visualReleaseAccepted true
 ```
 
 Build and launch the optional ADB shell helper from the same source workspace

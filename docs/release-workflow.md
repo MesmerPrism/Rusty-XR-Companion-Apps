@@ -70,11 +70,12 @@ LGPL shared FFmpeg build, verifies SHA-256, records source/version/hash/license
 metadata, and classifies `ffmpeg -version` for GPL/nonfree flags.
 
 The WPF app auto-loads this catalog on startup and defaults to the accepted
-`camera-stereo-gpu-composite` runtime profile. The catalog also includes OSC
-listener profiles that exercise the headset diagnostic HUD and a no-overlay
-profile for HUD cost isolation. It also includes the Rusty XR broker app and
-broker runtime profiles used by the OSC, WebSocket, LSL, and bio-simulation
-diagnostics. The composite APK URL comes from the
+`camera-stereo-gpu-composite` runtime profile. The catalog also includes fast
+direct and broker H.264 stereo projection profiles for renderer-parity checks,
+OSC listener profiles that exercise the headset diagnostic HUD, and a
+no-overlay profile for HUD cost isolation. It also includes the Rusty XR broker
+app and broker runtime profiles used by the OSC, WebSocket, LSL, and
+bio-simulation diagnostics. The composite APK URL comes from the
 workflow dispatch `composite_apk_url` input, the
 `RUSTY_XR_COMPOSITE_APK_URL` repository variable, or the default latest Rusty
 XR release asset URL, in that order. The broker APK URL follows the same order

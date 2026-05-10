@@ -222,6 +222,13 @@ head-motion projection, and a visible camera-driven border. New device/runtime
 variants should rerun diagnostics and keep that manual visual gate closed until
 the same conditions are inspected again.
 
+For renderer-parity checks, use `camera-stereo-gpu-composite-fast075`. It keeps
+the same direct Camera2 stereo source, projection geometry, and GPU-buffer
+import contract, but selects the fast public raw-projection shader at
+`rustyxr.xrRenderScale=0.75`. Use the `xr-composite-comparison-level-4` device
+profile when comparing this lane with broker H.264 Q2Q profiles so CPU/GPU
+levels are declared in the verification bundle.
+
 For projection A/B checks, use `camera-stereo-gpu-composite-quad-surface`.
 It keeps the same GPU-buffer stereo camera path and visual gate, but passes
 `rustyxr.cameraProjectionMode=quad-surface` so the renderer reconstructs the

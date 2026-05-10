@@ -118,6 +118,9 @@ on one visible button.
   diagnostics for the live-bounded broker H.264 stereo path with schema-2 source
   timestamps, concurrent left/right receive, and source/wire/decode cadence
   reporting before OpenXR stereo projection
+- source-workspace and bundled-catalog fast stereo profiles for direct
+  Camera2 projection and broker H.264 Q2Q renderer-parity checks at
+  `rustyxr.xrRenderScale=0.75`
 - raw-luma artifact inspection for saved broker app-camera payloads
 - bundled catalog profiles for the Rusty XR generic diagnostic HUD, including
   a no-overlay OSC A/B profile
