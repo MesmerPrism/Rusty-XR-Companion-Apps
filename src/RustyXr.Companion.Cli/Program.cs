@@ -1067,6 +1067,26 @@ internal static class CliProgram
                     options,
                     "--proximity-watchdog-interval-ms",
                     BrokerShellHelperDefaults.ProximityWatchdogDefaultIntervalMs),
+                FocusGuardian: options.Has("--focus-guardian"),
+                StopFocusGuardian: options.Has("--stop-focus-guardian") || disconnect,
+                FocusGuardianMode: options.ValueOrNull("--focus-guardian-mode") ?? BrokerShellHelperDefaults.FocusGuardianDefaultMode,
+                FocusGuardianDesiredFocus: options.ValueOrNull("--focus-guardian-desired-focus") ?? BrokerShellHelperDefaults.FocusGuardianDefaultDesiredFocus,
+                FocusTargetPackage: options.ValueOrNull("--focus-target-package") ?? string.Empty,
+                FocusTargetActivity: options.ValueOrNull("--focus-target-activity") ?? string.Empty,
+                FocusBrokerPackage: options.ValueOrNull("--focus-broker-package") ?? BrokerShellHelperDefaults.FocusGuardianDefaultBrokerPackage,
+                FocusBrokerActivity: options.ValueOrNull("--focus-broker-activity") ?? BrokerShellHelperDefaults.FocusGuardianDefaultBrokerActivity,
+                FocusGuardianDurationMs: ParseInt(
+                    options,
+                    "--focus-guardian-duration-ms",
+                    BrokerShellHelperDefaults.FocusGuardianDefaultDurationMs),
+                FocusGuardianIntervalMs: ParseInt(
+                    options,
+                    "--focus-guardian-interval-ms",
+                    BrokerShellHelperDefaults.FocusGuardianDefaultIntervalMs),
+                FocusGuardianCooldownMs: ParseInt(
+                    options,
+                    "--focus-guardian-cooldown-ms",
+                    BrokerShellHelperDefaults.FocusGuardianDefaultCooldownMs),
                 AndroidPlayerRoot: options.ValueOrNull("--android-player-root")))
             .ConfigureAwait(false);
 
@@ -2535,8 +2555,8 @@ internal static class CliProgram
           broker h264-proxy-probe [--serial <serial>] [--packet-count <n>] [--packet-bytes <n>] [--width <n>] [--height <n>] [--timeout-ms <n>] [--json]
           broker h264-proxy-start --remote-host <host> [--serial <serial>] [--remote-port <n>] [--local-port <n>] [--local-bind-host <host>] [--local-lan-enabled] [--json]
           broker shell-helper build [--rusty-xr-root <folder>] [--android-player-root <folder>] [--json]
-          broker shell-helper start --serial <serial> [--rusty-xr-root <folder>] [--helper-jar <path>] [--no-build] [--probe-codecs] [--probe-cameras] [--probe-camera-open] [--camera-open-id <id>] [--emit-synthetic-video-metadata] [--synthetic-video-samples <0-30>] [--emit-synthetic-video-binary] [--emit-mediacodec-synthetic-video] [--emit-screenrecord-video] [--binary-video-port <n>] [--binary-video-packets <1-30>] [--binary-video-packet-bytes <1-65536>] [--encoded-video-frames <1-60>] [--encoded-video-width <n>] [--encoded-video-height <n>] [--encoded-video-bitrate <bps>] [--screenrecord-time-limit <1-3>] [--proximity-watchdog] [--proximity-watchdog-duration-ms <n>] [--proximity-watchdog-hold-duration-ms <n>] [--proximity-watchdog-interval-ms <n>] [--host-port <n>] [--device-port <n>] [--broker-host 127.0.0.1] [--broker-port <n>] [--skip-status] [--json]
-          broker shell-helper stop --serial <serial> [--rusty-xr-root <folder>] [--helper-jar <path>] [--no-build] [--stop-proximity-watchdog] [--json]
+          broker shell-helper start --serial <serial> [--rusty-xr-root <folder>] [--helper-jar <path>] [--no-build] [--probe-codecs] [--probe-cameras] [--probe-camera-open] [--camera-open-id <id>] [--emit-synthetic-video-metadata] [--synthetic-video-samples <0-30>] [--emit-synthetic-video-binary] [--emit-mediacodec-synthetic-video] [--emit-screenrecord-video] [--binary-video-port <n>] [--binary-video-packets <1-30>] [--binary-video-packet-bytes <1-65536>] [--encoded-video-frames <1-60>] [--encoded-video-width <n>] [--encoded-video-height <n>] [--encoded-video-bitrate <bps>] [--screenrecord-time-limit <1-3>] [--proximity-watchdog] [--proximity-watchdog-duration-ms <n>] [--proximity-watchdog-hold-duration-ms <n>] [--proximity-watchdog-interval-ms <n>] [--focus-guardian] [--focus-guardian-mode <mode>] [--focus-target-package <package>] [--focus-target-activity <activity>] [--host-port <n>] [--device-port <n>] [--broker-host 127.0.0.1] [--broker-port <n>] [--skip-status] [--json]
+          broker shell-helper stop --serial <serial> [--rusty-xr-root <folder>] [--helper-jar <path>] [--no-build] [--stop-proximity-watchdog] [--stop-focus-guardian] [--json]
           broker shell-helper status [--serial <serial>] [--host-port <n>] [--device-port <n>] [--host 127.0.0.1] [--port <n>] [--status-url <http-url>] [--json]
           broker shell-helper binary-probe --serial <serial> [--rusty-xr-root <folder>] [--helper-jar <path>] [--no-build] [--probe-cameras] [--probe-camera-open] [--camera-open-id <id>] [--mediacodec-synthetic|--screenrecord-source] [--host-port <n>] [--device-port <n>] [--binary-video-packets <1-30>] [--binary-video-packet-bytes <1-65536>] [--encoded-video-frames <1-60>] [--encoded-video-width <n>] [--encoded-video-height <n>] [--encoded-video-bitrate <bps>] [--screenrecord-time-limit <1-3>] [--payload-out <file.h264>] [--timeout-ms <n>] [--json]
           tooling status [--latest] [--json]

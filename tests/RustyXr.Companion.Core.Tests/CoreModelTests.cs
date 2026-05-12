@@ -567,6 +567,49 @@ public sealed class CoreModelTests
     }
 
     [Fact]
+    public void BrokerShellHelperCommandBuildsBackgroundFocusGuardian()
+    {
+        var command = BrokerShellHelperService.BuildAppProcessShellCommand(
+            BrokerShellHelperDefaults.DeviceJarPath,
+            "127.0.0.1",
+            BrokerClientService.DefaultPort,
+            disconnect: false,
+            focusGuardian: true,
+            focusGuardianMode: "toggle_broker_target",
+            focusTargetPackage: "org.example.target",
+            focusTargetActivity: "org.example.target.MainActivity");
+
+        Assert.StartsWith("sh -c ", command, StringComparison.Ordinal);
+        Assert.Contains("--focus-guardian", command, StringComparison.Ordinal);
+        Assert.Contains("--focus-guardian-mode", command, StringComparison.Ordinal);
+        Assert.Contains("toggle_broker_target", command, StringComparison.Ordinal);
+        Assert.Contains("--focus-target-package", command, StringComparison.Ordinal);
+        Assert.Contains("org.example.target", command, StringComparison.Ordinal);
+        Assert.Contains("--focus-target-activity", command, StringComparison.Ordinal);
+        Assert.Contains("org.example.target.MainActivity", command, StringComparison.Ordinal);
+        Assert.Contains(BrokerShellHelperDefaults.FocusGuardianLogPath, command, StringComparison.Ordinal);
+        Assert.EndsWith("&'", command, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void BrokerShellHelperCommandCanStopWatchdogAndStartFocusGuardianInBackground()
+    {
+        var command = BrokerShellHelperService.BuildAppProcessShellCommand(
+            BrokerShellHelperDefaults.DeviceJarPath,
+            "127.0.0.1",
+            BrokerClientService.DefaultPort,
+            disconnect: false,
+            stopProximityWatchdog: true,
+            focusGuardian: true);
+
+        Assert.StartsWith("sh -c ", command, StringComparison.Ordinal);
+        Assert.Contains("--stop-proximity-watchdog", command, StringComparison.Ordinal);
+        Assert.Contains("--focus-guardian", command, StringComparison.Ordinal);
+        Assert.Contains(BrokerShellHelperDefaults.FocusGuardianLogPath, command, StringComparison.Ordinal);
+        Assert.EndsWith("&'", command, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void BrokerShellHelperStopRequestsProximityWatchdogStop()
     {
         var options = new BrokerShellHelperRunOptions(

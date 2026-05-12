@@ -34,6 +34,16 @@ public static class BrokerShellHelperDefaults
     public const int ProximityWatchdogMinIntervalMs = 1_000;
     public const int ProximityWatchdogMaxIntervalMs = 60_000;
     public const string ProximityWatchdogLogPath = "/data/local/tmp/rusty-xr-proximity-watchdog.log";
+    public const int FocusGuardianDefaultDurationMs = 28_800_000;
+    public const int FocusGuardianDefaultIntervalMs = 1_000;
+    public const int FocusGuardianDefaultCooldownMs = 1_500;
+    public const int FocusGuardianMinIntervalMs = 250;
+    public const int FocusGuardianMaxIntervalMs = 10_000;
+    public const string FocusGuardianDefaultMode = "observe";
+    public const string FocusGuardianDefaultDesiredFocus = "broker";
+    public const string FocusGuardianDefaultBrokerPackage = "com.example.rustyxr.broker";
+    public const string FocusGuardianDefaultBrokerActivity = "com.example.rustyxr.broker.MainActivity";
+    public const string FocusGuardianLogPath = "/data/local/tmp/rusty-xr-focus-guardian.log";
 }
 
 public sealed class BrokerShellHelperService
@@ -100,7 +110,18 @@ public sealed class BrokerShellHelperService
         bool stopProximityWatchdog = false,
         int proximityWatchdogDurationMs = BrokerShellHelperDefaults.ProximityWatchdogDefaultDurationMs,
         int proximityWatchdogHoldDurationMs = BrokerShellHelperDefaults.ProximityWatchdogDefaultHoldDurationMs,
-        int proximityWatchdogIntervalMs = BrokerShellHelperDefaults.ProximityWatchdogDefaultIntervalMs)
+        int proximityWatchdogIntervalMs = BrokerShellHelperDefaults.ProximityWatchdogDefaultIntervalMs,
+        bool focusGuardian = false,
+        bool stopFocusGuardian = false,
+        string? focusGuardianMode = null,
+        string? focusGuardianDesiredFocus = null,
+        string? focusTargetPackage = null,
+        string? focusTargetActivity = null,
+        string? focusBrokerPackage = null,
+        string? focusBrokerActivity = null,
+        int focusGuardianDurationMs = BrokerShellHelperDefaults.FocusGuardianDefaultDurationMs,
+        int focusGuardianIntervalMs = BrokerShellHelperDefaults.FocusGuardianDefaultIntervalMs,
+        int focusGuardianCooldownMs = BrokerShellHelperDefaults.FocusGuardianDefaultCooldownMs)
     {
         if (string.IsNullOrWhiteSpace(deviceJarPath) || !deviceJarPath.StartsWith("/", StringComparison.Ordinal))
         {
@@ -158,6 +179,18 @@ public sealed class BrokerShellHelperService
         if (proximityWatchdogIntervalMs is < BrokerShellHelperDefaults.ProximityWatchdogMinIntervalMs or > BrokerShellHelperDefaults.ProximityWatchdogMaxIntervalMs)
         {
             throw new ArgumentOutOfRangeException(nameof(proximityWatchdogIntervalMs), "Proximity watchdog interval must be between 1000 and 60000 ms.");
+        }
+        if (focusGuardianDurationMs < BrokerShellHelperDefaults.FocusGuardianMinIntervalMs)
+        {
+            throw new ArgumentOutOfRangeException(nameof(focusGuardianDurationMs), "Focus guardian duration must be at least 250 ms.");
+        }
+        if (focusGuardianIntervalMs is < BrokerShellHelperDefaults.FocusGuardianMinIntervalMs or > BrokerShellHelperDefaults.FocusGuardianMaxIntervalMs)
+        {
+            throw new ArgumentOutOfRangeException(nameof(focusGuardianIntervalMs), "Focus guardian interval must be between 250 and 10000 ms.");
+        }
+        if (focusGuardianCooldownMs is < BrokerShellHelperDefaults.FocusGuardianMinIntervalMs or > BrokerShellHelperDefaults.FocusGuardianMaxIntervalMs)
+        {
+            throw new ArgumentOutOfRangeException(nameof(focusGuardianCooldownMs), "Focus guardian cooldown must be between 250 and 10000 ms.");
         }
 
         var command =
@@ -242,10 +275,48 @@ public sealed class BrokerShellHelperService
         {
             command += " --stop-proximity-watchdog";
         }
-        if (proximityWatchdog && !stopProximityWatchdog)
+        if (focusGuardian)
         {
+            command += " --focus-guardian";
+            command += " --focus-guardian-mode " + ShellQuoteForDevice(
+                string.IsNullOrWhiteSpace(focusGuardianMode)
+                    ? BrokerShellHelperDefaults.FocusGuardianDefaultMode
+                    : focusGuardianMode.Trim());
+            command += " --focus-guardian-desired-focus " + ShellQuoteForDevice(
+                string.IsNullOrWhiteSpace(focusGuardianDesiredFocus)
+                    ? BrokerShellHelperDefaults.FocusGuardianDefaultDesiredFocus
+                    : focusGuardianDesiredFocus.Trim());
+            command += " --focus-guardian-duration-ms " + focusGuardianDurationMs.ToString(CultureInfo.InvariantCulture);
+            command += " --focus-guardian-interval-ms " + focusGuardianIntervalMs.ToString(CultureInfo.InvariantCulture);
+            command += " --focus-guardian-cooldown-ms " + focusGuardianCooldownMs.ToString(CultureInfo.InvariantCulture);
+            if (!string.IsNullOrWhiteSpace(focusTargetPackage))
+            {
+                command += " --focus-target-package " + ShellQuoteForDevice(focusTargetPackage.Trim());
+            }
+            if (!string.IsNullOrWhiteSpace(focusTargetActivity))
+            {
+                command += " --focus-target-activity " + ShellQuoteForDevice(focusTargetActivity.Trim());
+            }
+            if (!string.IsNullOrWhiteSpace(focusBrokerPackage))
+            {
+                command += " --focus-broker-package " + ShellQuoteForDevice(focusBrokerPackage.Trim());
+            }
+            if (!string.IsNullOrWhiteSpace(focusBrokerActivity))
+            {
+                command += " --focus-broker-activity " + ShellQuoteForDevice(focusBrokerActivity.Trim());
+            }
+        }
+        if (stopFocusGuardian)
+        {
+            command += " --stop-focus-guardian";
+        }
+        if ((proximityWatchdog && !stopProximityWatchdog) || (focusGuardian && !stopFocusGuardian))
+        {
+            var logPath = focusGuardian
+                ? BrokerShellHelperDefaults.FocusGuardianLogPath
+                : BrokerShellHelperDefaults.ProximityWatchdogLogPath;
             command = "sh -c " + ShellQuoteForDevice(
-                command + " > " + BrokerShellHelperDefaults.ProximityWatchdogLogPath + " 2>&1 &");
+                command + " > " + logPath + " 2>&1 &");
         }
 
         return command;
@@ -340,7 +411,18 @@ public sealed class BrokerShellHelperService
             normalized.StopProximityWatchdog,
             normalized.ProximityWatchdogDurationMs,
             normalized.ProximityWatchdogHoldDurationMs,
-            normalized.ProximityWatchdogIntervalMs);
+            normalized.ProximityWatchdogIntervalMs,
+            normalized.FocusGuardian,
+            normalized.StopFocusGuardian,
+            normalized.FocusGuardianMode,
+            normalized.FocusGuardianDesiredFocus,
+            normalized.FocusTargetPackage,
+            normalized.FocusTargetActivity,
+            normalized.FocusBrokerPackage,
+            normalized.FocusBrokerActivity,
+            normalized.FocusGuardianDurationMs,
+            normalized.FocusGuardianIntervalMs,
+            normalized.FocusGuardianCooldownMs);
         var launchResult = await _adbService
             .ShellAsync(normalized.Serial, shellCommand, cancellationToken)
             .ConfigureAwait(false);
@@ -602,6 +684,17 @@ public sealed record BrokerShellHelperRunOptions(
     int ProximityWatchdogDurationMs = BrokerShellHelperDefaults.ProximityWatchdogDefaultDurationMs,
     int ProximityWatchdogHoldDurationMs = BrokerShellHelperDefaults.ProximityWatchdogDefaultHoldDurationMs,
     int ProximityWatchdogIntervalMs = BrokerShellHelperDefaults.ProximityWatchdogDefaultIntervalMs,
+    bool FocusGuardian = false,
+    bool StopFocusGuardian = false,
+    string FocusGuardianMode = BrokerShellHelperDefaults.FocusGuardianDefaultMode,
+    string FocusGuardianDesiredFocus = BrokerShellHelperDefaults.FocusGuardianDefaultDesiredFocus,
+    string FocusTargetPackage = "",
+    string FocusTargetActivity = "",
+    string FocusBrokerPackage = BrokerShellHelperDefaults.FocusGuardianDefaultBrokerPackage,
+    string FocusBrokerActivity = BrokerShellHelperDefaults.FocusGuardianDefaultBrokerActivity,
+    int FocusGuardianDurationMs = BrokerShellHelperDefaults.FocusGuardianDefaultDurationMs,
+    int FocusGuardianIntervalMs = BrokerShellHelperDefaults.FocusGuardianDefaultIntervalMs,
+    int FocusGuardianCooldownMs = BrokerShellHelperDefaults.FocusGuardianDefaultCooldownMs,
     string? AndroidPlayerRoot = null)
 {
     public BrokerShellHelperRunOptions Normalize()
@@ -660,8 +753,48 @@ public sealed record BrokerShellHelperRunOptions(
                 : BrokerShellHelperDefaults.ProximityWatchdogDefaultHoldDurationMs,
             ProximityWatchdogIntervalMs = ProximityWatchdogIntervalMs is >= BrokerShellHelperDefaults.ProximityWatchdogMinIntervalMs and <= BrokerShellHelperDefaults.ProximityWatchdogMaxIntervalMs
                 ? ProximityWatchdogIntervalMs
-                : BrokerShellHelperDefaults.ProximityWatchdogDefaultIntervalMs
+                : BrokerShellHelperDefaults.ProximityWatchdogDefaultIntervalMs,
+            StopFocusGuardian = StopFocusGuardian || Disconnect,
+            FocusGuardianMode = NormalizeFocusGuardianMode(FocusGuardianMode),
+            FocusGuardianDesiredFocus = NormalizeFocusSide(FocusGuardianDesiredFocus),
+            FocusTargetPackage = (FocusTargetPackage ?? string.Empty).Trim(),
+            FocusTargetActivity = (FocusTargetActivity ?? string.Empty).Trim(),
+            FocusBrokerPackage = string.IsNullOrWhiteSpace(FocusBrokerPackage)
+                ? BrokerShellHelperDefaults.FocusGuardianDefaultBrokerPackage
+                : FocusBrokerPackage.Trim(),
+            FocusBrokerActivity = string.IsNullOrWhiteSpace(FocusBrokerActivity)
+                ? BrokerShellHelperDefaults.FocusGuardianDefaultBrokerActivity
+                : FocusBrokerActivity.Trim(),
+            FocusGuardianDurationMs = FocusGuardianDurationMs >= BrokerShellHelperDefaults.FocusGuardianMinIntervalMs
+                ? FocusGuardianDurationMs
+                : BrokerShellHelperDefaults.FocusGuardianDefaultDurationMs,
+            FocusGuardianIntervalMs = FocusGuardianIntervalMs is >= BrokerShellHelperDefaults.FocusGuardianMinIntervalMs and <= BrokerShellHelperDefaults.FocusGuardianMaxIntervalMs
+                ? FocusGuardianIntervalMs
+                : BrokerShellHelperDefaults.FocusGuardianDefaultIntervalMs,
+            FocusGuardianCooldownMs = FocusGuardianCooldownMs is >= BrokerShellHelperDefaults.FocusGuardianMinIntervalMs and <= BrokerShellHelperDefaults.FocusGuardianMaxIntervalMs
+                ? FocusGuardianCooldownMs
+                : BrokerShellHelperDefaults.FocusGuardianDefaultCooldownMs
         };
+    }
+
+    private static string NormalizeFocusGuardianMode(string? value)
+    {
+        var normalized = string.IsNullOrWhiteSpace(value)
+            ? BrokerShellHelperDefaults.FocusGuardianDefaultMode
+            : value.Trim().ToLowerInvariant();
+        return normalized is "off" or "observe" or "recover_target" or "recover_broker" or "toggle_broker_target" or "launch_target_guard" or "strict"
+            ? normalized
+            : BrokerShellHelperDefaults.FocusGuardianDefaultMode;
+    }
+
+    private static string NormalizeFocusSide(string? value)
+    {
+        var normalized = string.IsNullOrWhiteSpace(value)
+            ? BrokerShellHelperDefaults.FocusGuardianDefaultDesiredFocus
+            : value.Trim().ToLowerInvariant();
+        return normalized is "target" or "broker"
+            ? normalized
+            : BrokerShellHelperDefaults.FocusGuardianDefaultDesiredFocus;
     }
 }
 
