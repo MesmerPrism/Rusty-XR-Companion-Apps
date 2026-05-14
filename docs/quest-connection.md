@@ -7,6 +7,41 @@ nav_order: 3
 
 Rusty XR Companion uses ADB as the baseline Quest connection layer.
 
+## Prerequisites And Gates
+
+Keep three gates separate when diagnosing a connection:
+
+```text
+Developer Mode gate
+  the headset exposes ADB workflows only after Developer Mode is enabled
+
+ADB authorization gate
+  the user authorizes this Windows machine's ADB key in the headset prompt
+
+ADB transport gate
+  USB or Wi-Fi carries the already-authorized ADB session
+```
+
+For a normal retail Quest, enable Developer Mode through the supported Meta
+account/mobile-app flow before expecting ADB to appear. If Developer Mode is
+off, the headset may only charge over USB, may expose no ADB-class interface,
+and may never show the "Allow USB debugging" prompt.
+
+After Developer Mode is on, a new Windows machine still has to be authorized by
+accepting the headset debugging prompt. Once that host is authorized, Companion
+can install, launch, forward ports, run shell diagnostics, and enable Wi-Fi ADB
+from USB. The Meta developer account is not consulted for each ADB command, but
+the authorized ADB transport must be active.
+
+Wi-Fi ADB is not a first bootstrap path. It is a transport handoff for a
+working ADB relationship. Companion's **Enable Wi-Fi ADB From USB** action uses
+USB ADB first, asks the headset to listen on TCP port `5555`, reads the
+headset Wi-Fi address, and reconnects over TCP.
+
+A browser download or normal installed headset APK cannot enable Developer
+Mode, authorize this Windows machine, become Android `shell`, or turn on Wi-Fi
+ADB from a locked headset.
+
 The companion can install a managed LocalAppData copy of official Quest
 operator tooling:
 
@@ -59,6 +94,19 @@ dotnet run --project src/RustyXr.Companion.Cli -- connect --endpoint 192.168.1.2
 
 Then list devices again. If multiple devices are present, pass `--serial` for
 every action.
+
+If Wi-Fi ADB worked before but fails after a reboot, reconnect over USB and run
+the Wi-Fi enable flow again. Classic `adb tcpip` sessions commonly do not
+survive headset reboot or transport resets.
+
+## Troubleshooting Meaning
+
+| Symptom | Likely meaning |
+| --- | --- |
+| No device appears over USB | Developer Mode may be off, the cable may be charge-only, the headset may be asleep, or Windows driver/tooling selection may be wrong. |
+| Device appears as `unauthorized` | The headset prompt was denied, missed, or USB debugging authorizations were revoked. |
+| USB ADB works but Wi-Fi connect fails | Wrong headset IP, different network/subnet, port `5555` not listening, or local network/firewall routing issue. |
+| Shell helper status is absent | The broker is not running, the helper was not started by ADB, the helper exited, or the broker endpoint is not forwarded/visible. |
 
 ## Device Status
 
