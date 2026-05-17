@@ -44,7 +44,7 @@ public static class CompanionOperationSurface
                         Parameter("inputs", "object", required: false, "Operation inputs as a flat JSON object.", "{\"host\":\"127.0.0.1\"}"),
                         Parameter("allowSideEffects", "boolean", required: false, "Include the CLI opt-in flag for side-effecting operation plans.", "false")
                     },
-                    new[] { CompanionOperationPlanner.SchemaVersion },
+                    new[] { CompanionOperationPlanner.SchemaVersion, KioskCommandRunRecords.CommandRunRecordSchema },
                     "MCP servers should call the planner before executing side-effecting operations."),
                 new CompanionOperation(
                     "workspace.guide",
@@ -155,7 +155,7 @@ public static class CompanionOperationSurface
                         Parameter("host", "string", required: false, "Forwarded broker host.", "127.0.0.1"),
                         Parameter("port", "integer", required: false, "Forwarded broker HTTP port.", "8765")
                     },
-                    new[] { "BrokerStatusJson" }),
+                    new[] { "BrokerStatusJson", KioskCommandRunRecords.CommandRunRecordSchema }),
                 new CompanionOperation(
                     "broker.compare",
                     WindowsOwner,

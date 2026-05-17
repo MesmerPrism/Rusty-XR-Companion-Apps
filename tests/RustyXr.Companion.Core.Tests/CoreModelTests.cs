@@ -834,6 +834,13 @@ public sealed class CoreModelTests
         Assert.Equal(
             new[] { "broker", "status", "--host", "127.0.0.1", "--port", "8765", "--json" },
             plan.Arguments);
+        Assert.True(plan.KioskCommandRunRecordTemplate.HasValue);
+        Assert.Equal(
+            KioskCommandRunRecords.CommandRunRecordSchema,
+            plan.KioskCommandRunRecordTemplate.Value.GetProperty("schema").GetString());
+        Assert.Equal(
+            "NotStarted",
+            plan.KioskCommandRunRecordTemplate.Value.GetProperty("outcome").GetString());
     }
 
     [Fact]

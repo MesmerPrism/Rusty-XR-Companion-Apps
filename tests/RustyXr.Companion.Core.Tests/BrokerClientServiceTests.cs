@@ -83,6 +83,55 @@ public sealed class BrokerClientServiceTests
     }
 
     [Fact]
+    public void KioskCommandRunRecordWrapsBrokerStatusEvidence()
+    {
+        using var document = JsonDocument.Parse(
+            """
+            {
+              "type": "status",
+              "rustyKiosk": {
+                "schema": "rusty.xr.kiosk.control_plane.v1",
+                "phase": "BrokerPanel2d",
+                "surface_intent": "RustyKioskDefault",
+                "home_mode": "Normal2d",
+                "broker_available": true,
+                "broker_panel_visible": true,
+                "immersive_home_visible": false,
+                "shell_helper_connected": false,
+                "continuous_adb_shell_required": false,
+                "watchdog_required": false,
+                "focus_guardian_active": false,
+                "proximity_watchdog_active": false,
+                "meta_menu_active": false,
+                "meta_menu_entry_intentional": false,
+                "active_panel": "broker.home",
+                "foreground_package": "com.example.rustyxr.broker",
+                "foreground_activity": "com.example.rustyxr.broker.MainActivity",
+                "clock_epoch_id": "clock.epoch.test",
+                "latest_command": null,
+                "limitations": []
+              }
+            }
+            """);
+
+        var record = KioskCommandRunRecords.CreateBrokerStatusRecord(
+            new Uri("http://127.0.0.1:8765/status"),
+            document.RootElement,
+            DateTimeOffset.FromUnixTimeMilliseconds(1234),
+            "test-run");
+
+        Assert.Equal(KioskCommandRunRecords.CommandRunRecordSchema, record.GetProperty("schema").GetString());
+        Assert.Equal("test-run", record.GetProperty("run_id").GetString());
+        Assert.Equal("RustyKioskDefault", record.GetProperty("surface_intent").GetString());
+        Assert.Equal("Companion", record.GetProperty("primary").GetProperty("provider").GetString());
+        Assert.Equal("Broker", record.GetProperty("fallback").GetProperty("provider").GetString());
+        Assert.Equal(
+            "rusty.xr.kiosk.control_plane.v1",
+            record.GetProperty("status_after").GetProperty("schema").GetString());
+        Assert.Equal("Succeeded", record.GetProperty("outcome").GetString());
+    }
+
+    [Fact]
     public async Task QuestAdbServiceForwardsTcp()
     {
         var tempRoot = Path.Combine(Path.GetTempPath(), $"rusty-xr-adb-{Guid.NewGuid():N}");

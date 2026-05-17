@@ -64,7 +64,8 @@ public static class CompanionOperationPlanner
             normalizedInputs,
             warnings,
             operation.AndroidIntentAction,
-            operation.AndroidIntentComponent);
+            operation.AndroidIntentComponent,
+            KioskCommandRunRecords.CreatePlanTemplate(operation.Id, FormatCommand(command.Executable, command.Arguments)));
     }
 
     public static string ToMarkdown(CompanionOperationPlan plan)
@@ -105,6 +106,13 @@ public static class CompanionOperationPlanner
             {
                 builder.AppendLine($"- {warning}");
             }
+        }
+
+        if (plan.KioskCommandRunRecordTemplate.HasValue)
+        {
+            builder.AppendLine();
+            builder.AppendLine("Run record:");
+            builder.AppendLine($"- `{KioskCommandRunRecords.CommandRunRecordSchema}` template will be emitted by the execution path.");
         }
 
         return builder.ToString().TrimEnd();
@@ -463,4 +471,5 @@ public sealed record CompanionOperationPlan(
     IReadOnlyDictionary<string, string> Inputs,
     IReadOnlyList<string> Warnings,
     string? AndroidIntentAction,
-    string? AndroidIntentComponent);
+    string? AndroidIntentComponent,
+    JsonElement? KioskCommandRunRecordTemplate);

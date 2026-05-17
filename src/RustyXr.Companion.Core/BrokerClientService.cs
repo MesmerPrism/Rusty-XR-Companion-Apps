@@ -123,23 +123,32 @@ public sealed class BrokerClientService
         using var response = await _httpClient.GetAsync(statusUri, cancellationToken).ConfigureAwait(false);
         var raw = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
-        return new BrokerStatusProbeResult(statusUri, ParseElement(raw), DateTimeOffset.Now);
+        var receivedAt = DateTimeOffset.Now;
+        var status = ParseElement(raw);
+        return new BrokerStatusProbeResult(
+            statusUri,
+            status,
+            receivedAt,
+            KioskCommandRunRecords.CreateBrokerStatusRecord(statusUri, status, receivedAt));
     }
 
-    public Task<BrokerWebSocketProbeResult> SendCommandAsync(
+    public async Task<BrokerWebSocketProbeResult> SendCommandAsync(
         Uri eventsUri,
         BrokerCommandRequest request,
         TimeSpan listenDuration,
         int maxMessages = 16,
         TimeSpan? replyTimeout = null,
-        CancellationToken cancellationToken = default) =>
-        SendMessagesAsync(
+        CancellationToken cancellationToken = default)
+    {
+        var result = await SendMessagesAsync(
             eventsUri,
             [new BrokerWebSocketOutboundMessage("command", BuildCommandPayload(request))],
             listenDuration,
             maxMessages,
             replyTimeout,
-            cancellationToken);
+            cancellationToken).ConfigureAwait(false);
+        return result with { KioskCommandRunRecord = KioskCommandRunRecords.TryCreateFromBrokerCommand(request, result) };
+    }
 
     public Task<BrokerWebSocketProbeResult> SendLatencySampleAsync(
         Uri eventsUri,
@@ -358,7 +367,8 @@ public sealed record BrokerLatencySampleRequest(
 public sealed record BrokerStatusProbeResult(
     Uri Url,
     JsonElement Status,
-    DateTimeOffset ReceivedAt);
+    DateTimeOffset ReceivedAt,
+    JsonElement KioskCommandRunRecord);
 
 public sealed record BrokerWebSocketOutboundMessage(
     string Label,
@@ -381,7 +391,8 @@ public sealed record BrokerWebSocketProbeResult(
     IReadOnlyList<BrokerWebSocketOutboundMessage> SentMessages,
     IReadOnlyList<BrokerWebSocketReceivedMessage> ReceivedMessages,
     DateTimeOffset StartedAt,
-    DateTimeOffset CompletedAt)
+    DateTimeOffset CompletedAt,
+    JsonElement? KioskCommandRunRecord = null)
 {
     public bool HasAcceptedAck => ReceivedMessages.Any(static message =>
         message.Payload.ValueKind == JsonValueKind.Object &&

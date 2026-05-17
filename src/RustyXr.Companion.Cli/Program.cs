@@ -649,7 +649,7 @@ internal static class CliProgram
         var port = ParsePort(options, "--port", BrokerClientService.DefaultPort);
         var uri = BrokerClientService.CreateStatusUri(options.ValueOrNull("--url"), options.ValueOrNull("--host"), port);
         var result = await new BrokerClientService().GetStatusAsync(uri).ConfigureAwait(false);
-        WriteObject(result.Status, json: true);
+        WriteObject(result, json: true);
         return 0;
     }
 
