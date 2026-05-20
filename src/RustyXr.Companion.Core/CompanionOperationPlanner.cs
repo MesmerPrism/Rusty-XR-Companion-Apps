@@ -195,6 +195,13 @@ public static class CompanionOperationPlanner
                 Add(arguments, "--json");
                 break;
 
+            case "polar.bridge_plan":
+                Add(arguments, "polar", "plan");
+                AddOption(arguments, "--profile", ValueOrNull(inputs, "profile"));
+                AddOption(arguments, "--out", ValueOrNull(inputs, "out"));
+                Add(arguments, "--json");
+                break;
+
             case "broker.h264_proxy_probe":
                 Add(arguments, "broker", "h264-proxy-probe");
                 AddOption(arguments, "--serial", ValueOrNull(inputs, "serial"));

@@ -795,6 +795,7 @@ public sealed class CoreModelTests
         Assert.Contains(catalog.Operations, operation => operation.Id == "android.agent_command");
         Assert.Contains(catalog.Operations, operation => operation.Id == "broker.h264_proxy_probe");
         Assert.Contains(catalog.Operations, operation => operation.Id == "broker.h264_proxy_start");
+        Assert.Contains(catalog.Operations, operation => operation.Id == "polar.bridge_plan");
         Assert.All(catalog.Operations, operation =>
         {
             Assert.StartsWith("rusty_xr_", operation.McpToolName, StringComparison.Ordinal);
@@ -943,6 +944,24 @@ public sealed class CoreModelTests
                 "--json"
             },
             start.Arguments);
+    }
+
+    [Fact]
+    public void CompanionOperationPlannerBuildsPolarBridgePlanCommand()
+    {
+        var plan = CompanionOperationPlanner.CreatePlan(
+            "polar.bridge_plan",
+            new Dictionary<string, string>
+            {
+                ["profile"] = "pc-owned-pmd",
+                ["out"] = ".\\artifacts\\polar-bridge"
+            },
+            allowSideEffects: true);
+
+        Assert.True(plan.Allowed);
+        Assert.Equal(
+            new[] { "polar", "plan", "--profile", "pc-owned-pmd", "--out", ".\\artifacts\\polar-bridge", "--json" },
+            plan.Arguments);
     }
 
     [Fact]

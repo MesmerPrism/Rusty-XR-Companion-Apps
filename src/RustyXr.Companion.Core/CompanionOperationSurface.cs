@@ -175,6 +175,22 @@ public static class CompanionOperationSurface
                     },
                     new[] { "BrokerComparisonReport" }),
                 new CompanionOperation(
+                    "polar.bridge_plan",
+                    WindowsOwner,
+                    "Polar bridge plan",
+                    "Builds a device-free plan for Polar H10 to broker comparison profiles, including PMD ownership, transport options, and timing gates.",
+                    "PolarBridgePlanningService.Build",
+                    "polar plan [--profile <id>] [--out <folder>] --json",
+                    "rusty_xr_polar_bridge_plan",
+                    "local-read-write",
+                    new[]
+                    {
+                        Parameter("profile", "string", required: false, "Optional profile id to select.", "pc-owned-pmd"),
+                        Parameter("out", "path", required: false, "Folder for JSON and Markdown plan files.", ".\\artifacts\\polar-bridge")
+                    },
+                    new[] { PolarBridgePlanningService.SchemaVersion },
+                    "Omit out for stdout-only planning. Live capture is a separate explicit device action."),
+                new CompanionOperation(
                     "broker.h264_proxy_probe",
                     WindowsOwner,
                     "Broker H.264 TCP proxy probe",

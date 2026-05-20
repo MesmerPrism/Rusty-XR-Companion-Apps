@@ -51,6 +51,7 @@ internal static class CliProgram
                 "media" => await MediaAsync(args.Skip(1).ToArray()).ConfigureAwait(false),
                 "osc" => await OscAsync(args.Skip(1).ToArray()).ConfigureAwait(false),
                 "lsl" => await LslAsync(args.Skip(1).ToArray()).ConfigureAwait(false),
+                "polar" => Polar(args.Skip(1).ToArray()),
                 "broker" => await BrokerAsync(args.Skip(1).ToArray()).ConfigureAwait(false),
                 "tooling" => await ToolingAsync(args.Skip(1).ToArray()).ConfigureAwait(false),
                 "catalog" => await CatalogAsync(args.Skip(1).ToArray()).ConfigureAwait(false),
@@ -612,6 +613,37 @@ internal static class CliProgram
 
         WriteObject(report, options.Has("--json"));
         return report.Succeeded ? 0 : 2;
+    }
+
+    private static int Polar(string[] args)
+    {
+        if (args.Length == 0)
+        {
+            return Fail("Use: polar <plan> [options]");
+        }
+
+        var subcommand = args[0].ToLowerInvariant();
+        var options = ArgOptions.Parse(args.Skip(1));
+        return subcommand switch
+        {
+            "plan" => PolarPlan(options),
+            _ => Fail("Use: polar <plan> [options]")
+        };
+    }
+
+    private static int PolarPlan(ArgOptions options)
+    {
+        var plan = new PolarBridgePlanningService()
+            .Build(new PolarBridgePlanOptions(options.ValueOrNull("--profile")));
+
+        if (options.TryGet("--out", out var outputRoot))
+        {
+            var folder = PolarBridgePlanWriter.Write(plan, outputRoot);
+            Console.Error.WriteLine($"Polar bridge plan bundle written to {folder}");
+        }
+
+        WriteObject(plan, options.Has("--json"));
+        return plan.Profiles.Count > 0 ? 0 : 2;
     }
 
     private static async Task<int> BrokerForwardAsync(ArgOptions options)
@@ -2543,6 +2575,7 @@ internal static class CliProgram
           lsl runtime [--lsl-dll <path>] [--json]
           lsl loopback [--lsl-dll <path>] [--count <n>] [--interval-ms <n>] [--warmup-ms <n>] [--out <folder>] [--no-pdf] [--json]
           lsl broker-roundtrip [--serial <serial>] [--lsl-dll <path>] [--count <n>] [--interval-ms <n>] [--warmup-ms <n>] [--out <folder>] [--no-pdf] [--json]
+          polar plan [--profile <id>] [--out <folder>] [--json]
           broker forward --serial <serial> [--host-port <n>] [--device-port <n>] [--json]
           broker status [--host 127.0.0.1] [--port <n>] [--url <http-url>] [--json]
           broker command --command <status|capabilities|streams|subscribe|unsubscribe|name> [--stream <id>] [--host 127.0.0.1] [--port <n>] [--url <ws-url>] [--listen-ms <n>] [--json]

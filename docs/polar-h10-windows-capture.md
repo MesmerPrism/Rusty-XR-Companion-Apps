@@ -37,6 +37,33 @@ For direct-vs-mediated Quest comparisons, prefer one of these designs:
 - Two sensors are used when a true same-time raw ACC or ECG comparison is
   required.
 
+## Bridge Planning Command
+
+Use the portable CLI planner before a live capture to choose the PMD owner,
+transport options, and timing evidence to collect:
+
+```powershell
+dotnet run --project src/RustyXr.Companion.Cli -- polar plan --json
+dotnet run --project src/RustyXr.Companion.Cli -- polar plan --profile pc-owned-pmd --out .\artifacts\polar-bridge --json
+```
+
+The planner is device-free. It does not open Bluetooth, ADB, LSL, OSC, or
+ZeroMQ sockets; it only writes JSON and Markdown planning artifacts. Current
+profiles are:
+
+- `pc-owned-pmd`: Windows owns Polar PMD and forwards to the Quest broker over
+  LSL, OSC, or ZeroMQ-style bridge transports.
+- `quest-owned-pmd`: the Quest broker owns Polar PMD and relays timestamped
+  records back to the PC for plotting.
+- `hr-rr-dual-receiver`: both PC and Quest receive standard HR/RR while PMD is
+  disabled.
+- `two-sensor-raw-compare`: two sensors provide independent raw PMD streams for
+  direct and mediated comparison.
+
+For a single H10, do not label PC and Quest as simultaneous PMD owners. Run the
+LSL broker round-trip probe alongside live captures when a headset is available
+so plots can annotate clock offset and round-trip stability.
+
 ## Public Boundary
 
 Keep raw capture artifacts, local run paths, study identifiers, and private
