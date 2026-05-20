@@ -115,8 +115,15 @@ proximity after a system-service crash or Horizon OS restart, read
 `dumpsys vrpowermanager` first. A retained event log with no
 `automation_disable` command but a fresh `setInitialState` entry indicates that
 the virtual keep-awake override was lost when the service restarted. Reapply
-**Proximity Off / Keep Awake** or use `hzdb proximity keep-awake`; the WPF app's
-auto-refresh will preserve the hold after it has observed or requested one.
+**Proximity Off / Keep Awake** or use `hzdb proximity keep-awake`. The WPF
+app's normal auto-refresh is passive; its active watchdog preserves the hold
+only when the app requested **Wake** or **Proximity Off / Keep Awake**, or when
+an app-owned restore is already active. A passive status readback of
+`Virtual proximity state: CLOSE` is displayed as an observed hold and is not
+treated as permission to reapply it later. For autonomous camera sessions that
+need power reinforcement too, start the shell helper with
+`--proximity-watchdog --proximity-watchdog-until-stopped --proximity-watchdog-ensure-stay-awake`
+and stop it explicitly before restoring normal proximity.
 
 ## Setup Helper Is Blocked
 

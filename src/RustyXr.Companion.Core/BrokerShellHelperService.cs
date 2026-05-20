@@ -108,6 +108,8 @@ public sealed class BrokerShellHelperService
         int screenrecordTimeLimitSeconds = BrokerShellHelperDefaults.ScreenrecordDefaultTimeLimitSeconds,
         bool proximityWatchdog = false,
         bool stopProximityWatchdog = false,
+        bool proximityWatchdogUntilStopped = false,
+        bool proximityWatchdogEnsureStayAwake = false,
         int proximityWatchdogDurationMs = BrokerShellHelperDefaults.ProximityWatchdogDefaultDurationMs,
         int proximityWatchdogHoldDurationMs = BrokerShellHelperDefaults.ProximityWatchdogDefaultHoldDurationMs,
         int proximityWatchdogIntervalMs = BrokerShellHelperDefaults.ProximityWatchdogDefaultIntervalMs,
@@ -270,6 +272,14 @@ public sealed class BrokerShellHelperService
             command += " --proximity-watchdog-duration-ms " + proximityWatchdogDurationMs.ToString(CultureInfo.InvariantCulture);
             command += " --proximity-watchdog-hold-duration-ms " + proximityWatchdogHoldDurationMs.ToString(CultureInfo.InvariantCulture);
             command += " --proximity-watchdog-interval-ms " + proximityWatchdogIntervalMs.ToString(CultureInfo.InvariantCulture);
+            if (proximityWatchdogUntilStopped)
+            {
+                command += " --proximity-watchdog-until-stopped";
+            }
+            if (proximityWatchdogEnsureStayAwake)
+            {
+                command += " --proximity-watchdog-ensure-stay-awake";
+            }
         }
         if (stopProximityWatchdog)
         {
@@ -409,6 +419,8 @@ public sealed class BrokerShellHelperService
             normalized.ScreenrecordTimeLimitSeconds,
             normalized.ProximityWatchdog,
             normalized.StopProximityWatchdog,
+            normalized.ProximityWatchdogUntilStopped,
+            normalized.ProximityWatchdogEnsureStayAwake,
             normalized.ProximityWatchdogDurationMs,
             normalized.ProximityWatchdogHoldDurationMs,
             normalized.ProximityWatchdogIntervalMs,
@@ -681,6 +693,8 @@ public sealed record BrokerShellHelperRunOptions(
     int ScreenrecordTimeLimitSeconds = BrokerShellHelperDefaults.ScreenrecordDefaultTimeLimitSeconds,
     bool ProximityWatchdog = false,
     bool StopProximityWatchdog = false,
+    bool ProximityWatchdogUntilStopped = false,
+    bool ProximityWatchdogEnsureStayAwake = false,
     int ProximityWatchdogDurationMs = BrokerShellHelperDefaults.ProximityWatchdogDefaultDurationMs,
     int ProximityWatchdogHoldDurationMs = BrokerShellHelperDefaults.ProximityWatchdogDefaultHoldDurationMs,
     int ProximityWatchdogIntervalMs = BrokerShellHelperDefaults.ProximityWatchdogDefaultIntervalMs,

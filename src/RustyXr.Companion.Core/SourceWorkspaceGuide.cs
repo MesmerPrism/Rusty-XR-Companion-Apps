@@ -163,9 +163,9 @@ public static class SourceWorkspaceGuide
                 @"dotnet run --project .\src\RustyXr.Companion.Cli -- broker shell-helper binary-probe --serial <serial> --rusty-xr-root ..\Rusty-XR --screenrecord-source --encoded-video-width 320 --encoded-video-height 180 --encoded-video-bitrate 500000 --screenrecord-time-limit 1 --payload-out .\artifacts\broker-shell-helper\screenrecord.h264 --json"),
             new SourceWorkspaceCommand(
                 "start-broker-shell-helper-proximity-watchdog",
-                "Start the optional ADB shell helper proximity watchdog for autonomous Quest sessions.",
+                "Start the optional ADB shell helper awake/proximity watchdog for autonomous Quest sessions.",
                 companionPath,
-                @"dotnet run --project .\src\RustyXr.Companion.Cli -- broker shell-helper start --serial <serial> --rusty-xr-root ..\Rusty-XR --proximity-watchdog --json"),
+                @"dotnet run --project .\src\RustyXr.Companion.Cli -- broker shell-helper start --serial <serial> --rusty-xr-root ..\Rusty-XR --proximity-watchdog --proximity-watchdog-until-stopped --proximity-watchdog-ensure-stay-awake --json"),
             new SourceWorkspaceCommand(
                 "probe-broker-app-camera-luma",
                 "Forward, start, receive, and save a bounded broker app-context Camera2 raw-luma side-channel probe.",

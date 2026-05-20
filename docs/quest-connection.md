@@ -152,22 +152,28 @@ dotnet run --project src/RustyXr.Companion.Cli -- hzdb proximity normal --serial
 The wake helper treats wake and keep-awake as linked operations for off-face
 development. `hzdb wake` first sends the Meta wake request, then applies a
 keep-awake hold so the headset does not immediately fall back into a limbo or
-standby state. In the WPF app, snapshot auto-refresh also remembers an active
-keep-awake hold and reapplies it if a Horizon OS service restart or other
-device-side reset drops `Virtual proximity state` back to `DISABLED` before the
-expected hold expiry. While a hold is expected, the snapshot timer uses a short
-watchdog interval instead of the normal background refresh cadence. Click
-**Proximity On / Normal** when you want the app to stop preserving that hold.
+standby state. In the WPF app, normal snapshot auto-refresh is a passive
+watcher. It observes wake/proximity state and never adopts a passive
+`Virtual proximity state: CLOSE` as policy. The active keep-awake watchdog
+starts only when the app itself requests **Wake** or **Proximity Off / Keep
+Awake**, or when an earlier app-owned watchdog restore is still active. While
+that watchdog is active, the snapshot timer uses a short interval and reapplies
+the operator-requested hold until **Proximity On / Normal** or **Sleep** turns
+it off. Turning normal auto-refresh off does not disable an active watchdog;
+the watchdog is stopped only by the explicit normal/sleep actions.
 
 For broker workflows that already start the optional ADB shell helper, the
 helper can run an additional shell-side proximity watchdog:
 
 ```powershell
-dotnet run --project src\RustyXr.Companion.Cli -- broker shell-helper start --serial <serial> --rusty-xr-root ..\Rusty-XR --proximity-watchdog --json
+dotnet run --project src\RustyXr.Companion.Cli -- broker shell-helper start --serial <serial> --rusty-xr-root ..\Rusty-XR --proximity-watchdog --proximity-watchdog-until-stopped --proximity-watchdog-ensure-stay-awake --json
 dotnet run --project src\RustyXr.Companion.Cli -- broker shell-helper stop --serial <serial> --rusty-xr-root ..\Rusty-XR --no-build --json
 ```
 
 The shell-side and WPF watchdogs are designed to be idempotent. Both preserve
 `Virtual proximity state: CLOSE`, and neither sends normal-proximity
-`automation_disable` while preserving a hold. Stop the shell helper before
-intentionally restoring normal wear-sensor behavior.
+`automation_disable` while preserving a hold. With
+`--proximity-watchdog-ensure-stay-awake`, the shell helper also reinforces the
+power side of camera availability by reapplying `svc power stayon true` and
+issuing `KEYCODE_WAKEUP` when power readback drifts. Stop the shell helper
+before intentionally restoring normal wear-sensor behavior.

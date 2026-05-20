@@ -567,6 +567,25 @@ public sealed class CoreModelTests
     }
 
     [Fact]
+    public void BrokerShellHelperCommandBuildsManualStopAwakeWatchdog()
+    {
+        var command = BrokerShellHelperService.BuildAppProcessShellCommand(
+            BrokerShellHelperDefaults.DeviceJarPath,
+            "127.0.0.1",
+            BrokerClientService.DefaultPort,
+            disconnect: false,
+            proximityWatchdog: true,
+            proximityWatchdogUntilStopped: true,
+            proximityWatchdogEnsureStayAwake: true);
+
+        Assert.StartsWith("sh -c ", command, StringComparison.Ordinal);
+        Assert.Contains("--proximity-watchdog", command, StringComparison.Ordinal);
+        Assert.Contains("--proximity-watchdog-until-stopped", command, StringComparison.Ordinal);
+        Assert.Contains("--proximity-watchdog-ensure-stay-awake", command, StringComparison.Ordinal);
+        Assert.Contains(BrokerShellHelperDefaults.ProximityWatchdogLogPath, command, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void BrokerShellHelperCommandBuildsBackgroundFocusGuardian()
     {
         var command = BrokerShellHelperService.BuildAppProcessShellCommand(

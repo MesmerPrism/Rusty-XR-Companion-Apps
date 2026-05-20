@@ -60,6 +60,7 @@ public sealed class MainViewModel : ObservableObject
     private QuestProximityStatus? _currentProximityStatus;
     private string? _expectedProximityHoldSerial;
     private DateTimeOffset? _expectedProximityHoldUntil;
+    private bool _proximityWatchdogEnabled;
     private bool _proximityRestoreInFlight;
     private string _selectedSerial = string.Empty;
     private string _endpoint = "192.168.1.2:5555";
@@ -296,7 +297,11 @@ public sealed class MainViewModel : ObservableObject
         }
     }
 
-    public string SnapshotRefreshModeLabel => SnapshotAutoRefreshEnabled ? "Auto refresh on" : "Auto refresh off";
+    public string SnapshotRefreshModeLabel => HasActiveExpectedProximityHold()
+        ? "Watchdog active"
+        : SnapshotAutoRefreshEnabled
+            ? "Auto refresh on"
+            : "Auto refresh off";
 
     public string HeaderPowerActionToolTip =>
         _currentSnapshot?.IsAwake == true
@@ -304,9 +309,9 @@ public sealed class MainViewModel : ObservableObject
             : "Request headset wake";
 
     public string HeaderProximityActionToolTip =>
-        _currentProximityStatus?.HoldActive == true
-            ? "Restore normal proximity behavior"
-            : "Request keep-awake proximity hold";
+        _currentProximityStatus?.HoldActive == true || HasActiveExpectedProximityHold()
+            ? "Stop keep-awake watchdog and restore normal proximity behavior"
+            : "Start keep-awake watchdog";
 
     public string SelectedSerial
     {
@@ -1239,6 +1244,17 @@ public sealed class MainViewModel : ObservableObject
                     : requestSleep
                         ? "Sleep request sent."
                         : "Wake request sent.");
+                if (result.Succeeded)
+                {
+                    if (requestSleep)
+                    {
+                        ClearExpectedProximityHold();
+                    }
+                    else
+                    {
+                        StartProximityWatchdog(SelectedSerial, DateTimeOffset.Now.Add(DefaultProximityRestoreDuration));
+                    }
+                }
                 await RefreshSnapshotCoreAsync().ConfigureAwait(true);
             }).ConfigureAwait(true);
 
@@ -1259,7 +1275,7 @@ public sealed class MainViewModel : ObservableObject
                 : "Disabling wear sensor for keep-awake...",
             async () =>
             {
-                var durationMs = int.TryParse(ProximityDurationMs, out var parsedDuration) ? parsedDuration : 28_800_000;
+                var durationMs = ParseProximityDurationMilliseconds();
                 var result = await _hzdbService
                     .SetProximityAsync(SelectedSerial, enableNormalProximity, enableNormalProximity ? null : durationMs)
                     .ConfigureAwait(true);
@@ -1271,7 +1287,7 @@ public sealed class MainViewModel : ObservableObject
                     }
                     else
                     {
-                        RememberExpectedProximityHold(SelectedSerial, DateTimeOffset.Now.AddMilliseconds(durationMs));
+                        StartProximityWatchdog(SelectedSerial, DateTimeOffset.Now.AddMilliseconds(durationMs));
                     }
                 }
                 AddLog(result.CondensedOutput.Length > 0
@@ -1497,10 +1513,15 @@ public sealed class MainViewModel : ObservableObject
 
         if (status.HoldActive)
         {
-            RememberExpectedProximityHold(
-                SelectedSerial,
-                status.HoldUntil ?? DateTimeOffset.Now.Add(DefaultProximityRestoreDuration));
-            HeaderProximityStatus = "Proximity keep-awake";
+            if (IsSelectedSerialExpectedProximityHold())
+            {
+                UpdateExpectedProximityHold(
+                    SelectedSerial,
+                    status.HoldUntil ?? _expectedProximityHoldUntil ?? DateTimeOffset.Now.Add(DefaultProximityRestoreDuration));
+            }
+            HeaderProximityStatus = _proximityWatchdogEnabled && IsSelectedSerialExpectedProximityHold()
+                ? "Proximity watchdog"
+                : "Proximity hold observed";
             HeaderProximityStatusColor = StatusOkColor;
             OnPropertyChanged(nameof(HeaderProximityActionToolTip));
             return;
@@ -1522,7 +1543,18 @@ public sealed class MainViewModel : ObservableObject
         OnPropertyChanged(nameof(HeaderProximityActionToolTip));
     }
 
-    private void RememberExpectedProximityHold(string serial, DateTimeOffset holdUntil)
+    private void StartProximityWatchdog(string serial, DateTimeOffset holdUntil)
+    {
+        UpdateExpectedProximityHold(serial, holdUntil);
+        if (!string.IsNullOrWhiteSpace(_expectedProximityHoldSerial))
+        {
+            _proximityWatchdogEnabled = true;
+            OnPropertyChanged(nameof(SnapshotRefreshModeLabel));
+            OnPropertyChanged(nameof(HeaderProximityActionToolTip));
+        }
+    }
+
+    private void UpdateExpectedProximityHold(string serial, DateTimeOffset holdUntil)
     {
         if (string.IsNullOrWhiteSpace(serial))
         {
@@ -1537,6 +1569,9 @@ public sealed class MainViewModel : ObservableObject
     {
         _expectedProximityHoldSerial = null;
         _expectedProximityHoldUntil = null;
+        _proximityWatchdogEnabled = false;
+        OnPropertyChanged(nameof(SnapshotRefreshModeLabel));
+        OnPropertyChanged(nameof(HeaderProximityActionToolTip));
     }
 
     private bool ShouldRestoreExpectedProximityHold(QuestProximityStatus status)
@@ -1544,17 +1579,11 @@ public sealed class MainViewModel : ObservableObject
         if (_proximityRestoreInFlight ||
             !status.Available ||
             status.HoldActive ||
+            !_proximityWatchdogEnabled ||
             string.IsNullOrWhiteSpace(SelectedSerial) ||
             string.IsNullOrWhiteSpace(_expectedProximityHoldSerial) ||
             !string.Equals(SelectedSerial, _expectedProximityHoldSerial, StringComparison.OrdinalIgnoreCase))
         {
-            return false;
-        }
-
-        var now = DateTimeOffset.Now;
-        if (_expectedProximityHoldUntil is not { } holdUntil || holdUntil <= now)
-        {
-            ClearExpectedProximityHold();
             return false;
         }
 
@@ -1563,6 +1592,11 @@ public sealed class MainViewModel : ObservableObject
 
     private bool HasActiveExpectedProximityHold()
     {
+        return _proximityWatchdogEnabled && IsSelectedSerialExpectedProximityHold();
+    }
+
+    private bool IsSelectedSerialExpectedProximityHold()
+    {
         if (string.IsNullOrWhiteSpace(SelectedSerial) ||
             string.IsNullOrWhiteSpace(_expectedProximityHoldSerial) ||
             !string.Equals(SelectedSerial, _expectedProximityHoldSerial, StringComparison.OrdinalIgnoreCase))
@@ -1570,37 +1604,28 @@ public sealed class MainViewModel : ObservableObject
             return false;
         }
 
-        if (_expectedProximityHoldUntil is not { } holdUntil)
-        {
-            return false;
-        }
-
-        if (holdUntil > DateTimeOffset.Now)
-        {
-            return true;
-        }
-
-        ClearExpectedProximityHold();
-        return false;
+        return true;
     }
 
     private async Task RestoreExpectedProximityHoldAsync()
     {
         if (_proximityRestoreInFlight ||
+            !_proximityWatchdogEnabled ||
             string.IsNullOrWhiteSpace(_expectedProximityHoldSerial) ||
-            _expectedProximityHoldUntil is not { } holdUntil)
+            !IsSelectedSerialExpectedProximityHold())
         {
             return;
         }
 
         var now = DateTimeOffset.Now;
-        if (holdUntil <= now)
+        var holdUntil = _expectedProximityHoldUntil ?? now;
+        var duration = holdUntil > now
+            ? holdUntil - now
+            : TimeSpan.FromMilliseconds(ParseProximityDurationMilliseconds());
+        if (duration < MinimumProximityRestoreDuration)
         {
-            ClearExpectedProximityHold();
-            return;
+            duration = TimeSpan.FromMilliseconds(ParseProximityDurationMilliseconds());
         }
-
-        var duration = holdUntil - now;
         if (duration < MinimumProximityRestoreDuration)
         {
             duration = MinimumProximityRestoreDuration;
@@ -1617,7 +1642,7 @@ public sealed class MainViewModel : ObservableObject
                 .ConfigureAwait(true);
             if (result.Succeeded)
             {
-                RememberExpectedProximityHold(serial, DateTimeOffset.Now.AddMilliseconds(durationMs));
+                StartProximityWatchdog(serial, DateTimeOffset.Now.AddMilliseconds(durationMs));
                 AddLog(result.CondensedOutput.Length > 0
                     ? result.CondensedOutput
                     : $"Keep-awake proximity hold reapplied for {durationMs} ms.");
@@ -1683,14 +1708,15 @@ public sealed class MainViewModel : ObservableObject
     private async Task OnSnapshotTimerTickAsync()
     {
         UpdateSnapshotFreshness();
-        if (!SnapshotAutoRefreshEnabled || !HasSerial() || _snapshotRefreshInFlight)
+        var activeWatchdog = HasActiveExpectedProximityHold();
+        if ((!SnapshotAutoRefreshEnabled && !activeWatchdog) || !HasSerial() || _snapshotRefreshInFlight)
         {
             return;
         }
 
         var now = DateTimeOffset.Now;
         var lastActivity = _lastSnapshotAt ?? _lastSnapshotAttemptAt;
-        var refreshInterval = HasActiveExpectedProximityHold()
+        var refreshInterval = activeWatchdog
             ? ProximityWatchdogSnapshotInterval
             : AutoSnapshotInterval;
         if (lastActivity is not null && now - lastActivity.Value < refreshInterval)
@@ -1947,6 +1973,17 @@ public sealed class MainViewModel : ObservableObject
         };
 
         return string.Join("; ", parts.Where(static part => !string.IsNullOrWhiteSpace(part)));
+    }
+
+    private int ParseProximityDurationMilliseconds()
+    {
+        if (!int.TryParse(ProximityDurationMs, out var parsedDuration) ||
+            parsedDuration < (int)MinimumProximityRestoreDuration.TotalMilliseconds)
+        {
+            return (int)DefaultProximityRestoreDuration.TotalMilliseconds;
+        }
+
+        return parsedDuration;
     }
 
     private static string FormatMilliseconds(int? milliseconds)
