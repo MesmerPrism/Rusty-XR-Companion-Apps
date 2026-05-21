@@ -11,14 +11,19 @@ dependency.
 
 - connect to a Polar H10 by Bluetooth address;
 - read battery metadata when available;
-- subscribe to standard heart-rate and RR notifications;
-- start Polar PMD accelerometer streaming at 200 Hz, 16 bit, 8 g;
+- optionally subscribe to standard heart-rate and RR notifications;
+- optionally start Polar PMD accelerometer streaming at 200 Hz, 16 bit, 8 g;
 - write newline-delimited JSON records for sessions, battery, HR/RR, PMD
   control responses, ACC frames, and malformed frames;
 - stop the PMD stream during cleanup where the device still accepts the command.
 
 The JSONL output is intended as a local witness format for bridge and plotting
 tools. It is not a stable public data interchange contract yet.
+
+`PolarH10WindowsCaptureOptions` exposes `IncludeHeartRate` and `IncludePmdAcc`
+so capture tools can run HR/RR-only, PMD-only, or combined Windows sessions. PMD
+is still explicit at the call site even when a command defaults to the legacy
+combined capture behavior.
 
 ## PMD Ownership
 
