@@ -37,6 +37,19 @@ public sealed class BrokerShellHelperServiceTests
     }
 
     [Fact]
+    public void AppProcessCommandCanDisableBrokerReport()
+    {
+        var command = BrokerShellHelperService.BuildAppProcessShellCommand(
+            BrokerShellHelperDefaults.DeviceJarPath,
+            "127.0.0.1",
+            8765,
+            disconnect: false,
+            noBrokerReport: true);
+
+        Assert.Contains("--no-broker-report", command);
+    }
+
+    [Fact]
     public void AppProcessCommandCanRequestCodecProbe()
     {
         var command = BrokerShellHelperService.BuildAppProcessShellCommand(

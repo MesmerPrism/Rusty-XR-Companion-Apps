@@ -123,7 +123,8 @@ public sealed class BrokerShellHelperService
         string? focusBrokerActivity = null,
         int focusGuardianDurationMs = BrokerShellHelperDefaults.FocusGuardianDefaultDurationMs,
         int focusGuardianIntervalMs = BrokerShellHelperDefaults.FocusGuardianDefaultIntervalMs,
-        int focusGuardianCooldownMs = BrokerShellHelperDefaults.FocusGuardianDefaultCooldownMs)
+        int focusGuardianCooldownMs = BrokerShellHelperDefaults.FocusGuardianDefaultCooldownMs,
+        bool noBrokerReport = false)
     {
         if (string.IsNullOrWhiteSpace(deviceJarPath) || !deviceJarPath.StartsWith("/", StringComparison.Ordinal))
         {
@@ -199,6 +200,10 @@ public sealed class BrokerShellHelperService
             $"CLASSPATH={deviceJarPath} app_process / {BrokerShellHelperDefaults.HelperMainClass} " +
             $"--broker-host {ShellQuoteForDevice(brokerHost)} " +
             $"--broker-port {brokerPort.ToString(CultureInfo.InvariantCulture)}";
+        if (noBrokerReport)
+        {
+            command += " --no-broker-report";
+        }
         if (disconnect)
         {
             command += " --disconnect";
@@ -434,7 +439,8 @@ public sealed class BrokerShellHelperService
             normalized.FocusBrokerActivity,
             normalized.FocusGuardianDurationMs,
             normalized.FocusGuardianIntervalMs,
-            normalized.FocusGuardianCooldownMs);
+            normalized.FocusGuardianCooldownMs,
+            noBrokerReport: normalized.NoBrokerReport);
         var launchResult = await _adbService
             .ShellAsync(normalized.Serial, shellCommand, cancellationToken)
             .ConfigureAwait(false);
@@ -673,6 +679,7 @@ public sealed record BrokerShellHelperRunOptions(
     string BrokerHost = BrokerClientService.DefaultHost,
     int BrokerPort = BrokerClientService.DefaultPort,
     bool BuildBeforeRun = true,
+    bool NoBrokerReport = false,
     bool Disconnect = false,
     bool ProbeCodecs = false,
     bool ProbeCameras = false,
