@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Windows.Devices.Bluetooth;
 using Windows.Devices.Bluetooth.GenericAttributeProfile;
+using Windows.Foundation;
 using Windows.Storage.Streams;
 
 namespace RustyXr.Companion.Windows;
@@ -15,7 +16,21 @@ public sealed class PolarH10WindowsCaptureService
     public const string PmdControlSchema = "rusty.xr.companion.polar_pmd_control.v1";
     public const string HeartRateSchema = "rusty.xr.companion.polar_hr_rr.v1";
     public const string AccFrameSchema = "rusty.xr.companion.polar_acc_frame.v1";
+    public const string EcgFrameSchema = "rusty.xr.companion.polar_ecg_frame.v1";
     public const string MalformedFrameSchema = "rusty.xr.companion.polar_malformed_frame.v1";
+    public const string PmdStreamAcc = "acc";
+    public const string PmdStreamEcg = "ecg";
+    public const string WindowsBleConnectionDefault = "default";
+    public const string WindowsBleConnectionThroughputOptimized = "throughput-optimized";
+
+    private const byte PmdMeasurementEcg = 0x00;
+    private const byte PmdMeasurementAcc = 0x02;
+    private const byte PmdOpcodeGetSettings = 0x01;
+    private const byte PmdOpcodeStartStream = 0x02;
+    private const byte PmdOpcodeStopStream = 0x03;
+    private const byte PmdSettingSampleRate = 0x00;
+    private const byte PmdSettingResolution = 0x01;
+    private const byte PmdSettingRange = 0x02;
 
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
@@ -24,6 +39,14 @@ public sealed class PolarH10WindowsCaptureService
     };
 
     public async Task<PolarH10WindowsCaptureResult> CaptureAccAsync(
+        PolarH10WindowsCaptureOptions options,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        return await CaptureAsync(options with { PmdStream = PmdStreamAcc }, cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task<PolarH10WindowsCaptureResult> CaptureAsync(
         PolarH10WindowsCaptureOptions options,
         CancellationToken cancellationToken = default)
     {
@@ -43,20 +66,32 @@ public sealed class PolarH10WindowsCaptureService
             throw new ArgumentOutOfRangeException(nameof(options), "Duration must be 3..300 seconds.");
         }
 
+        var pmdStream = NormalizePmdStream(options.PmdStream);
+        var pmdMeasurement = MeasurementForStream(pmdStream);
+        var includePmd = options.IncludePmdAcc || options.IncludePmd;
+        var accSampleRateHz = NormalizeAccSampleRate(options.AccSampleRateHz);
+        var windowsBleMode = NormalizeWindowsBleConnectionMode(options.WindowsBleConnectionMode);
+
         Directory.CreateDirectory(Path.GetDirectoryName(options.OutputJsonlPath) ?? ".");
 
         var startedAt = DateTimeOffset.UtcNow;
         var address = ParseBluetoothAddress(options.DeviceAddress);
         var formattedAddress = FormatAddress(address);
+        long pmdFrameCount = 0L;
         long accFrameCount = 0L;
+        long ecgFrameCount = 0L;
         long heartRateEventCount = 0L;
         long malformedFrameCount = 0L;
+        var maxPduSize = 0;
         var connected = false;
 
         await using var writer = new PolarJsonlWriter(options.OutputJsonlPath);
         BluetoothLEDevice? device = null;
         GattSession? session = null;
         GattCharacteristic? pmdControl = null;
+        var keepAlive = new List<object>();
+        var unsubscribeActions = new List<Action>();
+        var acceptingNotifications = true;
 
         try
         {
@@ -68,7 +103,14 @@ public sealed class PolarH10WindowsCaptureService
 
             session = await GattSession.FromDeviceIdAsync(device.BluetoothDeviceId).AsTask(cancellationToken).ConfigureAwait(false);
             session.MaintainConnection = true;
+            maxPduSize = session.MaxPduSize;
             connected = true;
+            var connectionParameterStatus = await TryRequestPreferredConnectionParametersAsync(
+                    device,
+                    windowsBleMode,
+                    formattedAddress,
+                    cancellationToken)
+                .ConfigureAwait(false);
 
             await writer.WriteAsync(new PolarSessionRecord(
                     SessionSchema,
@@ -76,8 +118,10 @@ public sealed class PolarH10WindowsCaptureService
                     UnixNowNs(),
                     formattedAddress,
                     device.Name,
-                    session.MaxPduSize,
-                    null),
+                    maxPduSize,
+                    null,
+                    windowsBleMode,
+                    connectionParameterStatus),
                 cancellationToken).ConfigureAwait(false);
 
             await TryCaptureBatteryAsync(device, formattedAddress, writer, cancellationToken).ConfigureAwait(false);
@@ -89,6 +133,9 @@ public sealed class PolarH10WindowsCaptureService
                         writer,
                         () => Interlocked.Increment(ref heartRateEventCount),
                         options.RecordObserver,
+                        keepAlive,
+                        unsubscribeActions,
+                        () => acceptingNotifications,
                         cancellationToken)
                     .ConfigureAwait(false);
             }
@@ -100,7 +147,7 @@ public sealed class PolarH10WindowsCaptureService
                     .ConfigureAwait(false);
             }
 
-            if (options.IncludePmdAcc)
+            if (includePmd)
             {
                 var pmdService = await GetServiceAsync(device, PolarGattIds.PmdService, cancellationToken).ConfigureAwait(false)
                     ?? throw new InvalidOperationException("Polar PMD service not available.");
@@ -108,9 +155,17 @@ public sealed class PolarH10WindowsCaptureService
                     ?? throw new InvalidOperationException("Polar PMD control point not available.");
                 var pmdData = await GetCharacteristicAsync(pmdService, PolarGattIds.PmdData, cancellationToken).ConfigureAwait(false)
                     ?? throw new InvalidOperationException("Polar PMD data characteristic not available.");
+                keepAlive.Add(pmdService);
+                keepAlive.Add(pmdControl);
+                keepAlive.Add(pmdData);
 
-                pmdControl.ValueChanged += async (_, eventArgs) =>
+                TypedEventHandler<GattCharacteristic, GattValueChangedEventArgs> pmdControlHandler = async (_, eventArgs) =>
                 {
+                    if (!acceptingNotifications)
+                    {
+                        return;
+                    }
+
                     var data = ReadBuffer(eventArgs.CharacteristicValue);
                     await writer.WriteAsync(new PolarPmdControlRecord(
                             PmdControlSchema,
@@ -119,20 +174,37 @@ public sealed class PolarH10WindowsCaptureService
                             Convert.ToHexString(data).ToLowerInvariant()),
                         CancellationToken.None).ConfigureAwait(false);
                 };
+                pmdControl.ValueChanged += pmdControlHandler;
+                unsubscribeActions.Add(() => pmdControl.ValueChanged -= pmdControlHandler);
                 await EnableNotificationsAsync(pmdControl, cancellationToken).ConfigureAwait(false);
 
-                pmdData.ValueChanged += async (_, eventArgs) =>
+                TypedEventHandler<GattCharacteristic, GattValueChangedEventArgs> pmdDataHandler = async (_, eventArgs) =>
                 {
+                    if (!acceptingNotifications)
+                    {
+                        return;
+                    }
+
                     var data = ReadBuffer(eventArgs.CharacteristicValue);
                     var receivedUnixNs = UnixNowNs();
                     var ticks = Stopwatch.GetTimestamp();
                     try
                     {
-                        var sequence = Interlocked.Read(ref accFrameCount);
-                        var frame = DecodeAccFrame(data, sequence, receivedUnixNs, ticks, formattedAddress, device.Name);
+                        var sequence = Interlocked.Read(ref pmdFrameCount);
+                        object? frame = pmdStream == PmdStreamEcg
+                            ? DecodeEcgFrame(data, sequence, receivedUnixNs, ticks, formattedAddress, device.Name)
+                            : DecodeAccFrame(data, sequence, receivedUnixNs, ticks, formattedAddress, device.Name);
                         if (frame is not null)
                         {
-                            Interlocked.Increment(ref accFrameCount);
+                            Interlocked.Increment(ref pmdFrameCount);
+                            if (frame is PolarAccFrameRecord)
+                            {
+                                Interlocked.Increment(ref accFrameCount);
+                            }
+                            else if (frame is PolarEcgFrameRecord)
+                            {
+                                Interlocked.Increment(ref ecgFrameCount);
+                            }
                             await writer.WriteAsync(frame, CancellationToken.None).ConfigureAwait(false);
                             await NotifyRecordAsync(options.RecordObserver, frame, CancellationToken.None).ConfigureAwait(false);
                         }
@@ -149,24 +221,31 @@ public sealed class PolarH10WindowsCaptureService
                             CancellationToken.None).ConfigureAwait(false);
                     }
                 };
+                pmdData.ValueChanged += pmdDataHandler;
+                unsubscribeActions.Add(() => pmdData.ValueChanged -= pmdDataHandler);
                 await EnableNotificationsAsync(pmdData, cancellationToken).ConfigureAwait(false);
 
-                await WritePmdAsync(pmdControl, [0x01, 0x02], cancellationToken).ConfigureAwait(false);
+                await WritePmdAsync(pmdControl, [PmdOpcodeGetSettings, pmdMeasurement], cancellationToken).ConfigureAwait(false);
                 await Task.Delay(300, cancellationToken).ConfigureAwait(false);
                 await WritePmdAsync(
                         pmdControl,
-                        [0x02, 0x02, 0x02, 0x01, 0x08, 0x00, 0x00, 0x01, 0xC8, 0x00, 0x01, 0x01, 0x10, 0x00],
+                        BuildStartPmdCommand(pmdStream, accSampleRateHz),
                         cancellationToken)
                     .ConfigureAwait(false);
                 await writer.WriteAsync(
-                        PolarSessionRecord.Info("acc_start_requested", formattedAddress, "ACC 200 Hz / 16 bit / 8 g requested."),
+                        PolarSessionRecord.Info(
+                            $"{pmdStream}_start_requested",
+                            formattedAddress,
+                            pmdStream == PmdStreamEcg
+                                ? "ECG 130 Hz / 14 bit requested."
+                                : $"ACC {accSampleRateHz} Hz / 16 bit / 8 g requested."),
                         cancellationToken)
                     .ConfigureAwait(false);
             }
             else
             {
                 await writer.WriteAsync(
-                        PolarSessionRecord.Info("pmd_acc_skipped", formattedAddress, "Polar PMD ACC was not requested."),
+                        PolarSessionRecord.Info("pmd_skipped", formattedAddress, "Polar PMD stream was not requested."),
                         cancellationToken)
                     .ConfigureAwait(false);
             }
@@ -179,17 +258,41 @@ public sealed class PolarH10WindowsCaptureService
             {
                 try
                 {
-                    await WritePmdAsync(pmdControl, [0x03, 0x02], CancellationToken.None).ConfigureAwait(false);
+                    await WritePmdAsync(pmdControl, [PmdOpcodeStopStream, pmdMeasurement], CancellationToken.None).ConfigureAwait(false);
                     await Task.Delay(300).ConfigureAwait(false);
                 }
                 catch (Exception ex)
                 {
                     await writer.WriteAsync(
-                            PolarSessionRecord.Warning("acc_stop_failed", formattedAddress, ex.Message),
+                            PolarSessionRecord.Warning($"{pmdStream}_stop_failed", formattedAddress, ex.Message),
                             CancellationToken.None)
                         .ConfigureAwait(false);
                 }
             }
+
+            if (session is not null)
+            {
+                try
+                {
+                    maxPduSize = session.MaxPduSize;
+                }
+                catch (ObjectDisposedException)
+                {
+                }
+            }
+
+            acceptingNotifications = false;
+            foreach (var unsubscribe in unsubscribeActions)
+            {
+                try
+                {
+                    unsubscribe();
+                }
+                catch
+                {
+                }
+            }
+            await Task.Delay(100).ConfigureAwait(false);
 
             await writer.WriteAsync(new PolarSessionRecord(
                     SessionSchema,
@@ -197,12 +300,15 @@ public sealed class PolarH10WindowsCaptureService
                     UnixNowNs(),
                     formattedAddress,
                     device?.Name ?? string.Empty,
-                    session?.MaxPduSize ?? 0,
-                    $"connected={connected}; include_hr={options.IncludeHeartRate}; include_pmd_acc={options.IncludePmdAcc}; hr_events={Interlocked.Read(ref heartRateEventCount)}; acc_frames={Interlocked.Read(ref accFrameCount)}; malformed={Interlocked.Read(ref malformedFrameCount)}"),
+                    maxPduSize,
+                    $"connected={connected}; include_hr={options.IncludeHeartRate}; include_pmd={includePmd}; pmd_stream={pmdStream}; hr_events={Interlocked.Read(ref heartRateEventCount)}; acc_frames={Interlocked.Read(ref accFrameCount)}; ecg_frames={Interlocked.Read(ref ecgFrameCount)}; malformed={Interlocked.Read(ref malformedFrameCount)}",
+                    windowsBleMode,
+                    null),
                 CancellationToken.None).ConfigureAwait(false);
 
             session?.Dispose();
             device?.Dispose();
+            GC.KeepAlive(keepAlive);
         }
 
         return new PolarH10WindowsCaptureResult(
@@ -212,11 +318,142 @@ public sealed class PolarH10WindowsCaptureService
             device?.Name ?? string.Empty,
             connected,
             options.IncludeHeartRate,
-            options.IncludePmdAcc,
+            includePmd,
+            pmdStream,
+            accSampleRateHz,
+            windowsBleMode,
+            maxPduSize,
             Interlocked.Read(ref heartRateEventCount),
             Interlocked.Read(ref accFrameCount),
+            Interlocked.Read(ref ecgFrameCount),
             Interlocked.Read(ref malformedFrameCount),
             options.OutputJsonlPath);
+    }
+
+    private static string NormalizePmdStream(string value)
+    {
+        var normalized = value.Trim().ToLowerInvariant();
+        return normalized is "ecg" or "bio:polar_ecg" or "polar_ecg" ? PmdStreamEcg : PmdStreamAcc;
+    }
+
+    private static byte MeasurementForStream(string pmdStream) =>
+        pmdStream == PmdStreamEcg ? PmdMeasurementEcg : PmdMeasurementAcc;
+
+    private static int NormalizeAccSampleRate(int value) =>
+        value is 25 or 50 or 100 or 200 ? value : 200;
+
+    private static string NormalizeWindowsBleConnectionMode(string value)
+    {
+        var normalized = value.Trim().ToLowerInvariant().Replace('_', '-');
+        return normalized is "throughput" or "throughput-optimized" or "high-throughput"
+            ? WindowsBleConnectionThroughputOptimized
+            : WindowsBleConnectionDefault;
+    }
+
+    private static byte[] BuildStartPmdCommand(string pmdStream, int accSampleRateHz)
+    {
+        if (pmdStream == PmdStreamEcg)
+        {
+            return
+            [
+                PmdOpcodeStartStream,
+                PmdMeasurementEcg,
+                PmdSettingSampleRate,
+                0x01,
+                0x82,
+                0x00,
+                PmdSettingResolution,
+                0x01,
+                0x0E,
+                0x00
+            ];
+        }
+
+        return
+        [
+            PmdOpcodeStartStream,
+            PmdMeasurementAcc,
+            PmdSettingRange,
+            0x01,
+            0x08,
+            0x00,
+            PmdSettingSampleRate,
+            0x01,
+            (byte)(accSampleRateHz & 0xff),
+            (byte)((accSampleRateHz >> 8) & 0xff),
+            PmdSettingResolution,
+            0x01,
+            0x10,
+            0x00
+        ];
+    }
+
+    private static async Task<string> TryRequestPreferredConnectionParametersAsync(
+        BluetoothLEDevice device,
+        string mode,
+        string deviceAddress,
+        CancellationToken cancellationToken)
+    {
+        if (mode != WindowsBleConnectionThroughputOptimized)
+        {
+            return "not_requested";
+        }
+
+        try
+        {
+            var parametersType = Type.GetType("Windows.Devices.Bluetooth.BluetoothLEPreferredConnectionParameters, Microsoft.Windows.SDK.NET");
+            if (parametersType is null)
+            {
+                return "unavailable: BluetoothLEPreferredConnectionParameters type not present";
+            }
+
+            var throughputProperty = parametersType.GetProperty("ThroughputOptimized");
+            var parameters = throughputProperty?.GetValue(null);
+            if (parameters is null)
+            {
+                return "unavailable: ThroughputOptimized property not present";
+            }
+
+            var method = device.GetType().GetMethod("RequestPreferredConnectionParameters", [parametersType]);
+            if (method is null)
+            {
+                return "unavailable: RequestPreferredConnectionParameters method not present";
+            }
+
+            var operation = method.Invoke(device, [parameters]);
+            if (operation is null)
+            {
+                return "not_started";
+            }
+
+            var statusProperty = operation.GetType().GetProperty("Status");
+            var errorProperty = operation.GetType().GetProperty("ErrorCode");
+            var getResultsMethod = operation.GetType().GetMethod("GetResults");
+            for (var attempt = 0; attempt < 30; attempt++)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var status = statusProperty?.GetValue(operation)?.ToString() ?? "unknown";
+                if (!string.Equals(status, "Started", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (string.Equals(status, "Completed", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var result = getResultsMethod?.Invoke(operation, null);
+                        return result is null ? "completed" : $"completed: {result}";
+                    }
+
+                    var error = errorProperty?.GetValue(operation);
+                    return error is null ? status : $"{status}: {error}";
+                }
+
+                await Task.Delay(100, cancellationToken).ConfigureAwait(false);
+            }
+
+            return $"started: request still pending for {deviceAddress}";
+        }
+        catch (Exception ex)
+        {
+            return $"failed: {ex.GetType().Name}: {ex.Message}";
+        }
     }
 
     private static async Task TryCaptureBatteryAsync(
@@ -265,6 +502,9 @@ public sealed class PolarH10WindowsCaptureService
         PolarJsonlWriter writer,
         Action onHeartRate,
         Func<object, CancellationToken, ValueTask>? recordObserver,
+        ICollection<object> keepAlive,
+        ICollection<Action> unsubscribeActions,
+        Func<bool> shouldAcceptNotifications,
         CancellationToken cancellationToken)
     {
         var hrService = await GetServiceAsync(device, PolarGattIds.HeartRateService, cancellationToken).ConfigureAwait(false);
@@ -278,9 +518,16 @@ public sealed class PolarH10WindowsCaptureService
         {
             return;
         }
+        keepAlive.Add(hrService);
+        keepAlive.Add(heartRate);
 
-        heartRate.ValueChanged += async (_, eventArgs) =>
+        TypedEventHandler<GattCharacteristic, GattValueChangedEventArgs> handler = async (_, eventArgs) =>
         {
+            if (!shouldAcceptNotifications())
+            {
+                return;
+            }
+
             var data = ReadBuffer(eventArgs.CharacteristicValue);
             var hr = DecodeHeartRate(data);
             if (hr is not null)
@@ -296,6 +543,8 @@ public sealed class PolarH10WindowsCaptureService
                 await NotifyRecordAsync(recordObserver, record, CancellationToken.None).ConfigureAwait(false);
             }
         };
+        heartRate.ValueChanged += handler;
+        unsubscribeActions.Add(() => heartRate.ValueChanged -= handler);
         await EnableNotificationsAsync(heartRate, cancellationToken).ConfigureAwait(false);
     }
 
@@ -461,6 +710,76 @@ public sealed class PolarH10WindowsCaptureService
             samples);
     }
 
+    public static PolarEcgFrameRecord? DecodeEcgFrame(
+        byte[] payload,
+        long sequence,
+        long unixNs,
+        long ticks,
+        string deviceAddress,
+        string deviceName)
+    {
+        if (payload.Length < 10 || payload[0] != PmdMeasurementEcg)
+        {
+            return null;
+        }
+
+        var sensorTimestampNs = BinaryPrimitives.ReadUInt64LittleEndian(payload.AsSpan(1, 8));
+        var frameType = payload[9];
+        var compressed = (frameType & 0x80) != 0;
+        if (compressed || (frameType & 0x7f) != 0)
+        {
+            throw new InvalidOperationException("Compressed ECG frames are not decoded by this capture service.");
+        }
+
+        var payloadLength = payload.Length - 10;
+        if (payloadLength <= 0 || payloadLength % 3 != 0)
+        {
+            throw new InvalidOperationException("ECG frame payload was not a multiple of signed 24-bit samples.");
+        }
+
+        var samples = new List<int>(payloadLength / 3);
+        for (var offset = 10; offset + 2 < payload.Length; offset += 3)
+        {
+            samples.Add(ReadInt24LittleEndian(payload, offset));
+        }
+
+        if (samples.Count == 0)
+        {
+            throw new InvalidOperationException("ECG frame contained no decoded samples.");
+        }
+
+        return new PolarEcgFrameRecord(
+            EcgFrameSchema,
+            "windows_polar_ble",
+            "ecg",
+            sequence,
+            deviceAddress,
+            deviceName,
+            sensorTimestampNs,
+            unixNs,
+            ticks,
+            samples.Count,
+            frameType,
+            compressed,
+            payload.Length,
+            samples[0],
+            samples.Average(),
+            samples.Min(),
+            samples.Max(),
+            samples);
+    }
+
+    private static int ReadInt24LittleEndian(byte[] payload, int offset)
+    {
+        var raw = payload[offset] | (payload[offset + 1] << 8) | (payload[offset + 2] << 16);
+        if ((raw & 0x00800000) != 0)
+        {
+            raw |= unchecked((int)0xff000000);
+        }
+
+        return raw;
+    }
+
     public static PolarHeartRateRecord? DecodeHeartRate(byte[] payload)
     {
         if (payload.Length < 2)
@@ -566,7 +885,11 @@ public sealed record PolarH10WindowsCaptureOptions(
     int DurationSeconds,
     string OutputJsonlPath,
     bool IncludeHeartRate = true,
-    bool IncludePmdAcc = true)
+    bool IncludePmdAcc = true,
+    bool IncludePmd = false,
+    string PmdStream = PolarH10WindowsCaptureService.PmdStreamAcc,
+    int AccSampleRateHz = 200,
+    string WindowsBleConnectionMode = PolarH10WindowsCaptureService.WindowsBleConnectionDefault)
 {
     [JsonIgnore]
     public Func<object, CancellationToken, ValueTask>? RecordObserver { get; init; }
@@ -579,9 +902,14 @@ public sealed record PolarH10WindowsCaptureResult(
     string DeviceName,
     bool Connected,
     bool IncludeHeartRate,
-    bool IncludePmdAcc,
+    bool IncludePmd,
+    string PmdStream,
+    int AccSampleRateHz,
+    string WindowsBleConnectionMode,
+    int MaxPduSize,
     long HeartRateEventCount,
     long AccFrameCount,
+    long EcgFrameCount,
     long MalformedFrameCount,
     string OutputJsonlPath);
 
@@ -591,14 +919,16 @@ public sealed record PolarSessionRecord(
     long TimeUnixNs,
     string DeviceAddress,
     string DeviceName,
-    int Mtu,
-    string? Note)
+    int MaxPduSize,
+    string? Note,
+    string? RequestedConnectionMode,
+    string? RequestedConnectionStatus)
 {
     public static PolarSessionRecord Info(string @event, string deviceAddress, string note) =>
-        new(PolarH10WindowsCaptureService.SessionSchema, @event, NowNs(), deviceAddress, string.Empty, 0, note);
+        new(PolarH10WindowsCaptureService.SessionSchema, @event, NowNs(), deviceAddress, string.Empty, 0, note, null, null);
 
     public static PolarSessionRecord Warning(string @event, string deviceAddress, string note) =>
-        new(PolarH10WindowsCaptureService.SessionSchema, @event, NowNs(), deviceAddress, string.Empty, 0, note);
+        new(PolarH10WindowsCaptureService.SessionSchema, @event, NowNs(), deviceAddress, string.Empty, 0, note, null, null);
 
     private static long NowNs()
     {
@@ -654,6 +984,26 @@ public sealed record PolarAccFrameRecord(
     int MinZMilliG,
     int MaxZMilliG,
     IReadOnlyList<int[]> SamplesMilliG);
+
+public sealed record PolarEcgFrameRecord(
+    string Schema,
+    string Route,
+    string StreamKind,
+    long Sequence,
+    string DeviceAddress,
+    string DeviceName,
+    ulong SensorTimestampNs,
+    long PcBleReceivedUnixNs,
+    long PcBleReceivedStopwatchTicks,
+    int SampleCount,
+    byte FrameType,
+    bool Compressed,
+    int PayloadSizeBytes,
+    int FirstMicrovolts,
+    double MeanMicrovolts,
+    int MinMicrovolts,
+    int MaxMicrovolts,
+    IReadOnlyList<int> SamplesMicrovolts);
 
 public sealed record PolarMalformedFrameRecord(
     string Schema,

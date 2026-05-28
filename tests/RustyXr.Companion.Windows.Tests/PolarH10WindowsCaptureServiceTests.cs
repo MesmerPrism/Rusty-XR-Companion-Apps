@@ -49,6 +49,38 @@ public sealed class PolarH10WindowsCaptureServiceTests
     }
 
     [Fact]
+    public void DecodesUncompressedEcgFrameSummary()
+    {
+        var payload = new byte[10 + 6];
+        payload[0] = 0x00;
+        BinaryPrimitives.WriteUInt64LittleEndian(payload.AsSpan(1, 8), 987_654_321UL);
+        payload[9] = 0x00;
+        payload[10] = 0x01;
+        payload[11] = 0x00;
+        payload[12] = 0x00;
+        payload[13] = 0xff;
+        payload[14] = 0xff;
+        payload[15] = 0xff;
+
+        var frame = PolarH10WindowsCaptureService.DecodeEcgFrame(
+            payload,
+            sequence: 3,
+            unixNs: 111,
+            ticks: 222,
+            deviceAddress: "A1:B2:C3:D4:E5:F6",
+            deviceName: "Polar H10");
+
+        Assert.NotNull(frame);
+        Assert.Equal(PolarH10WindowsCaptureService.EcgFrameSchema, frame.Schema);
+        Assert.Equal(3, frame.Sequence);
+        Assert.Equal(987_654_321UL, frame.SensorTimestampNs);
+        Assert.Equal(2, frame.SampleCount);
+        Assert.Equal(1, frame.FirstMicrovolts);
+        Assert.Equal(-1, frame.MinMicrovolts);
+        Assert.Equal(1, frame.MaxMicrovolts);
+    }
+
+    [Fact]
     public void DecodesHeartRateAndRrIntervals()
     {
         var payload = new byte[4];

@@ -29,7 +29,8 @@ public sealed class PolarThroughputDiagnosticsService
         var notes = new List<string>
         {
             "Polar PMD ownership is exclusive for this diagnostic. The command modes never start Windows PMD and Quest PMD at the same time.",
-            "Heart-rate/RR may be used as the dual-receiver path, but raw PMD ECG/ACC should not be treated as dual-receiver capable."
+            "Heart-rate/RR may be used as the dual-receiver path, but raw PMD ECG/ACC should not be treated as dual-receiver capable.",
+            $"PMD stream under test: {normalized.PmdStream}; ACC request rate: {normalized.AccSampleRateHz} Hz; Windows BLE mode: {normalized.WindowsBleConnectionMode}; Quest BLE priority: {normalized.QuestBleConnectionPriority}."
         };
         var forwardSamples = new ConcurrentQueue<LslStringForwardSample>();
         var windowsRecords = new ConcurrentQueue<PolarThroughputSourceRecord>();
@@ -122,7 +123,7 @@ public sealed class PolarThroughputDiagnosticsService
                         normalized,
                         pmd: true,
                         includeHeartRate: normalized.IncludeHeartRate,
-                        requiredStream: normalized.RequiredStreamOrDefault("bio:polar_acc"),
+                        requiredStream: normalized.RequiredStreamOrDefault(normalized.PmdStreamId),
                         notes,
                         cancellationToken)
                     .ConfigureAwait(false);
@@ -184,13 +185,17 @@ public sealed class PolarThroughputDiagnosticsService
             options.LslDllPath));
         var capturePath = Path.Combine(runFolder, "windows-polar-capture.jsonl");
         return await new PolarH10WindowsCaptureService()
-            .CaptureAccAsync(
+            .CaptureAsync(
                 new PolarH10WindowsCaptureOptions(
                     options.EffectiveWindowsDeviceAddress,
                     options.DurationSeconds,
                     capturePath,
                     IncludeHeartRate: options.IncludeHeartRate,
-                    IncludePmdAcc: true)
+                    IncludePmdAcc: options.PmdStream == PolarH10WindowsCaptureService.PmdStreamAcc,
+                    IncludePmd: true,
+                    PmdStream: options.PmdStream,
+                    AccSampleRateHz: options.AccSampleRateHz,
+                    WindowsBleConnectionMode: options.WindowsBleConnectionMode)
                 {
                     RecordObserver = (record, _) =>
                     {
@@ -217,7 +222,7 @@ public sealed class PolarThroughputDiagnosticsService
             ["resolve_property"] = "name",
             ["resolve_value"] = options.WindowsLslStreamName,
             ["required_type"] = "polar_windows_record",
-            ["required_stream"] = options.RequiredStreamOrDefault("bio:polar_acc"),
+            ["required_stream"] = options.RequiredStreamOrDefault(options.PmdStreamId),
             ["duration_ms"] = options.DurationSeconds * 1000,
             ["max_samples"] = options.MaxLslSamples,
             ["resolve_timeout_ms"] = options.ResolveTimeoutMilliseconds,
@@ -297,7 +302,10 @@ public sealed class PolarThroughputDiagnosticsService
         {
             ["include_hr"] = includeHeartRate,
             ["include_pmd"] = pmd,
-            ["scan_timeout_ms"] = options.ScanTimeoutMilliseconds
+            ["scan_timeout_ms"] = options.ScanTimeoutMilliseconds,
+            ["pmd_stream"] = options.PmdStream,
+            ["acc_sample_rate_hz"] = options.AccSampleRateHz,
+            ["high_connection_priority"] = options.QuestBleConnectionPriority == "high"
         };
         if (!string.IsNullOrWhiteSpace(options.EffectiveQuestDeviceAddress))
         {
@@ -555,6 +563,15 @@ public sealed class PolarThroughputDiagnosticsService
                 acc.SensorTimestampNs > long.MaxValue ? null : (long)acc.SensorTimestampNs,
                 acc.SampleCount,
                 acc.PayloadSizeBytes),
+            PolarEcgFrameRecord ecg => new PolarThroughputSourceRecord(
+                route,
+                "bio:polar_ecg",
+                ecg.Schema,
+                ecg.Sequence,
+                ecg.PcBleReceivedUnixNs,
+                ecg.SensorTimestampNs > long.MaxValue ? null : (long)ecg.SensorTimestampNs,
+                ecg.SampleCount,
+                ecg.PayloadSizeBytes),
             PolarHeartRateRecord hr => new PolarThroughputSourceRecord(
                 route,
                 "bio:polar_hr_rr",
@@ -614,7 +631,7 @@ public sealed class PolarThroughputDiagnosticsService
                 ResolveProperty: StringProperty(capture, "resolve_property", "name"),
                 ResolveValue: StringProperty(capture, "resolve_value", options.WindowsLslStreamName),
                 RequiredType: StringProperty(capture, "required_type", "polar_windows_record"),
-                RequiredStream: StringProperty(capture, "required_stream", options.RequiredStreamOrDefault("bio:polar_acc")),
+                RequiredStream: StringProperty(capture, "required_stream", options.RequiredStreamOrDefault(options.PmdStreamId)),
                 LslDllPath: options.LslDllPath);
             var timeCorrection = capture.TryGetProperty("time_correction", out var correctionElement) &&
                 correctionElement.ValueKind == JsonValueKind.Object
@@ -755,6 +772,10 @@ public sealed record PolarThroughputDiagnosticOptions(
     int DurationSeconds = 15,
     string OutputRoot = "",
     bool IncludeHeartRate = true,
+    string PmdStream = PolarH10WindowsCaptureService.PmdStreamAcc,
+    int AccSampleRateHz = 200,
+    string WindowsBleConnectionMode = PolarH10WindowsCaptureService.WindowsBleConnectionDefault,
+    string QuestBleConnectionPriority = "high",
     string QuestSerial = "",
     string BrokerHost = BrokerClientService.DefaultHost,
     int HostPort = BrokerClientService.DefaultPort,
@@ -785,6 +806,10 @@ public sealed record PolarThroughputDiagnosticOptions(
             QuestDeviceAddress = QuestDeviceAddress?.Trim() ?? string.Empty,
             DurationSeconds = Math.Clamp(DurationSeconds, 3, 300),
             OutputRoot = OutputRoot?.Trim() ?? string.Empty,
+            PmdStream = NormalizePmdStream(PmdStream),
+            AccSampleRateHz = NormalizeAccSampleRate(AccSampleRateHz),
+            WindowsBleConnectionMode = NormalizeWindowsBleConnectionMode(WindowsBleConnectionMode),
+            QuestBleConnectionPriority = NormalizeQuestBleConnectionPriority(QuestBleConnectionPriority),
             QuestSerial = QuestSerial?.Trim() ?? string.Empty,
             BrokerHost = string.IsNullOrWhiteSpace(BrokerHost) ? BrokerClientService.DefaultHost : BrokerHost.Trim(),
             HostPort = HostPort is > 0 and <= 65535 ? HostPort : BrokerClientService.DefaultPort,
@@ -809,11 +834,39 @@ public sealed record PolarThroughputDiagnosticOptions(
     public string RequiredStreamOrDefault(string value) =>
         string.IsNullOrWhiteSpace(RequiredStream) ? value : RequiredStream;
 
+    public string PmdStreamId =>
+        PmdStream == PolarH10WindowsCaptureService.PmdStreamEcg ? "bio:polar_ecg" : "bio:polar_acc";
+
     public string EffectiveWindowsDeviceAddress =>
         string.IsNullOrWhiteSpace(WindowsDeviceAddress) ? DeviceAddress : WindowsDeviceAddress;
 
     public string EffectiveQuestDeviceAddress =>
         string.IsNullOrWhiteSpace(QuestDeviceAddress) ? DeviceAddress : QuestDeviceAddress;
+
+    private static string NormalizePmdStream(string value)
+    {
+        var normalized = value.Trim().ToLowerInvariant();
+        return normalized is "ecg" or "bio:polar_ecg" or "polar_ecg"
+            ? PolarH10WindowsCaptureService.PmdStreamEcg
+            : PolarH10WindowsCaptureService.PmdStreamAcc;
+    }
+
+    private static int NormalizeAccSampleRate(int value) =>
+        value is 25 or 50 or 100 or 200 ? value : 200;
+
+    private static string NormalizeWindowsBleConnectionMode(string value)
+    {
+        var normalized = value.Trim().ToLowerInvariant().Replace('_', '-');
+        return normalized is "throughput" or "throughput-optimized" or "high-throughput"
+            ? PolarH10WindowsCaptureService.WindowsBleConnectionThroughputOptimized
+            : PolarH10WindowsCaptureService.WindowsBleConnectionDefault;
+    }
+
+    private static string NormalizeQuestBleConnectionPriority(string value)
+    {
+        var normalized = value.Trim().ToLowerInvariant();
+        return normalized is "balanced" or "default" or "normal" ? "default" : "high";
+    }
 }
 
 public sealed record PolarThroughputDiagnosticReport(
@@ -856,7 +909,8 @@ public sealed record PolarThroughputSummary(
     double? QuestSensorSampleRateHz,
     double? MeanWindowsSourceToLslPushMs,
     double? MeanQuestLslReceiveDelayMs,
-    double? MeanLslTimeCorrectionUncertaintyMs)
+    double? MeanLslTimeCorrectionUncertaintyMs,
+    IReadOnlyList<PolarStreamThroughputSummary> Streams)
 {
     public static PolarThroughputSummary From(
         IEnumerable<PolarThroughputSourceRecord> windowsRecords,
@@ -882,7 +936,59 @@ public sealed record PolarThroughputSummary(
             questLslCapture?.Summary.SensorSampleRateHz,
             Mean(forwards.Select(static sample => sample.SourceToPushMs)),
             questLslCapture?.Summary.MeanLslReceiveDelayMs,
-            questLslCapture?.Summary.MeanTimeCorrectionUncertaintyMs);
+            questLslCapture?.Summary.MeanTimeCorrectionUncertaintyMs,
+            BuildStreamSummaries(records, forwards, questLslCapture, questWebSocketCapture));
+    }
+
+    private static IReadOnlyList<PolarStreamThroughputSummary> BuildStreamSummaries(
+        IReadOnlyList<PolarThroughputSourceRecord> records,
+        IReadOnlyList<LslStringForwardSample> forwards,
+        LslStringStreamCaptureReport? questLslCapture,
+        BrokerWebSocketProbeResult? questWebSocketCapture)
+    {
+        var questSamples = questLslCapture?.Samples ?? [];
+        var websocketMessages = QuestStreamMessages(questWebSocketCapture).ToArray();
+        var streams = records.Select(static record => record.Stream)
+            .Concat(forwards.Select(static sample => sample.Stream))
+            .Concat(questSamples.Select(static sample => sample.Stream))
+            .Concat(websocketMessages.Select(StreamFromMessage))
+            .Where(static stream => !string.IsNullOrWhiteSpace(stream))
+            .Distinct(StringComparer.Ordinal)
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+
+        var summaries = new List<PolarStreamThroughputSummary>(streams.Length);
+        foreach (var stream in streams)
+        {
+            var streamRecords = records.Where(record => string.Equals(record.Stream, stream, StringComparison.Ordinal)).ToArray();
+            var streamForwards = forwards.Where(sample => string.Equals(sample.Stream, stream, StringComparison.Ordinal)).ToArray();
+            var streamQuestSamples = questSamples.Where(sample => string.Equals(sample.Stream, stream, StringComparison.Ordinal)).ToArray();
+            var streamWebsocketMessages = websocketMessages.Where(message => string.Equals(StreamFromMessage(message), stream, StringComparison.Ordinal)).ToArray();
+            var sourceCadence = TimingCadenceSummary.FromUnixNs(streamRecords.Select(static record => (long?)record.SourceUnixNs));
+            var sensorSamples = streamRecords.Sum(static record => record.SampleCount);
+            double? sensorRate = sourceCadence.DurationMs is > 0
+                ? sensorSamples / (sourceCadence.DurationMs.Value / 1000d)
+                : null;
+            var questSummary = LslStringStreamCaptureSummary.From(streamQuestSamples);
+            summaries.Add(new PolarStreamThroughputSummary(
+                stream,
+                streamRecords.Length,
+                sourceCadence,
+                TimingCadenceSummary.FromUnixNs(streamForwards.Where(static sample => sample.Pushed).Select(static sample => (long?)sample.HostPushUnixNs)),
+                questSummary.HostReceiveCadence,
+                TimingCadenceSummary.FromUnixNs(streamWebsocketMessages.Select(static message => (long?)UnixTimeNanoseconds(message.ReceivedAt))),
+                sensorSamples,
+                sensorRate,
+                questSummary.SensorSampleCount,
+                questSummary.SensorSampleRateHz,
+                Mean(streamForwards.Select(static sample => sample.SourceToPushMs)),
+                questSummary.MeanLslReceiveDelayMs,
+                questSummary.MeanTimeCorrectionUncertaintyMs,
+                PayloadSizeSummary.From(streamRecords.Select(static record => record.PayloadSizeBytes)),
+                PayloadSizeSummary.From(streamQuestSamples.Select(static sample => sample.PayloadSizeBytes))));
+        }
+
+        return summaries;
     }
 
     private static IEnumerable<BrokerWebSocketReceivedMessage> QuestStreamMessages(BrokerWebSocketProbeResult? probe) =>
@@ -892,6 +998,11 @@ public sealed record PolarThroughputSummary(
             type.ValueKind == JsonValueKind.String &&
             string.Equals(type.GetString(), "stream_event", StringComparison.Ordinal)) ?? [];
 
+    private static string StreamFromMessage(BrokerWebSocketReceivedMessage message) =>
+        message.Payload.TryGetProperty("stream", out var stream) && stream.ValueKind == JsonValueKind.String
+            ? stream.GetString() ?? string.Empty
+            : string.Empty;
+
     private static long UnixTimeNanoseconds(DateTimeOffset value) =>
         (value.ToUniversalTime().Ticks - DateTimeOffset.UnixEpoch.Ticks) * 100L;
 
@@ -899,6 +1010,48 @@ public sealed record PolarThroughputSummary(
     {
         var materialized = values.Where(static value => value.HasValue).Select(static value => value!.Value).ToArray();
         return materialized.Length == 0 ? null : materialized.Average();
+    }
+}
+
+public sealed record PolarStreamThroughputSummary(
+    string Stream,
+    long WindowsRecordCount,
+    TimingCadenceSummary WindowsSourceCadence,
+    TimingCadenceSummary WindowsLslPushCadence,
+    TimingCadenceSummary QuestLslReceiveCadence,
+    TimingCadenceSummary QuestWebSocketReceiveCadence,
+    long WindowsSensorSamples,
+    double? WindowsSensorSampleRateHz,
+    long QuestSensorSamples,
+    double? QuestSensorSampleRateHz,
+    double? MeanWindowsSourceToLslPushMs,
+    double? MeanQuestLslReceiveDelayMs,
+    double? MeanLslTimeCorrectionUncertaintyMs,
+    PayloadSizeSummary WindowsNotificationPayloadBytes,
+    PayloadSizeSummary QuestObservedPayloadBytes);
+
+public sealed record PayloadSizeSummary(
+    long Count,
+    int MinBytes,
+    int MaxBytes,
+    double? MeanBytes,
+    IReadOnlyDictionary<int, long> Histogram)
+{
+    public static PayloadSizeSummary From(IEnumerable<int> payloadSizes)
+    {
+        var values = payloadSizes.Where(static value => value > 0).ToArray();
+        if (values.Length == 0)
+        {
+            return new PayloadSizeSummary(0, 0, 0, null, new SortedDictionary<int, long>());
+        }
+
+        var histogram = new SortedDictionary<int, long>();
+        foreach (var value in values)
+        {
+            histogram[value] = histogram.TryGetValue(value, out var count) ? count + 1 : 1;
+        }
+
+        return new PayloadSizeSummary(values.Length, values.Min(), values.Max(), values.Average(), histogram);
     }
 }
 
@@ -938,10 +1091,32 @@ public static class PolarThroughputDiagnosticReportWriter
         - Quest sensor samples: {report.Summary.QuestSensorSamples} at {Format(report.Summary.QuestSensorSampleRateHz)} Hz
         - LSL clock uncertainty: {Format(report.Summary.MeanLslTimeCorrectionUncertaintyMs)} ms
 
+        ## Stream Summaries
+
+        {StreamSummariesMarkdown(report.Summary.Streams)}
+
         ## Notes
 
         {string.Join(Environment.NewLine, report.Notes.Select(static note => $"- {note}"))}
         """;
+
+    private static string StreamSummariesMarkdown(IReadOnlyList<PolarStreamThroughputSummary> streams)
+    {
+        if (streams.Count == 0)
+        {
+            return "- No stream-specific samples were observed.";
+        }
+
+        return string.Join(
+            Environment.NewLine,
+            streams.Select(stream =>
+                $"- {stream.Stream}: windows records {stream.WindowsRecordCount}, windows source {Format(stream.WindowsSourceCadence.RateHz)} Hz, windows sensor {stream.WindowsSensorSamples} at {Format(stream.WindowsSensorSampleRateHz)} Hz, Quest LSL samples {stream.QuestLslReceiveCadence.Count}, Quest sensor {stream.QuestSensorSamples} at {Format(stream.QuestSensorSampleRateHz)} Hz, Windows payload bytes {PayloadSummary(stream.WindowsNotificationPayloadBytes)}, Quest payload bytes {PayloadSummary(stream.QuestObservedPayloadBytes)}"));
+    }
+
+    private static string PayloadSummary(PayloadSizeSummary summary) =>
+        summary.Count == 0
+            ? "n/a"
+            : $"n={summary.Count} min={summary.MinBytes} mean={Format(summary.MeanBytes)} max={summary.MaxBytes}";
 
     private static string ForwardCsv(IReadOnlyList<LslStringForwardSample> samples)
     {

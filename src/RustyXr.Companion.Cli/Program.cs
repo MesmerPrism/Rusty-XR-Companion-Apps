@@ -660,6 +660,12 @@ internal static class CliProgram
                 DurationSeconds: ParseInt(options, "--duration-seconds", ParseInt(options, "--seconds", 15)),
                 OutputRoot: options.ValueOrNull("--out") ?? Path.Combine("artifacts", "polar-throughput"),
                 IncludeHeartRate: !options.Has("--skip-hr"),
+                PmdStream: options.ValueOrNull("--pmd-stream") ?? options.ValueOrNull("--measurement") ?? PolarH10WindowsCaptureService.PmdStreamAcc,
+                AccSampleRateHz: ParseInt(options, "--acc-rate", ParseInt(options, "--acc-sample-rate-hz", 200)),
+                WindowsBleConnectionMode: options.Has("--windows-throughput-optimized")
+                    ? PolarH10WindowsCaptureService.WindowsBleConnectionThroughputOptimized
+                    : options.ValueOrNull("--windows-ble-mode") ?? options.ValueOrNull("--windows-ble-throughput") ?? PolarH10WindowsCaptureService.WindowsBleConnectionDefault,
+                QuestBleConnectionPriority: options.ValueOrNull("--quest-ble-priority") ?? "high",
                 QuestSerial: options.ValueOrNull("--serial") ?? string.Empty,
                 BrokerHost: options.ValueOrNull("--host") ?? BrokerClientService.DefaultHost,
                 HostPort: ParsePort(options, "--host-port", port),
@@ -2622,7 +2628,7 @@ internal static class CliProgram
           lsl loopback [--lsl-dll <path>] [--count <n>] [--interval-ms <n>] [--warmup-ms <n>] [--out <folder>] [--no-pdf] [--json]
           lsl broker-roundtrip [--serial <serial>] [--lsl-dll <path>] [--count <n>] [--interval-ms <n>] [--warmup-ms <n>] [--out <folder>] [--no-pdf] [--json]
           polar plan [--profile <id>] [--out <folder>] [--json]
-          polar throughput [--mode <windows-owned-pmd|quest-owned-pmd|hr-rr-dual-receiver>] [--device-address <mac>] [--windows-device-address <mac>] [--quest-device-address <mac>] [--serial <quest>] [--lsl-dll <path>] [--duration-seconds <n>] [--out <folder>] [--json]
+          polar throughput [--mode <windows-owned-pmd|quest-owned-pmd|hr-rr-dual-receiver>] [--pmd-stream <acc|ecg>] [--acc-rate <25|50|100|200>] [--windows-ble-mode <default|throughput-optimized>] [--quest-ble-priority <high|default>] [--device-address <mac>] [--windows-device-address <mac>] [--quest-device-address <mac>] [--serial <quest>] [--lsl-dll <path>] [--duration-seconds <n>] [--out <folder>] [--json]
           broker forward --serial <serial> [--host-port <n>] [--device-port <n>] [--json]
           broker status [--host 127.0.0.1] [--port <n>] [--url <http-url>] [--json]
           broker command --command <status|capabilities|streams|subscribe|unsubscribe|name> [--stream <id>] [--host 127.0.0.1] [--port <n>] [--url <ws-url>] [--listen-ms <n>] [--json]
