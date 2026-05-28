@@ -485,7 +485,7 @@ internal static class CliProgram
     {
         if (args.Length == 0)
         {
-            return Fail("Use: broker <forward|status|host-manifest|command|capabilities|streams|subscribe|unsubscribe|sample|verify|compare|bio-simulate|app-camera-luma-probe|app-camera-h264-probe|app-camera-h264-decode-probe|h264-proxy-start|h264-proxy-probe|shell-helper> [options]");
+            return Fail("Use: broker <forward|status|host-manifest|lease-request|lease-release|command|capabilities|streams|subscribe|unsubscribe|sample|verify|compare|bio-simulate|app-camera-luma-probe|app-camera-h264-probe|app-camera-h264-decode-probe|h264-proxy-start|h264-proxy-probe|shell-helper> [options]");
         }
 
         var subcommand = args[0].ToLowerInvariant();
@@ -500,6 +500,8 @@ internal static class CliProgram
             "forward" => await BrokerForwardAsync(options).ConfigureAwait(false),
             "status" => await BrokerStatusAsync(options).ConfigureAwait(false),
             "host-manifest" => await BrokerHostManifestAsync(options).ConfigureAwait(false),
+            "lease-request" => await BrokerLeaseRequestAsync(options).ConfigureAwait(false),
+            "lease-release" => await BrokerLeaseReleaseAsync(options).ConfigureAwait(false),
             "command" => await BrokerCommandAsync(options.ValueOrNull("--command") ?? "status_request", options).ConfigureAwait(false),
             "capabilities" => await BrokerCommandAsync("list_capabilities", options).ConfigureAwait(false),
             "streams" => await BrokerCommandAsync("list_streams", options).ConfigureAwait(false),
@@ -514,7 +516,7 @@ internal static class CliProgram
             "app-camera-h264-decode-probe" => await BrokerAppCameraH264DecodeProbeAsync(options).ConfigureAwait(false),
             "h264-proxy-start" => await BrokerH264ProxyStartAsync(options).ConfigureAwait(false),
             "h264-proxy-probe" => await BrokerH264ProxyProbeAsync(options).ConfigureAwait(false),
-            _ => Fail("Use: broker <forward|status|host-manifest|command|capabilities|streams|subscribe|unsubscribe|sample|verify|compare|bio-simulate|app-camera-luma-probe|app-camera-h264-probe|app-camera-h264-decode-probe|h264-proxy-start|h264-proxy-probe|shell-helper> [options]")
+            _ => Fail("Use: broker <forward|status|host-manifest|lease-request|lease-release|command|capabilities|streams|subscribe|unsubscribe|sample|verify|compare|bio-simulate|app-camera-luma-probe|app-camera-h264-probe|app-camera-h264-decode-probe|h264-proxy-start|h264-proxy-probe|shell-helper> [options]")
         };
     }
 
@@ -776,6 +778,69 @@ internal static class CliProgram
         WriteObject(result, options.Has("--json"));
         return result.HasAcceptedAck ? 0 : 2;
     }
+
+    private static async Task<int> BrokerLeaseRequestAsync(ArgOptions options)
+    {
+        var holderClientId = options.ValueOrNull("--client-id") ?? "rusty-xr-companion-cli";
+        var scope = options.ValueOrNull("--scope") ?? "session.lifecycle";
+        var parameters = BrokerClientService.BuildControlLeaseRequestParameters(
+            new BrokerControlLeaseRequest(
+                holderClientId,
+                scope,
+                options.ValueOrNull("--command-scope") ?? scope,
+                options.ValueOrNull("--resource"),
+                OptionalLong(options, "--expected-revision"),
+                OptionalLong(options, "--duration-ms") ?? 60_000,
+                options.Has("--operator-confirmed")));
+
+        var result = await SendBrokerLeaseCommandAsync(
+            BrokerClientService.ControlLeaseRequestCommand,
+            parameters,
+            options,
+            "companion-lease-request").ConfigureAwait(false);
+        WriteObject(result, options.Has("--json"));
+        return result.HasAcceptedAck ? 0 : 2;
+    }
+
+    private static async Task<int> BrokerLeaseReleaseAsync(ArgOptions options)
+    {
+        var holderClientId = options.ValueOrNull("--client-id") ?? "rusty-xr-companion-cli";
+        var parameters = BrokerClientService.BuildControlLeaseReleaseParameters(
+            new BrokerControlLeaseRelease(
+                Required(options, "--lease"),
+                holderClientId,
+                options.ValueOrNull("--scope"),
+                options.ValueOrNull("--command-scope") ?? options.ValueOrNull("--scope"),
+                options.ValueOrNull("--resource"),
+                OptionalLong(options, "--expected-revision"),
+                options.ValueOrNull("--reason") ?? "companion_operator_release"));
+
+        var result = await SendBrokerLeaseCommandAsync(
+            BrokerClientService.ControlLeaseReleaseCommand,
+            parameters,
+            options,
+            "companion-lease-release").ConfigureAwait(false);
+        WriteObject(result, options.Has("--json"));
+        return result.HasAcceptedAck ? 0 : 2;
+    }
+
+    private static Task<BrokerWebSocketProbeResult> SendBrokerLeaseCommandAsync(
+        string command,
+        JsonObject parameters,
+        ArgOptions options,
+        string requestPrefix) =>
+        new BrokerClientService()
+            .SendCommandAsync(
+                BrokerEventsUri(options),
+                new BrokerCommandRequest(
+                    command,
+                    options.ValueOrNull("--request-id") ?? $"{requestPrefix}-{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}",
+                    options.ValueOrNull("--client-id") ?? "rusty-xr-companion-cli",
+                    "Rusty XR Companion CLI",
+                    AppBuildIdentity.Detect().DisplayLabel,
+                    Parameters: parameters),
+                TimeSpan.FromMilliseconds(ParseInt(options, "--listen-ms", 0)),
+                ParseInt(options, "--max-messages", 16));
 
     private static async Task<int> BrokerLatencySampleAsync(ArgOptions options)
     {
@@ -1873,6 +1938,8 @@ internal static class CliProgram
             "capabilities" => "list_capabilities",
             "streams" => "list_streams",
             "host-manifest" or "host_manifest" => BrokerClientService.HostManifestCommand,
+            "lease-request" or "lease_request" => BrokerClientService.ControlLeaseRequestCommand,
+            "lease-release" or "lease_release" => BrokerClientService.ControlLeaseReleaseCommand,
             _ => command
         };
 
@@ -2607,6 +2674,11 @@ internal static class CliProgram
             ? long.Parse(value, CultureInfo.InvariantCulture)
             : fallback;
 
+    private static long? OptionalLong(ArgOptions options, string name) =>
+        options.TryGet(name, out var value)
+            ? long.Parse(value, CultureInfo.InvariantCulture)
+            : null;
+
     private static int ParsePort(ArgOptions options, string name, int fallback)
     {
         var port = ParseInt(options, name, fallback);
@@ -2661,7 +2733,9 @@ internal static class CliProgram
           broker forward --serial <serial> [--host-port <n>] [--device-port <n>] [--json]
           broker status [--host 127.0.0.1] [--port <n>] [--url <http-url>] [--json]
           broker host-manifest [--host 127.0.0.1] [--port <n>] [--url <http-url>] [--manifest-url <http-url>] [--json]
-          broker command --command <status|capabilities|streams|host-manifest|subscribe|unsubscribe|name> [--stream <id>] [--host 127.0.0.1] [--port <n>] [--url <ws-url>] [--listen-ms <n>] [--json]
+          broker lease-request [--scope <id>] [--command-scope <id>] [--resource <id>] [--expected-revision <n>] [--duration-ms <n>] [--operator-confirmed] [--listen-ms <n>] [--json]
+          broker lease-release --lease <id> [--scope <id>] [--command-scope <id>] [--resource <id>] [--expected-revision <n>] [--reason <text>] [--listen-ms <n>] [--json]
+          broker command --command <status|capabilities|streams|host-manifest|lease-request|lease-release|subscribe|unsubscribe|name> [--stream <id>] [--host 127.0.0.1] [--port <n>] [--url <ws-url>] [--listen-ms <n>] [--json]
           broker subscribe --stream <id> [--listen-ms <n>] [--json]
           broker sample [--subscribe] [--sequence <n>] [--path <name>] [--bytes <n>] [--listen-ms <n>] [--json]
           broker verify [--serial <serial>] [--host-port <n>] [--device-port <n>] [--osc-host <quest-ip>] [--osc-value <n>] [--out <folder>] [--json]

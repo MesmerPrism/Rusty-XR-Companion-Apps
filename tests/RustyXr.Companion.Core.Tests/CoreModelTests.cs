@@ -793,6 +793,8 @@ public sealed class CoreModelTests
         Assert.Equal(CompanionOperationSurface.SchemaVersion, catalog.SchemaVersion);
         Assert.Contains(catalog.Operations, operation => operation.Id == "workspace.guide");
         Assert.Contains(catalog.Operations, operation => operation.Id == "broker.host_manifest");
+        Assert.Contains(catalog.Operations, operation => operation.Id == "broker.lease_request");
+        Assert.Contains(catalog.Operations, operation => operation.Id == "broker.lease_release");
         Assert.Contains(catalog.Operations, operation => operation.Id == "android.agent_command");
         Assert.Contains(catalog.Operations, operation => operation.Id == "broker.h264_proxy_probe");
         Assert.Contains(catalog.Operations, operation => operation.Id == "broker.h264_proxy_start");
@@ -835,6 +837,11 @@ public sealed class CoreModelTests
             tool => tool.Name == "rusty_xr_broker_host_manifest" &&
                     tool.Annotations.ReadOnlyHint &&
                     tool.InputSchema["properties"]?["host"]?["type"]?.GetValue<string>() == "string");
+        Assert.Contains(
+            tools.Tools,
+            tool => tool.Name == "rusty_xr_broker_lease_request" &&
+                    tool.Annotations.DestructiveHint &&
+                    tool.InputSchema["properties"]?["expectedRevision"]?["type"]?.GetValue<string>() == "integer");
         Assert.Contains(
             tools.Tools,
             tool => tool.Name == "rusty_xr_broker_h264_proxy_probe" &&
@@ -885,6 +892,64 @@ public sealed class CoreModelTests
         Assert.Equal(
             new[] { "broker", "host-manifest", "--host", "127.0.0.1", "--port", "8765", "--json" },
             plan.Arguments);
+    }
+
+    [Fact]
+    public void CompanionOperationPlannerGatesBrokerLeaseRequest()
+    {
+        var blocked = CompanionOperationPlanner.CreatePlan(
+            "broker.lease_request",
+            new Dictionary<string, string>
+            {
+                ["scope"] = "runtime.bio",
+                ["expectedRevision"] = "7",
+                ["durationMs"] = "60000",
+                ["operatorConfirmed"] = "true"
+            });
+
+        Assert.False(blocked.Allowed);
+        Assert.True(blocked.RequiresSideEffectOptIn);
+        Assert.Equal(
+            new[]
+            {
+                "broker",
+                "lease-request",
+                "--scope",
+                "runtime.bio",
+                "--expected-revision",
+                "7",
+                "--duration-ms",
+                "60000",
+                "--operator-confirmed",
+                "--json"
+            },
+            blocked.Arguments);
+
+        var allowed = CompanionOperationPlanner.CreatePlan(
+            "broker.lease_release",
+            new Dictionary<string, string>
+            {
+                ["lease"] = "control-lease-1",
+                ["scope"] = "runtime.bio",
+                ["reason"] = "operator_done"
+            },
+            allowSideEffects: true);
+
+        Assert.True(allowed.Allowed);
+        Assert.Equal(
+            new[]
+            {
+                "broker",
+                "lease-release",
+                "--lease",
+                "control-lease-1",
+                "--scope",
+                "runtime.bio",
+                "--reason",
+                "operator_done",
+                "--json"
+            },
+            allowed.Arguments);
     }
 
     [Fact]

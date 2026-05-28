@@ -173,6 +173,46 @@ public static class CompanionOperationSurface
                     new[] { BrokerClientService.HostManifestSchema, "BrokerHostManifestProbeResult" },
                     "Use this before choosing a control or stream endpoint in a UI host."),
                 new CompanionOperation(
+                    "broker.lease_request",
+                    WindowsOwner,
+                    "Broker control lease request",
+                    "Requests a temporary broker-side control lease for one advertised command scope.",
+                    "BrokerClientService.BuildControlLeaseRequestParameters",
+                    "broker lease-request [--scope <id>] [--expected-revision <n>] [--operator-confirmed] --json",
+                    "rusty_xr_broker_lease_request",
+                    "device-commanding",
+                    new[]
+                    {
+                        Parameter("scope", "string", required: false, "Broker control scope id.", "session.lifecycle"),
+                        Parameter("commandScope", "string", required: false, "Command scope when it differs from the scope id.", "session.lifecycle"),
+                        Parameter("resource", "string", required: false, "Optional scoped resource id.", "bio:breath"),
+                        Parameter("expectedRevision", "integer", required: false, "Expected stream registry revision.", "7"),
+                        Parameter("durationMs", "integer", required: false, "Requested lease duration in milliseconds.", "60000"),
+                        Parameter("operatorConfirmed", "boolean", required: false, "Whether the operator explicitly confirmed the lease request.", "true")
+                    },
+                    new[] { BrokerClientService.ControlLeaseRequestSchema, "BrokerWebSocketProbeResult" },
+                    "The broker remains authoritative and may reject stale revisions, conflicts, or missing capability."),
+                new CompanionOperation(
+                    "broker.lease_release",
+                    WindowsOwner,
+                    "Broker control lease release",
+                    "Releases a broker-side control lease held by this companion client.",
+                    "BrokerClientService.BuildControlLeaseReleaseParameters",
+                    "broker lease-release --lease <id> [--scope <id>] [--reason <text>] --json",
+                    "rusty_xr_broker_lease_release",
+                    "device-commanding",
+                    new[]
+                    {
+                        Parameter("lease", "string", required: true, "Control lease id returned by the broker.", "control-lease-1"),
+                        Parameter("scope", "string", required: false, "Broker control scope id.", "session.lifecycle"),
+                        Parameter("commandScope", "string", required: false, "Command scope when it differs from the scope id.", "session.lifecycle"),
+                        Parameter("resource", "string", required: false, "Optional scoped resource id.", "bio:breath"),
+                        Parameter("expectedRevision", "integer", required: false, "Expected stream registry revision.", "8"),
+                        Parameter("reason", "string", required: false, "Short release reason.", "operator_done")
+                    },
+                    new[] { BrokerClientService.ControlLeaseReleaseSchema, "BrokerWebSocketProbeResult" },
+                    "Use after a lease-aware UI finishes a mutating command window."),
+                new CompanionOperation(
                     "broker.compare",
                     WindowsOwner,
                     "Broker route comparison",

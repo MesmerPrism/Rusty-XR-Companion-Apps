@@ -209,6 +209,8 @@ dotnet run --project src/RustyXr.Companion.Cli -- catalog verify --path samples\
 dotnet run --project src/RustyXr.Companion.Cli -- broker forward --serial <serial>
 dotnet run --project src/RustyXr.Companion.Cli -- broker status --json
 dotnet run --project src/RustyXr.Companion.Cli -- broker host-manifest --json
+dotnet run --project src/RustyXr.Companion.Cli -- broker lease-request --scope runtime.bio --expected-revision 7 --operator-confirmed --json
+dotnet run --project src/RustyXr.Companion.Cli -- broker lease-release --lease control-lease-1 --scope runtime.bio --reason operator_done --json
 dotnet run --project src/RustyXr.Companion.Cli -- broker streams --json
 dotnet run --project src/RustyXr.Companion.Cli -- broker sample --subscribe --json
 dotnet run --project src/RustyXr.Companion.Cli -- broker verify --serial <serial> --osc-host <quest-lan-ip> --out .\artifacts\verify --json

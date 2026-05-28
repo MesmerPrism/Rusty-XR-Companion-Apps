@@ -16,6 +16,11 @@ public sealed class BrokerClientService
     public const string LatencySampleSchema = "rusty.xr.broker.latency_sample.v1";
     public const string HostManifestSchema = "rusty.xr.broker.host_manifest.v1";
     public const string HostManifestCommand = "broker.host_manifest";
+    public const string ControlScopeSchema = "rusty.xr.broker.control_scope.v1";
+    public const string ControlLeaseRequestSchema = "rusty.xr.broker.control_lease_request.v1";
+    public const string ControlLeaseReleaseSchema = "rusty.xr.broker.control_lease_release.v1";
+    public const string ControlLeaseRequestCommand = "control_lease.request";
+    public const string ControlLeaseReleaseCommand = "control_lease.release";
 
     private static readonly JsonSerializerOptions BrokerJsonOptions = new(JsonSerializerDefaults.Web)
     {
@@ -129,6 +134,72 @@ public sealed class BrokerClientService
 
         return ToElement(root);
     }
+
+    public static JsonObject BuildControlLeaseRequestParameters(BrokerControlLeaseRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request.HolderClientId))
+        {
+            throw new ArgumentException("Holder client id is required.", nameof(request));
+        }
+
+        if (string.IsNullOrWhiteSpace(request.ScopeId))
+        {
+            throw new ArgumentException("Control lease scope id is required.", nameof(request));
+        }
+
+        var durationNs = request.RequestedDurationMilliseconds is > 0
+            ? request.RequestedDurationMilliseconds.Value * 1_000_000L
+            : (long?)null;
+        var scope = BuildControlScopeObject(request.ScopeId, request.CommandScope, request.ResourceId);
+        var root = new JsonObject
+        {
+            ["schema"] = ControlLeaseRequestSchema,
+            ["holder_client_id"] = request.HolderClientId,
+            ["scope"] = scope,
+            ["requested_duration_elapsed_ns"] = durationNs,
+            ["expected_revision"] = request.ExpectedRevision,
+            ["operator_confirmed"] = request.OperatorConfirmed
+        };
+        return root;
+    }
+
+    public static JsonObject BuildControlLeaseReleaseParameters(BrokerControlLeaseRelease request)
+    {
+        if (string.IsNullOrWhiteSpace(request.LeaseId))
+        {
+            throw new ArgumentException("Control lease id is required.", nameof(request));
+        }
+
+        if (string.IsNullOrWhiteSpace(request.HolderClientId))
+        {
+            throw new ArgumentException("Holder client id is required.", nameof(request));
+        }
+
+        var root = new JsonObject
+        {
+            ["schema"] = ControlLeaseReleaseSchema,
+            ["lease_id"] = request.LeaseId,
+            ["holder_client_id"] = request.HolderClientId,
+            ["scope"] = string.IsNullOrWhiteSpace(request.ScopeId)
+                ? null
+                : BuildControlScopeObject(request.ScopeId, request.CommandScope, request.ResourceId),
+            ["expected_revision"] = request.ExpectedRevision,
+            ["reason"] = string.IsNullOrWhiteSpace(request.Reason) ? null : request.Reason
+        };
+        return root;
+    }
+
+    private static JsonObject BuildControlScopeObject(
+        string scopeId,
+        string? commandScope,
+        string? resourceId) =>
+        new()
+        {
+            ["schema"] = ControlScopeSchema,
+            ["scope_id"] = scopeId,
+            ["command_scope"] = string.IsNullOrWhiteSpace(commandScope) ? scopeId : commandScope,
+            ["resource_id"] = string.IsNullOrWhiteSpace(resourceId) ? null : resourceId
+        };
 
     public async Task<BrokerStatusProbeResult> GetStatusAsync(
         Uri statusUri,
@@ -390,6 +461,24 @@ public sealed record BrokerLatencySampleRequest(
     string ClientId,
     string AppLabel,
     string? AppVersion);
+
+public sealed record BrokerControlLeaseRequest(
+    string HolderClientId,
+    string ScopeId,
+    string? CommandScope = null,
+    string? ResourceId = null,
+    long? ExpectedRevision = null,
+    long? RequestedDurationMilliseconds = null,
+    bool OperatorConfirmed = false);
+
+public sealed record BrokerControlLeaseRelease(
+    string LeaseId,
+    string HolderClientId,
+    string? ScopeId = null,
+    string? CommandScope = null,
+    string? ResourceId = null,
+    long? ExpectedRevision = null,
+    string? Reason = null);
 
 public sealed record BrokerStatusProbeResult(
     Uri Url,

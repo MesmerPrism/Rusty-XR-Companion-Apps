@@ -85,6 +85,66 @@ public sealed class BrokerClientServiceTests
     }
 
     [Fact]
+    public void BrokerControlLeaseRequestPayloadUsesPublicContractShape()
+    {
+        var parameters = BrokerClientService.BuildControlLeaseRequestParameters(
+            new BrokerControlLeaseRequest(
+                "test-client",
+                "runtime.bio",
+                "runtime.bio",
+                "bio:breath",
+                ExpectedRevision: 7,
+                RequestedDurationMilliseconds: 60_000,
+                OperatorConfirmed: true));
+        var payload = BrokerClientService.BuildCommandPayload(new BrokerCommandRequest(
+            BrokerClientService.ControlLeaseRequestCommand,
+            "lease-req",
+            "test-client",
+            "Test Client",
+            "1.0",
+            Parameters: parameters));
+
+        var commandParameters = payload.GetProperty("params");
+        Assert.Equal(BrokerClientService.ControlLeaseRequestCommand, payload.GetProperty("command").GetString());
+        Assert.Equal(BrokerClientService.ControlLeaseRequestSchema, commandParameters.GetProperty("schema").GetString());
+        Assert.Equal("test-client", commandParameters.GetProperty("holder_client_id").GetString());
+        Assert.Equal(60_000_000_000L, commandParameters.GetProperty("requested_duration_elapsed_ns").GetInt64());
+        Assert.Equal(7, commandParameters.GetProperty("expected_revision").GetInt64());
+        Assert.True(commandParameters.GetProperty("operator_confirmed").GetBoolean());
+        Assert.Equal("runtime.bio", commandParameters.GetProperty("scope").GetProperty("scope_id").GetString());
+        Assert.Equal("bio:breath", commandParameters.GetProperty("scope").GetProperty("resource_id").GetString());
+    }
+
+    [Fact]
+    public void BrokerControlLeaseReleasePayloadUsesPublicContractShape()
+    {
+        var parameters = BrokerClientService.BuildControlLeaseReleaseParameters(
+            new BrokerControlLeaseRelease(
+                "control-lease-1",
+                "test-client",
+                "runtime.bio",
+                "runtime.bio",
+                ExpectedRevision: 8,
+                Reason: "operator_done"));
+        var payload = BrokerClientService.BuildCommandPayload(new BrokerCommandRequest(
+            BrokerClientService.ControlLeaseReleaseCommand,
+            "lease-release",
+            "test-client",
+            "Test Client",
+            "1.0",
+            Parameters: parameters));
+
+        var commandParameters = payload.GetProperty("params");
+        Assert.Equal(BrokerClientService.ControlLeaseReleaseCommand, payload.GetProperty("command").GetString());
+        Assert.Equal(BrokerClientService.ControlLeaseReleaseSchema, commandParameters.GetProperty("schema").GetString());
+        Assert.Equal("control-lease-1", commandParameters.GetProperty("lease_id").GetString());
+        Assert.Equal("test-client", commandParameters.GetProperty("holder_client_id").GetString());
+        Assert.Equal(8, commandParameters.GetProperty("expected_revision").GetInt64());
+        Assert.Equal("operator_done", commandParameters.GetProperty("reason").GetString());
+        Assert.Equal("runtime.bio", commandParameters.GetProperty("scope").GetProperty("scope_id").GetString());
+    }
+
+    [Fact]
     public async Task BrokerHostManifestProbeReadsHttpEndpoint()
     {
         var handler = new StaticJsonHandler(

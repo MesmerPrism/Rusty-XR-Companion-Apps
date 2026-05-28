@@ -151,6 +151,8 @@ dotnet run --project src\RustyXr.Companion.Cli -- catalog verify --path ..\Rusty
 dotnet run --project src\RustyXr.Companion.Cli -- broker forward --serial <serial>
 dotnet run --project src\RustyXr.Companion.Cli -- broker status --json
 dotnet run --project src\RustyXr.Companion.Cli -- broker host-manifest --json
+dotnet run --project src\RustyXr.Companion.Cli -- broker lease-request --scope runtime.bio --expected-revision 7 --operator-confirmed --json
+dotnet run --project src\RustyXr.Companion.Cli -- broker lease-release --lease control-lease-1 --scope runtime.bio --reason operator_done --json
 dotnet run --project src\RustyXr.Companion.Cli -- broker streams --json
 dotnet run --project src\RustyXr.Companion.Cli -- broker sample --subscribe --json
 dotnet run --project src\RustyXr.Companion.Cli -- broker verify --serial <serial> --osc-host <quest-lan-ip> --out .\artifacts\verify --json
@@ -168,6 +170,10 @@ declared host role, endpoint visibility, security policy, clock domain, and
 capabilities. Use it before selecting a UI/control endpoint; `broker verify`
 now includes the same read-only manifest check so stale broker APKs fail before
 stream or mutation diagnostics depend on implicit endpoint assumptions.
+`broker lease-request` and `broker lease-release` exercise the same
+lease-aware control contracts used by broker-described UI surfaces. They mutate
+only broker lease state; the broker still validates holder, scope, revision,
+expiry, and conflicts before granting or releasing authority.
 
 ## Broker Comparison Runner
 

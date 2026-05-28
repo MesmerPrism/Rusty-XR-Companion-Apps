@@ -192,6 +192,31 @@ public static class CompanionOperationPlanner
                 Add(arguments, "--json");
                 break;
 
+            case "broker.lease_request":
+                Add(arguments, "broker", "lease-request");
+                AddOption(arguments, "--scope", ValueOrNull(inputs, "scope"));
+                AddOption(arguments, "--command-scope", ValueOrNull(inputs, "commandScope"));
+                AddOption(arguments, "--resource", ValueOrNull(inputs, "resource"));
+                AddOption(arguments, "--expected-revision", ValueOrNull(inputs, "expectedRevision"));
+                AddOption(arguments, "--duration-ms", ValueOrNull(inputs, "durationMs"));
+                if (TryGetBoolean(inputs, "operatorConfirmed"))
+                {
+                    Add(arguments, "--operator-confirmed");
+                }
+                Add(arguments, "--json");
+                break;
+
+            case "broker.lease_release":
+                Add(arguments, "broker", "lease-release");
+                AddOption(arguments, "--lease", Required(inputs, "lease"));
+                AddOption(arguments, "--scope", ValueOrNull(inputs, "scope"));
+                AddOption(arguments, "--command-scope", ValueOrNull(inputs, "commandScope"));
+                AddOption(arguments, "--resource", ValueOrNull(inputs, "resource"));
+                AddOption(arguments, "--expected-revision", ValueOrNull(inputs, "expectedRevision"));
+                AddOption(arguments, "--reason", ValueOrNull(inputs, "reason"));
+                Add(arguments, "--json");
+                break;
+
             case "broker.compare":
                 Add(arguments, "broker", "compare");
                 AddOption(arguments, "--quest-host", Required(inputs, "questHost"));
