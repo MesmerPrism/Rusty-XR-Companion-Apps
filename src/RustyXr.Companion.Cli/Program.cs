@@ -5,6 +5,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using RustyXr.Companion.Core;
 using RustyXr.Companion.Diagnostics;
+using RustyXr.Companion.Windows;
 
 var exitCode = await CliProgram.RunAsync(args).ConfigureAwait(false);
 return exitCode;
@@ -51,7 +52,7 @@ internal static class CliProgram
                 "media" => await MediaAsync(args.Skip(1).ToArray()).ConfigureAwait(false),
                 "osc" => await OscAsync(args.Skip(1).ToArray()).ConfigureAwait(false),
                 "lsl" => await LslAsync(args.Skip(1).ToArray()).ConfigureAwait(false),
-                "polar" => Polar(args.Skip(1).ToArray()),
+                "polar" => await PolarAsync(args.Skip(1).ToArray()).ConfigureAwait(false),
                 "broker" => await BrokerAsync(args.Skip(1).ToArray()).ConfigureAwait(false),
                 "tooling" => await ToolingAsync(args.Skip(1).ToArray()).ConfigureAwait(false),
                 "catalog" => await CatalogAsync(args.Skip(1).ToArray()).ConfigureAwait(false),
@@ -615,11 +616,11 @@ internal static class CliProgram
         return report.Succeeded ? 0 : 2;
     }
 
-    private static int Polar(string[] args)
+    private static async Task<int> PolarAsync(string[] args)
     {
         if (args.Length == 0)
         {
-            return Fail("Use: polar <plan> [options]");
+            return Fail("Use: polar <plan|throughput> [options]");
         }
 
         var subcommand = args[0].ToLowerInvariant();
@@ -627,7 +628,8 @@ internal static class CliProgram
         return subcommand switch
         {
             "plan" => PolarPlan(options),
-            _ => Fail("Use: polar <plan> [options]")
+            "throughput" => await PolarThroughputAsync(options).ConfigureAwait(false),
+            _ => Fail("Use: polar <plan|throughput> [options]")
         };
     }
 
@@ -644,6 +646,49 @@ internal static class CliProgram
 
         WriteObject(plan, options.Has("--json"));
         return plan.Profiles.Count > 0 ? 0 : 2;
+    }
+
+    private static async Task<int> PolarThroughputAsync(ArgOptions options)
+    {
+        var port = ParsePort(options, "--port", BrokerClientService.DefaultPort);
+        var report = await new PolarThroughputDiagnosticsService()
+            .RunAsync(new PolarThroughputDiagnosticOptions(
+                Mode: options.ValueOrNull("--mode") ?? PolarThroughputModes.WindowsOwnedPmd,
+                DeviceAddress: options.ValueOrNull("--device-address") ?? string.Empty,
+                WindowsDeviceAddress: options.ValueOrNull("--windows-device-address") ?? string.Empty,
+                QuestDeviceAddress: options.ValueOrNull("--quest-device-address") ?? string.Empty,
+                DurationSeconds: ParseInt(options, "--duration-seconds", ParseInt(options, "--seconds", 15)),
+                OutputRoot: options.ValueOrNull("--out") ?? Path.Combine("artifacts", "polar-throughput"),
+                IncludeHeartRate: !options.Has("--skip-hr"),
+                QuestSerial: options.ValueOrNull("--serial") ?? string.Empty,
+                BrokerHost: options.ValueOrNull("--host") ?? BrokerClientService.DefaultHost,
+                HostPort: ParsePort(options, "--host-port", port),
+                DevicePort: ParsePort(options, "--device-port", BrokerClientService.DefaultPort),
+                ScanTimeoutMilliseconds: ParseInt(options, "--scan-timeout-ms", 30000),
+                TimeoutMilliseconds: ParseInt(options, "--timeout-ms", 5000),
+                ResolveTimeoutMilliseconds: ParseInt(options, "--resolve-timeout-ms", 10000),
+                WarmupMilliseconds: ParseInt(options, "--warmup-ms", 500),
+                ListenMilliseconds: ParseInt(options, "--listen-ms", 0),
+                MaxBrokerMessages: ParseInt(options, "--max-messages", 24),
+                MaxLslSamples: ParseInt(options, "--max-lsl-samples", 2048),
+                RequiredStream: options.ValueOrNull("--stream") ?? string.Empty,
+                LslDllPath: options.ValueOrNull("--lsl-dll") ?? string.Empty,
+                QuestLslStreamName: options.ValueOrNull("--quest-lsl-stream-name") ?? LslDiagnosticDefaults.BrokerLatencyStreamName,
+                WindowsLslStreamName: options.ValueOrNull("--windows-lsl-stream-name") ?? "rusty_xr_polar_windows_bridge",
+                WindowsLslStreamType: options.ValueOrNull("--windows-lsl-stream-type") ?? "rusty.xr.polar.diagnostic",
+                WindowsLslSourceId: options.ValueOrNull("--windows-lsl-source-id") ?? string.Empty,
+                RunBrokerRoundTrip: !options.Has("--skip-roundtrip"),
+                RoundTripCount: ParseInt(options, "--roundtrip-count", 8),
+                RoundTripIntervalMilliseconds: ParseInt(options, "--roundtrip-interval-ms", 250)))
+            .ConfigureAwait(false);
+
+        Console.Error.WriteLine($"Polar throughput bundle written to {report.ArtifactFolder}");
+        WriteObject(report, options.Has("--json"));
+        return report.Summary.WindowsSourceCadence.Count > 0 ||
+               report.Summary.QuestLslReceiveCadence.Count > 0 ||
+               report.BrokerRoundTrip is { Succeeded: true }
+            ? 0
+            : 2;
     }
 
     private static async Task<int> BrokerForwardAsync(ArgOptions options)
@@ -2577,6 +2622,7 @@ internal static class CliProgram
           lsl loopback [--lsl-dll <path>] [--count <n>] [--interval-ms <n>] [--warmup-ms <n>] [--out <folder>] [--no-pdf] [--json]
           lsl broker-roundtrip [--serial <serial>] [--lsl-dll <path>] [--count <n>] [--interval-ms <n>] [--warmup-ms <n>] [--out <folder>] [--no-pdf] [--json]
           polar plan [--profile <id>] [--out <folder>] [--json]
+          polar throughput [--mode <windows-owned-pmd|quest-owned-pmd|hr-rr-dual-receiver>] [--device-address <mac>] [--windows-device-address <mac>] [--quest-device-address <mac>] [--serial <quest>] [--lsl-dll <path>] [--duration-seconds <n>] [--out <folder>] [--json]
           broker forward --serial <serial> [--host-port <n>] [--device-port <n>] [--json]
           broker status [--host 127.0.0.1] [--port <n>] [--url <http-url>] [--json]
           broker command --command <status|capabilities|streams|subscribe|unsubscribe|name> [--stream <id>] [--host 127.0.0.1] [--port <n>] [--url <ws-url>] [--listen-ms <n>] [--json]

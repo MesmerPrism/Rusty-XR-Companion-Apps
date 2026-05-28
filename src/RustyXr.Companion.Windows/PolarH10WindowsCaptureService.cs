@@ -88,6 +88,7 @@ public sealed class PolarH10WindowsCaptureService
                         formattedAddress,
                         writer,
                         () => Interlocked.Increment(ref heartRateEventCount),
+                        options.RecordObserver,
                         cancellationToken)
                     .ConfigureAwait(false);
             }
@@ -133,6 +134,7 @@ public sealed class PolarH10WindowsCaptureService
                         {
                             Interlocked.Increment(ref accFrameCount);
                             await writer.WriteAsync(frame, CancellationToken.None).ConfigureAwait(false);
+                            await NotifyRecordAsync(options.RecordObserver, frame, CancellationToken.None).ConfigureAwait(false);
                         }
                     }
                     catch (Exception ex)
@@ -262,6 +264,7 @@ public sealed class PolarH10WindowsCaptureService
         string deviceAddress,
         PolarJsonlWriter writer,
         Action onHeartRate,
+        Func<object, CancellationToken, ValueTask>? recordObserver,
         CancellationToken cancellationToken)
     {
         var hrService = await GetServiceAsync(device, PolarGattIds.HeartRateService, cancellationToken).ConfigureAwait(false);
@@ -283,16 +286,28 @@ public sealed class PolarH10WindowsCaptureService
             if (hr is not null)
             {
                 onHeartRate();
-                await writer.WriteAsync(hr with
+                var record = hr with
                     {
                         TimeUnixNs = UnixNowNs(),
                         ReceivedStopwatchTicks = Stopwatch.GetTimestamp(),
                         DeviceAddress = deviceAddress
-                    },
-                    CancellationToken.None).ConfigureAwait(false);
+                    };
+                await writer.WriteAsync(record, CancellationToken.None).ConfigureAwait(false);
+                await NotifyRecordAsync(recordObserver, record, CancellationToken.None).ConfigureAwait(false);
             }
         };
         await EnableNotificationsAsync(heartRate, cancellationToken).ConfigureAwait(false);
+    }
+
+    private static async ValueTask NotifyRecordAsync(
+        Func<object, CancellationToken, ValueTask>? observer,
+        object record,
+        CancellationToken cancellationToken)
+    {
+        if (observer is not null)
+        {
+            await observer(record, cancellationToken).ConfigureAwait(false);
+        }
     }
 
     private static async Task<GattDeviceService?> GetServiceAsync(
@@ -551,7 +566,11 @@ public sealed record PolarH10WindowsCaptureOptions(
     int DurationSeconds,
     string OutputJsonlPath,
     bool IncludeHeartRate = true,
-    bool IncludePmdAcc = true);
+    bool IncludePmdAcc = true)
+{
+    [JsonIgnore]
+    public Func<object, CancellationToken, ValueTask>? RecordObserver { get; init; }
+}
 
 public sealed record PolarH10WindowsCaptureResult(
     DateTimeOffset StartedAt,

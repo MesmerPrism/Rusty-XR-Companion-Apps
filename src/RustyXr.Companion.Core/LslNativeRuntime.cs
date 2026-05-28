@@ -64,6 +64,12 @@ public static class LslNativeRuntime
         return new LslDoubleOutlet(name, type, sourceId, channelCount);
     }
 
+    internal static LslStringOutlet CreateStringOutlet(string name, string type, string sourceId, int channelCount = 1)
+    {
+        EnsureAvailable();
+        return new LslStringOutlet(name, type, sourceId, channelCount);
+    }
+
     internal static LslDoubleInlet ResolveDoubleInlet(string property, string value, TimeSpan timeout, int channelCount)
     {
         EnsureAvailable();
@@ -291,6 +297,78 @@ public static class LslNativeRuntime
         }
     }
 
+    internal sealed class LslStringOutlet : IDisposable
+    {
+        private nint _streamInfo;
+        private nint _outlet;
+        private readonly int _channelCount;
+
+        public LslStringOutlet(string name, string type, string sourceId, int channelCount)
+        {
+            _channelCount = Math.Clamp(channelCount, 1, 128);
+            _streamInfo = NativeMethods.CreateStreamInfo(name, type, _channelCount, 0d, ChannelFormatString, sourceId);
+            if (_streamInfo == IntPtr.Zero)
+            {
+                throw new InvalidOperationException($"Could not create LSL stream info: {NativeMethods.LastError()}");
+            }
+
+            _outlet = NativeMethods.CreateOutlet(_streamInfo, 0, 8);
+            if (_outlet == IntPtr.Zero)
+            {
+                Dispose();
+                throw new InvalidOperationException($"Could not create LSL outlet: {NativeMethods.LastError()}");
+            }
+        }
+
+        public void Push(string[] values, double timestampSeconds)
+        {
+            if (values.Length != _channelCount)
+            {
+                throw new ArgumentException($"Expected {_channelCount} LSL channels, got {values.Length}.", nameof(values));
+            }
+
+            var pointers = new IntPtr[values.Length];
+            try
+            {
+                for (var index = 0; index < values.Length; index++)
+                {
+                    pointers[index] = Marshal.StringToCoTaskMemUTF8(values[index] ?? string.Empty);
+                }
+
+                var result = NativeMethods.PushStringSample(_outlet, pointers, timestampSeconds, 1);
+                if (result != 0)
+                {
+                    throw new InvalidOperationException($"LSL string sample push failed ({ErrorName(result)}): {NativeMethods.LastError()}");
+                }
+            }
+            finally
+            {
+                foreach (var pointer in pointers)
+                {
+                    if (pointer != IntPtr.Zero)
+                    {
+                        Marshal.FreeCoTaskMem(pointer);
+                    }
+                }
+            }
+        }
+
+        public void Dispose()
+        {
+            if (_outlet != IntPtr.Zero)
+            {
+                NativeMethods.DestroyOutlet(_outlet);
+                _outlet = IntPtr.Zero;
+            }
+
+            if (_streamInfo != IntPtr.Zero)
+            {
+                NativeMethods.DestroyStreamInfo(_streamInfo);
+                _streamInfo = IntPtr.Zero;
+            }
+        }
+    }
+
     internal sealed class LslDoubleInlet : IDisposable
     {
         private nint _inlet;
@@ -443,6 +521,9 @@ public static class LslNativeRuntime
         [DllImport("lsl", EntryPoint = "lsl_push_sample_dtp", CallingConvention = CallingConvention.Cdecl)]
         private static extern int lsl_push_sample_dtp(nint outlet, double[] data, double timestamp, int pushThrough);
 
+        [DllImport("lsl", EntryPoint = "lsl_push_sample_strtp", CallingConvention = CallingConvention.Cdecl)]
+        private static extern int lsl_push_sample_strtp(nint outlet, IntPtr[] data, double timestamp, int pushThrough);
+
         [DllImport("lsl", EntryPoint = "lsl_resolve_byprop", CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
         private static extern int lsl_resolve_byprop(
             [Out] IntPtr[] buffer,
@@ -490,6 +571,9 @@ public static class LslNativeRuntime
 
         internal static int PushDoubleSample(nint outlet, double[] values, double timestamp, int pushThrough) =>
             lsl_push_sample_dtp(outlet, values, timestamp, pushThrough);
+
+        internal static int PushStringSample(nint outlet, IntPtr[] values, double timestamp, int pushThrough) =>
+            lsl_push_sample_strtp(outlet, values, timestamp, pushThrough);
 
         internal static int ResolveByProperty(IntPtr[] buffer, uint bufferElements, string property, string value, int minimum, double timeoutSeconds) =>
             lsl_resolve_byprop(buffer, bufferElements, property, value, minimum, timeoutSeconds);

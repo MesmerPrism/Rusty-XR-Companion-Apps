@@ -69,6 +69,62 @@ For a single H10, do not label PC and Quest as simultaneous PMD owners. Run the
 LSL broker round-trip probe alongside live captures when a headset is available
 so plots can annotate clock offset and round-trip stability.
 
+## Throughput Diagnostic Command
+
+Use `polar throughput` for the live timing run. It writes a bundle containing
+the raw Windows JSONL capture where applicable, `polar-throughput-report.json`,
+CSV timing extracts, and `polar-throughput-summary.md`.
+
+```powershell
+dotnet run --project src/RustyXr.Companion.Cli -- polar throughput `
+  --mode windows-owned-pmd `
+  --serial <quest-serial> `
+  --device-address <polar-mac> `
+  --duration-seconds 30 `
+  --lsl-dll <path-to-lsl.dll> `
+  --out .\artifacts\polar-throughput `
+  --json
+
+dotnet run --project src/RustyXr.Companion.Cli -- polar throughput `
+  --mode quest-owned-pmd `
+  --serial <quest-serial> `
+  --quest-device-address <polar-mac> `
+  --duration-seconds 30 `
+  --lsl-dll <path-to-lsl.dll> `
+  --out .\artifacts\polar-throughput `
+  --json
+
+dotnet run --project src/RustyXr.Companion.Cli -- polar throughput `
+  --mode hr-rr-dual-receiver `
+  --serial <quest-serial> `
+  --windows-device-address <polar-windows-mac> `
+  --quest-device-address <polar-quest-mac> `
+  --duration-seconds 30 `
+  --lsl-dll <path-to-lsl.dll> `
+  --out .\artifacts\polar-throughput `
+  --json
+```
+
+`windows-owned-pmd` opens PMD on Windows, records HR/RR and ACC frames, pushes
+those records to a Windows LSL string outlet, and, when `--serial` is supplied,
+asks the Quest broker to run a bounded LSL string inlet capture for the
+forwarded `bio:polar_acc` records. `quest-owned-pmd` starts the broker-owned
+Polar source on the Quest and listens on Windows for the broker's LSL-mirrored
+`bio:polar_acc` events. `hr-rr-dual-receiver` disables PMD on Windows and
+starts HR/RR on both sides, which is the supported single-sensor overlap test.
+
+Use `--device-address` when both hosts see the same BLE address. Use
+`--windows-device-address` and `--quest-device-address` when Windows and
+Android expose different BLE identities for the same strap.
+
+The command also runs the existing broker LSL round-trip probe unless
+`--skip-roundtrip` is set. That gives the report an LSL clock-correction and
+transport-stability witness independent of the Polar samples.
+
+For PMD handoff reliability, run `quest-owned-pmd`, verify the broker reports
+PMD stopped, run `windows-owned-pmd`, then run `quest-owned-pmd` again. Raw PMD
+should have exactly one owner in each leg.
+
 ## Public Boundary
 
 Keep raw capture artifacts, local run paths, study identifiers, and private

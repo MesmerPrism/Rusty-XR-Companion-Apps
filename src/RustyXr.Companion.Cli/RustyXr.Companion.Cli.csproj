@@ -3,6 +3,7 @@
   <ItemGroup>
     <ProjectReference Include="..\RustyXr.Companion.Core\RustyXr.Companion.Core.csproj" />
     <ProjectReference Include="..\RustyXr.Companion.Diagnostics\RustyXr.Companion.Diagnostics.csproj" />
+    <ProjectReference Include="..\RustyXr.Companion.Windows\RustyXr.Companion.Windows.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -30,7 +31,7 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>net10.0</TargetFramework>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
   </PropertyGroup>

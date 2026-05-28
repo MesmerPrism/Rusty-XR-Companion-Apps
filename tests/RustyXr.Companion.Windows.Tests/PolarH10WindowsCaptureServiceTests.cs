@@ -8,11 +8,11 @@ public sealed class PolarH10WindowsCaptureServiceTests
     [Fact]
     public void ParsesCompactOrDelimitedBluetoothAddress()
     {
-        var compact = PolarH10WindowsCaptureService.ParseBluetoothAddress("A09E1AC77456");
-        var delimited = PolarH10WindowsCaptureService.ParseBluetoothAddress("A0:9E:1A:C7:74:56");
+        var compact = PolarH10WindowsCaptureService.ParseBluetoothAddress("A1B2C3D4E5F6");
+        var delimited = PolarH10WindowsCaptureService.ParseBluetoothAddress("A1:B2:C3:D4:E5:F6");
 
         Assert.Equal(compact, delimited);
-        Assert.Equal("A0:9E:1A:C7:74:56", PolarH10WindowsCaptureService.FormatAddress(compact));
+        Assert.Equal("A1:B2:C3:D4:E5:F6", PolarH10WindowsCaptureService.FormatAddress(compact));
     }
 
     [Fact]
@@ -34,7 +34,7 @@ public sealed class PolarH10WindowsCaptureServiceTests
             sequence: 7,
             unixNs: 111,
             ticks: 222,
-            deviceAddress: "A0:9E:1A:C7:74:56",
+            deviceAddress: "A1:B2:C3:D4:E5:F6",
             deviceName: "Polar H10");
 
         Assert.NotNull(frame);
