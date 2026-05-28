@@ -185,6 +185,13 @@ public static class CompanionOperationPlanner
                 Add(arguments, "--json");
                 break;
 
+            case "broker.host_manifest":
+                Add(arguments, "broker", "host-manifest");
+                AddOption(arguments, "--host", ValueOrNull(inputs, "host"));
+                AddOption(arguments, "--port", ValueOrNull(inputs, "port"));
+                Add(arguments, "--json");
+                break;
+
             case "broker.compare":
                 Add(arguments, "broker", "compare");
                 AddOption(arguments, "--quest-host", Required(inputs, "questHost"));

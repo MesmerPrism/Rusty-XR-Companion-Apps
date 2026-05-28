@@ -11,8 +11,11 @@ public sealed class BrokerClientService
     public const int DefaultPort = 8765;
     public const string EventsPath = "/rustyxr/v1/events";
     public const string StatusPath = "/status";
+    public const string HostManifestPath = "/broker/host_manifest";
     public const string CommandSchema = "rusty.xr.broker.command.v1";
     public const string LatencySampleSchema = "rusty.xr.broker.latency_sample.v1";
+    public const string HostManifestSchema = "rusty.xr.broker.host_manifest.v1";
+    public const string HostManifestCommand = "broker.host_manifest";
 
     private static readonly JsonSerializerOptions BrokerJsonOptions = new(JsonSerializerDefaults.Web)
     {
@@ -52,6 +55,17 @@ public sealed class BrokerClientService
 
         ValidatePort(port, nameof(port));
         return new UriBuilder("ws", string.IsNullOrWhiteSpace(host) ? DefaultHost : host, port, EventsPath).Uri;
+    }
+
+    public static Uri CreateHostManifestUri(string? explicitUrl, string? host = null, int port = DefaultPort)
+    {
+        if (!string.IsNullOrWhiteSpace(explicitUrl))
+        {
+            return new Uri(explicitUrl, UriKind.Absolute);
+        }
+
+        ValidatePort(port, nameof(port));
+        return new UriBuilder("http", string.IsNullOrWhiteSpace(host) ? DefaultHost : host, port, HostManifestPath).Uri;
     }
 
     public static JsonElement BuildCommandPayload(BrokerCommandRequest request)
@@ -130,6 +144,19 @@ public sealed class BrokerClientService
             status,
             receivedAt,
             KioskCommandRunRecords.CreateBrokerStatusRecord(statusUri, status, receivedAt));
+    }
+
+    public async Task<BrokerHostManifestProbeResult> GetHostManifestAsync(
+        Uri hostManifestUri,
+        CancellationToken cancellationToken = default)
+    {
+        using var response = await _httpClient.GetAsync(hostManifestUri, cancellationToken).ConfigureAwait(false);
+        var raw = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+        response.EnsureSuccessStatusCode();
+        return new BrokerHostManifestProbeResult(
+            hostManifestUri,
+            ParseElement(raw),
+            DateTimeOffset.Now);
     }
 
     public async Task<BrokerWebSocketProbeResult> SendCommandAsync(
@@ -369,6 +396,11 @@ public sealed record BrokerStatusProbeResult(
     JsonElement Status,
     DateTimeOffset ReceivedAt,
     JsonElement KioskCommandRunRecord);
+
+public sealed record BrokerHostManifestProbeResult(
+    Uri Url,
+    JsonElement Manifest,
+    DateTimeOffset ReceivedAt);
 
 public sealed record BrokerWebSocketOutboundMessage(
     string Label,

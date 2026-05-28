@@ -137,6 +137,11 @@ public static class SourceWorkspaceGuide
                 companionPath,
                 @"dotnet run --project .\src\RustyXr.Companion.Cli -- catalog verify --path ..\Rusty-XR\examples\quest-broker-apk\catalog\rusty-xr-quest-broker.catalog.json --app rusty-xr-quest-broker --serial <serial> --stop-catalog-apps --install --launch --device-profile broker-smoke-test --runtime-profile broker-osc-drive-ingress --settle-ms 5000 --logcat-lines 1000 --out .\artifacts\verify"),
             new SourceWorkspaceCommand(
+                "inspect-broker-host-manifest",
+                "Read the broker-described host role, endpoints, security policy, clock domain, and capabilities.",
+                companionPath,
+                @"dotnet run --project .\src\RustyXr.Companion.Cli -- broker host-manifest --json"),
+            new SourceWorkspaceCommand(
                 "start-broker-shell-helper",
                 "Build, push, and launch the optional ADB shell helper, then read broker shell-helper status.",
                 companionPath,

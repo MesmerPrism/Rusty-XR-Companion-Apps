@@ -485,7 +485,7 @@ internal static class CliProgram
     {
         if (args.Length == 0)
         {
-            return Fail("Use: broker <forward|status|command|capabilities|streams|subscribe|unsubscribe|sample|verify|compare|bio-simulate|app-camera-luma-probe|app-camera-h264-probe|app-camera-h264-decode-probe|h264-proxy-start|h264-proxy-probe|shell-helper> [options]");
+            return Fail("Use: broker <forward|status|host-manifest|command|capabilities|streams|subscribe|unsubscribe|sample|verify|compare|bio-simulate|app-camera-luma-probe|app-camera-h264-probe|app-camera-h264-decode-probe|h264-proxy-start|h264-proxy-probe|shell-helper> [options]");
         }
 
         var subcommand = args[0].ToLowerInvariant();
@@ -499,6 +499,7 @@ internal static class CliProgram
         {
             "forward" => await BrokerForwardAsync(options).ConfigureAwait(false),
             "status" => await BrokerStatusAsync(options).ConfigureAwait(false),
+            "host-manifest" => await BrokerHostManifestAsync(options).ConfigureAwait(false),
             "command" => await BrokerCommandAsync(options.ValueOrNull("--command") ?? "status_request", options).ConfigureAwait(false),
             "capabilities" => await BrokerCommandAsync("list_capabilities", options).ConfigureAwait(false),
             "streams" => await BrokerCommandAsync("list_streams", options).ConfigureAwait(false),
@@ -513,7 +514,7 @@ internal static class CliProgram
             "app-camera-h264-decode-probe" => await BrokerAppCameraH264DecodeProbeAsync(options).ConfigureAwait(false),
             "h264-proxy-start" => await BrokerH264ProxyStartAsync(options).ConfigureAwait(false),
             "h264-proxy-probe" => await BrokerH264ProxyProbeAsync(options).ConfigureAwait(false),
-            _ => Fail("Use: broker <forward|status|command|capabilities|streams|subscribe|unsubscribe|sample|verify|compare|bio-simulate|app-camera-luma-probe|app-camera-h264-probe|app-camera-h264-decode-probe|h264-proxy-start|h264-proxy-probe|shell-helper> [options]")
+            _ => Fail("Use: broker <forward|status|host-manifest|command|capabilities|streams|subscribe|unsubscribe|sample|verify|compare|bio-simulate|app-camera-luma-probe|app-camera-h264-probe|app-camera-h264-decode-probe|h264-proxy-start|h264-proxy-probe|shell-helper> [options]")
         };
     }
 
@@ -736,6 +737,16 @@ internal static class CliProgram
         return 0;
     }
 
+    private static async Task<int> BrokerHostManifestAsync(ArgOptions options)
+    {
+        var port = ParsePort(options, "--port", BrokerClientService.DefaultPort);
+        var explicitUrl = options.ValueOrNull("--manifest-url") ?? options.ValueOrNull("--url");
+        var uri = BrokerClientService.CreateHostManifestUri(explicitUrl, options.ValueOrNull("--host"), port);
+        var result = await new BrokerClientService().GetHostManifestAsync(uri).ConfigureAwait(false);
+        WriteObject(result, json: true);
+        return HostManifestSchema(result.Manifest) == BrokerClientService.HostManifestSchema ? 0 : 2;
+    }
+
     private static async Task<int> BrokerCommandAsync(
         string command,
         ArgOptions options,
@@ -800,6 +811,7 @@ internal static class CliProgram
         var hostPort = ParsePort(options, "--host-port", port);
         var devicePort = ParsePort(options, "--device-port", BrokerClientService.DefaultPort);
         var statusUri = BrokerClientService.CreateStatusUri(options.ValueOrNull("--status-url"), host, hostPort);
+        var hostManifestUri = BrokerClientService.CreateHostManifestUri(options.ValueOrNull("--manifest-url"), host, hostPort);
         var eventsUri = BrokerClientService.CreateEventsUri(options.ValueOrNull("--events-url"), host, hostPort);
         var client = new BrokerClientService();
         var notes = new List<string>();
@@ -817,6 +829,7 @@ internal static class CliProgram
         }
 
         var status = await client.GetStatusAsync(statusUri).ConfigureAwait(false);
+        var hostManifest = await client.GetHostManifestAsync(hostManifestUri).ConfigureAwait(false);
         var streamsProbe = await client
             .SendCommandAsync(
                 eventsUri,
@@ -865,6 +878,7 @@ internal static class CliProgram
         }
 
         var statusOk = BrokerStatusContractVersion(status.Status) == "rusty.xr.broker.v1";
+        var hostManifestOk = HostManifestSchema(hostManifest.Manifest) == BrokerClientService.HostManifestSchema;
         var streamsOk = streamsProbe.HasAcceptedAck;
         var latencyAckOk = BrokerResultHasMessageType(latencyProbe, "latency_ack");
         var latencyStreamOk = BrokerResultHasStreamEvent(latencyProbe, "latency:sample");
@@ -872,6 +886,10 @@ internal static class CliProgram
         if (!statusOk)
         {
             notes.Add("Status response did not report contractVersion rusty.xr.broker.v1.");
+        }
+        if (!hostManifestOk)
+        {
+            notes.Add($"Host manifest response did not report schema {BrokerClientService.HostManifestSchema}.");
         }
         if (!streamsOk)
         {
@@ -889,14 +907,17 @@ internal static class CliProgram
         var report = new BrokerVerificationReport(
             DateTimeOffset.Now,
             statusUri,
+            hostManifestUri,
             eventsUri,
             forwardResult,
             status.Status,
+            hostManifest.Manifest,
             streamsProbe,
             latencyProbe,
             oscSend,
             oscProbe,
             statusOk,
+            hostManifestOk,
             streamsOk,
             latencyAckOk,
             latencyStreamOk,
@@ -1838,12 +1859,20 @@ internal static class CliProgram
             ? version.GetString() ?? string.Empty
             : string.Empty;
 
+    private static string HostManifestSchema(JsonElement manifest) =>
+        manifest.ValueKind == JsonValueKind.Object &&
+        manifest.TryGetProperty("schema", out var schema) &&
+        schema.ValueKind == JsonValueKind.String
+            ? schema.GetString() ?? string.Empty
+            : string.Empty;
+
     private static string NormalizeBrokerCommand(string command) =>
         command.ToLowerInvariant() switch
         {
             "status" => "status_request",
             "capabilities" => "list_capabilities",
             "streams" => "list_streams",
+            "host-manifest" or "host_manifest" => BrokerClientService.HostManifestCommand,
             _ => command
         };
 
@@ -2631,7 +2660,8 @@ internal static class CliProgram
           polar throughput [--mode <windows-owned-pmd|quest-owned-pmd|hr-rr-dual-receiver>] [--pmd-stream <acc|ecg>] [--acc-rate <25|50|100|200>] [--windows-ble-mode <default|throughput-optimized>] [--quest-ble-priority <high|default>] [--device-address <mac>] [--windows-device-address <mac>] [--quest-device-address <mac>] [--serial <quest>] [--lsl-dll <path>] [--duration-seconds <n>] [--out <folder>] [--json]
           broker forward --serial <serial> [--host-port <n>] [--device-port <n>] [--json]
           broker status [--host 127.0.0.1] [--port <n>] [--url <http-url>] [--json]
-          broker command --command <status|capabilities|streams|subscribe|unsubscribe|name> [--stream <id>] [--host 127.0.0.1] [--port <n>] [--url <ws-url>] [--listen-ms <n>] [--json]
+          broker host-manifest [--host 127.0.0.1] [--port <n>] [--url <http-url>] [--manifest-url <http-url>] [--json]
+          broker command --command <status|capabilities|streams|host-manifest|subscribe|unsubscribe|name> [--stream <id>] [--host 127.0.0.1] [--port <n>] [--url <ws-url>] [--listen-ms <n>] [--json]
           broker subscribe --stream <id> [--listen-ms <n>] [--json]
           broker sample [--subscribe] [--sequence <n>] [--path <name>] [--bytes <n>] [--listen-ms <n>] [--json]
           broker verify [--serial <serial>] [--host-port <n>] [--device-port <n>] [--osc-host <quest-ip>] [--osc-value <n>] [--out <folder>] [--json]
@@ -2678,14 +2708,17 @@ internal static class CliProgram
     private sealed record BrokerVerificationReport(
         DateTimeOffset CapturedAt,
         Uri StatusUrl,
+        Uri HostManifestUrl,
         Uri EventsUrl,
         CommandResult? ForwardResult,
         JsonElement Status,
+        JsonElement HostManifest,
         BrokerWebSocketProbeResult StreamsProbe,
         BrokerWebSocketProbeResult LatencyProbe,
         OscSendResult? OscSend,
         BrokerWebSocketProbeResult? OscProbe,
         bool StatusOk,
+        bool HostManifestOk,
         bool StreamsOk,
         bool LatencyAckOk,
         bool LatencyStreamOk,
@@ -2695,6 +2728,7 @@ internal static class CliProgram
         public bool Succeeded =>
             (ForwardResult is null || ForwardResult.Succeeded) &&
             StatusOk &&
+            HostManifestOk &&
             StreamsOk &&
             LatencyAckOk &&
             LatencyStreamOk &&

@@ -150,6 +150,7 @@ launch the broker and send a drive value to the Quest LAN IP:
 dotnet run --project src\RustyXr.Companion.Cli -- catalog verify --path ..\Rusty-XR\examples\quest-broker-apk\catalog\rusty-xr-quest-broker.catalog.json --app rusty-xr-quest-broker --serial <serial> --stop-catalog-apps --install --launch --runtime-profile broker-osc-drive-ingress --settle-ms 5000 --logcat-lines 1000 --out .\artifacts\verify
 dotnet run --project src\RustyXr.Companion.Cli -- broker forward --serial <serial>
 dotnet run --project src\RustyXr.Companion.Cli -- broker status --json
+dotnet run --project src\RustyXr.Companion.Cli -- broker host-manifest --json
 dotnet run --project src\RustyXr.Companion.Cli -- broker streams --json
 dotnet run --project src\RustyXr.Companion.Cli -- broker sample --subscribe --json
 dotnet run --project src\RustyXr.Companion.Cli -- broker verify --serial <serial> --osc-host <quest-lan-ip> --out .\artifacts\verify --json
@@ -161,6 +162,12 @@ events. The public Unity Quest target for this comparison is
 [The Big Red Button Institute](https://github.com/MesmerPrism/the-big-red-button-institute),
 which consumes the broker stream events and exposes the direct Unity OSC
 acknowledgement route used by `broker compare`.
+
+`broker host-manifest` reads `/broker/host_manifest` and reports the broker's
+declared host role, endpoint visibility, security policy, clock domain, and
+capabilities. Use it before selecting a UI/control endpoint; `broker verify`
+now includes the same read-only manifest check so stale broker APKs fail before
+stream or mutation diagnostics depend on implicit endpoint assumptions.
 
 ## Broker Comparison Runner
 

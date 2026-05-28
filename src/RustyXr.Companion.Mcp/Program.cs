@@ -187,6 +187,7 @@ internal sealed class RustyXrMcpServer
                 devices = await new QuestAdbService().ListDevicesAsync(cancellationToken).ConfigureAwait(false)
             }),
             "broker.status" => await BrokerStatusToolAsync(inputs, cancellationToken).ConfigureAwait(false),
+            "broker.host_manifest" => await BrokerHostManifestToolAsync(inputs, cancellationToken).ConfigureAwait(false),
             "core.quest_app_catalog_schema" => ToolResult(await new CatalogLoader()
                 .LoadAsync(Required(inputs, "path"), cancellationToken)
                 .ConfigureAwait(false)),
@@ -206,6 +207,20 @@ internal sealed class RustyXrMcpServer
             host: ValueOrNull(inputs, "host"),
             port: port);
         return ToolResult(await new BrokerClientService().GetStatusAsync(uri, cancellationToken).ConfigureAwait(false));
+    }
+
+    private static async Task<object> BrokerHostManifestToolAsync(
+        IReadOnlyDictionary<string, string> inputs,
+        CancellationToken cancellationToken)
+    {
+        var port = inputs.TryGetValue("port", out var rawPort) && int.TryParse(rawPort, out var parsedPort)
+            ? parsedPort
+            : BrokerClientService.DefaultPort;
+        var uri = BrokerClientService.CreateHostManifestUri(
+            explicitUrl: null,
+            host: ValueOrNull(inputs, "host"),
+            port: port);
+        return ToolResult(await new BrokerClientService().GetHostManifestAsync(uri, cancellationToken).ConfigureAwait(false));
     }
 
     private static object BlockedPlan(string operationId, IReadOnlyDictionary<string, string> inputs)

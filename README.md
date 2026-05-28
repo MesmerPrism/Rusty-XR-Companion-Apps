@@ -17,7 +17,10 @@ route against the same OSC drive stream routed through the Quest broker, plus a
 broker bio-simulation command for publishing Polar-compatible HR/RR, ECG, and
 ACC diagnostic payloads through the broker, and LSL round-trip diagnostics that
 write JSON, CSV, Markdown, and PDF report bundles from a user-supplied
-Windows `lsl.dll`. In a source workspace, the CLI can also build, push, launch,
+Windows `lsl.dll`. The broker CLI can also read the broker host manifest so
+operator tooling can choose UI/control endpoints from broker-declared host
+roles, security policy, clock domain, and capabilities instead of hard-coded
+transport assumptions. In a source workspace, the CLI can also build, push, launch,
 disconnect-report, and binary-probe the optional Rusty XR broker ADB shell
 helper, including a guarded MediaCodec synthetic-Surface packet probe with
 broker metric reporting, host receive counters, a lightweight H.264 NAL
@@ -89,6 +92,8 @@ on one visible button.
 - clock-aligned `broker compare` diagnostics that write JSON, Markdown, and
   CSV bundles for direct target-app OSC acknowledgements and broker-routed OSC
   WebSocket events
+- read-only `broker host-manifest` inspection for broker-declared host role,
+  endpoints, security policy, clock domain, and capabilities
 - `broker bio-simulate` diagnostics for Polar-compatible standard Heart Rate
   Measurement and Polar PMD ECG/ACC payloads published as broker stream events
 - LSL runtime, local loopback, and broker latency round-trip diagnostics with
@@ -203,6 +208,7 @@ dotnet run --project src/RustyXr.Companion.Cli -- catalog verify --path samples\
 dotnet run --project src/RustyXr.Companion.Cli -- catalog verify --path samples\quest-session-kit\apk-catalog.example.json --app rusty-xr-quest-broker --serial <serial> --stop-catalog-apps --install --launch --device-profile broker-smoke-test --runtime-profile broker-osc-drive-ingress --settle-ms 5000 --logcat-lines 1000 --out .\artifacts\verify
 dotnet run --project src/RustyXr.Companion.Cli -- broker forward --serial <serial>
 dotnet run --project src/RustyXr.Companion.Cli -- broker status --json
+dotnet run --project src/RustyXr.Companion.Cli -- broker host-manifest --json
 dotnet run --project src/RustyXr.Companion.Cli -- broker streams --json
 dotnet run --project src/RustyXr.Companion.Cli -- broker sample --subscribe --json
 dotnet run --project src/RustyXr.Companion.Cli -- broker verify --serial <serial> --osc-host <quest-lan-ip> --out .\artifacts\verify --json

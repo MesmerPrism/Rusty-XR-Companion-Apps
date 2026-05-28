@@ -157,6 +157,22 @@ public static class CompanionOperationSurface
                     },
                     new[] { "BrokerStatusJson", KioskCommandRunRecords.CommandRunRecordSchema }),
                 new CompanionOperation(
+                    "broker.host_manifest",
+                    WindowsOwner,
+                    "Broker host manifest",
+                    "Reads the broker-described host role, security policy, endpoint list, clock domain, and capabilities.",
+                    "BrokerClientService.GetHostManifestAsync",
+                    "broker host-manifest [--host 127.0.0.1] [--port <n>] --json",
+                    "rusty_xr_broker_host_manifest",
+                    "read-only-device",
+                    new[]
+                    {
+                        Parameter("host", "string", required: false, "Forwarded broker host.", "127.0.0.1"),
+                        Parameter("port", "integer", required: false, "Forwarded broker HTTP port.", "8765")
+                    },
+                    new[] { BrokerClientService.HostManifestSchema, "BrokerHostManifestProbeResult" },
+                    "Use this before choosing a control or stream endpoint in a UI host."),
+                new CompanionOperation(
                     "broker.compare",
                     WindowsOwner,
                     "Broker route comparison",

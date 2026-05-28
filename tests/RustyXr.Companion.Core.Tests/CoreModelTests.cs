@@ -792,6 +792,7 @@ public sealed class CoreModelTests
 
         Assert.Equal(CompanionOperationSurface.SchemaVersion, catalog.SchemaVersion);
         Assert.Contains(catalog.Operations, operation => operation.Id == "workspace.guide");
+        Assert.Contains(catalog.Operations, operation => operation.Id == "broker.host_manifest");
         Assert.Contains(catalog.Operations, operation => operation.Id == "android.agent_command");
         Assert.Contains(catalog.Operations, operation => operation.Id == "broker.h264_proxy_probe");
         Assert.Contains(catalog.Operations, operation => operation.Id == "broker.h264_proxy_start");
@@ -831,6 +832,11 @@ public sealed class CoreModelTests
                     tool.InputSchema["properties"]?["root"]?["type"]?.GetValue<string>() == "string");
         Assert.Contains(
             tools.Tools,
+            tool => tool.Name == "rusty_xr_broker_host_manifest" &&
+                    tool.Annotations.ReadOnlyHint &&
+                    tool.InputSchema["properties"]?["host"]?["type"]?.GetValue<string>() == "string");
+        Assert.Contains(
+            tools.Tools,
             tool => tool.Name == "rusty_xr_broker_h264_proxy_probe" &&
                     tool.Annotations.DestructiveHint &&
                     tool.InputSchema["properties"]?["packetCount"]?["type"]?.GetValue<string>() == "integer");
@@ -861,6 +867,24 @@ public sealed class CoreModelTests
         Assert.Equal(
             "NotStarted",
             plan.KioskCommandRunRecordTemplate.Value.GetProperty("outcome").GetString());
+    }
+
+    [Fact]
+    public void CompanionOperationPlannerPlansReadOnlyBrokerHostManifest()
+    {
+        var plan = CompanionOperationPlanner.CreatePlan(
+            "broker.host_manifest",
+            new Dictionary<string, string>
+            {
+                ["host"] = "127.0.0.1",
+                ["port"] = "8765"
+            });
+
+        Assert.True(plan.Allowed);
+        Assert.False(plan.RequiresSideEffectOptIn);
+        Assert.Equal(
+            new[] { "broker", "host-manifest", "--host", "127.0.0.1", "--port", "8765", "--json" },
+            plan.Arguments);
     }
 
     [Fact]

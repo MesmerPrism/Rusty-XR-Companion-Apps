@@ -1,3 +1,5 @@
+using System.Net;
+using System.Net.Http;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using RustyXr.Companion.Core;
@@ -17,8 +19,14 @@ public sealed class BrokerClientServiceTests
             "ws://127.0.0.1:8765/rustyxr/v1/events",
             BrokerClientService.CreateEventsUri(null).ToString());
         Assert.Equal(
+            "http://127.0.0.1:8765/broker/host_manifest",
+            BrokerClientService.CreateHostManifestUri(null).ToString());
+        Assert.Equal(
             "ws://localhost:9001/custom",
             BrokerClientService.CreateEventsUri("http://localhost:9001/custom").ToString());
+        Assert.Equal(
+            "http://localhost:9001/custom",
+            BrokerClientService.CreateHostManifestUri("http://localhost:9001/custom").ToString());
     }
 
     [Fact]
@@ -60,6 +68,40 @@ public sealed class BrokerClientServiceTests
         Assert.True(parameters.GetProperty("enabled").GetBoolean());
         Assert.Equal(9000, parameters.GetProperty("port").GetInt32());
         Assert.Equal("/rusty-xr/drive/radius", parameters.GetProperty("address").GetString());
+    }
+
+    [Fact]
+    public void BrokerHostManifestCommandUsesPublicContractName()
+    {
+        var payload = BrokerClientService.BuildCommandPayload(new BrokerCommandRequest(
+            BrokerClientService.HostManifestCommand,
+            "req-host",
+            "test-client",
+            "Test Client",
+            "1.0"));
+
+        Assert.Equal(BrokerClientService.CommandSchema, payload.GetProperty("schema").GetString());
+        Assert.Equal(BrokerClientService.HostManifestCommand, payload.GetProperty("command").GetString());
+    }
+
+    [Fact]
+    public async Task BrokerHostManifestProbeReadsHttpEndpoint()
+    {
+        var handler = new StaticJsonHandler(
+            """
+            {
+              "schema": "rusty.xr.broker.host_manifest.v1",
+              "host_id": "synthetic",
+              "label": "Synthetic broker host"
+            }
+            """);
+        var client = new BrokerClientService(new HttpClient(handler));
+
+        var result = await client.GetHostManifestAsync(BrokerClientService.CreateHostManifestUri(null));
+
+        Assert.Equal(BrokerClientService.HostManifestPath, handler.RequestUri?.AbsolutePath);
+        Assert.Equal(BrokerClientService.HostManifestSchema, result.Manifest.GetProperty("schema").GetString());
+        Assert.Equal("synthetic", result.Manifest.GetProperty("host_id").GetString());
     }
 
     [Fact]
@@ -167,5 +209,21 @@ public sealed class BrokerClientServiceTests
             TimeSpan timeout,
             CancellationToken cancellationToken = default) =>
             Task.FromResult(new CommandResult(fileName, arguments, 0, string.Empty, string.Empty, TimeSpan.Zero));
+    }
+
+    private sealed class StaticJsonHandler(string json) : HttpMessageHandler
+    {
+        public Uri? RequestUri { get; private set; }
+
+        protected override Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken)
+        {
+            RequestUri = request.RequestUri;
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(json)
+            });
+        }
     }
 }
