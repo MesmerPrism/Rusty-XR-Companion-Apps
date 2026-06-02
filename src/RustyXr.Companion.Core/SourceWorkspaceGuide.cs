@@ -132,6 +132,11 @@ public static class SourceWorkspaceGuide
                 companionPath,
                 @"dotnet run --project .\src\RustyXr.Companion.Cli -- catalog verify --path ..\Rusty-XR\examples\quest-broker-apk\catalog\rusty-xr-quest-broker.catalog.json --app rusty-xr-quest-broker --serial <serial> --stop-catalog-apps --install --launch --device-profile broker-smoke-test --runtime-profile broker-latency-websocket-lsl --settle-ms 5000 --logcat-lines 1000 --out .\artifacts\verify"),
             new SourceWorkspaceCommand(
+                "open-broker-system-console",
+                "Launch the visible broker console directly on the System page.",
+                companionPath,
+                @"dotnet run --project .\src\RustyXr.Companion.Cli -- catalog launch --path ..\Rusty-XR\examples\quest-broker-apk\catalog\rusty-xr-quest-broker.catalog.json --app rusty-xr-quest-broker-console --serial <serial> --runtime-profile broker-console-system-page"),
+            new SourceWorkspaceCommand(
                 "verify-broker-osc-ingress",
                 "Install, launch, and log the broker OSC drive ingress profile.",
                 companionPath,

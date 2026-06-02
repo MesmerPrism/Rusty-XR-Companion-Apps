@@ -774,6 +774,7 @@ public sealed class CoreModelTests
             Assert.False(status.BrokerApkPresent);
             Assert.Contains(status.Commands, command => command.Id == "verify-minimal-apk");
             Assert.Contains(status.Commands, command => command.Id == "verify-broker-apk");
+            Assert.Contains(status.Commands, command => command.Id == "open-broker-system-console");
             Assert.Contains("Rusty XR Source Workspace", SourceWorkspaceGuide.ToMarkdown(status));
         }
         finally

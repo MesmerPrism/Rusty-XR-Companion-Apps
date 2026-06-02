@@ -225,6 +225,15 @@
       "description": "Listens for laptop OSC values at /rusty-xr/drive/radius and rebroadcasts accepted values to localhost WebSocket clients as osc_drive JSON events."
     },
     {
+      "id": "broker-console-system-page",
+      "label": "Broker console System page",
+      "values": {
+        "rustyxr.example": "quest-broker-apk",
+        "rustyxr.consolePage": "System"
+      },
+      "description": "Opens the visible broker console directly on the System page for operator inspection of broker status and normal Android settings shortcuts."
+    },
+    {
       "id": "camera-source-diagnostics",
       "label": "Camera source diagnostics",
       "values": {

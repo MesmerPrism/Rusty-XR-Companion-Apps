@@ -180,6 +180,14 @@ dotnet run --project src\RustyXr.Companion.Cli -- catalog verify --path ..\Rusty
 dotnet run --project src\RustyXr.Companion.Cli -- osc send --host <quest-lan-ip> --port 9000 --address /rusty-xr/drive/radius --arg float:0.75
 ```
 
+The sibling Rusty XR source catalog also exposes a visible broker-console target
+for headset-local inspection. Use `broker-console-system-page` when the launch
+should open the broker console directly on the System page:
+
+```powershell
+dotnet run --project src\RustyXr.Companion.Cli -- catalog launch --path ..\Rusty-XR\examples\quest-broker-apk\catalog\rusty-xr-quest-broker.catalog.json --app rusty-xr-quest-broker-console --serial <serial> --runtime-profile broker-console-system-page
+```
+
 That OSC ingress path has been validated with
 [The Big Red Button Institute](https://github.com/MesmerPrism/the-big-red-button-institute),
 the public Unity Quest example for comparing direct Unity OSC/BLE input against
