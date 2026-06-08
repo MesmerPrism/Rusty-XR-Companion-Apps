@@ -2,6 +2,11 @@
 
 This is a public open-source repository. Keep every committed file public-safe.
 
+Rusty Morphospace is the top-level project/platform umbrella for the clean
+refactor. This companion repo remains a public operator/tooling compatibility
+lane; do not rename public Rusty-XR surfaces or make the companion a
+Morphospace runtime authority.
+
 ## Public Boundary
 
 Do not commit:
