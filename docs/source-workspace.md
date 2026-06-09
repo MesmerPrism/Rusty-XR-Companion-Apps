@@ -30,12 +30,46 @@ detects these optional sibling repos when they are present:
 <workspace>\rusty-quest
 <workspace>\rusty-quest-makepad
 <workspace>\makepad-morphospace
+<workspace>\rusty-hostess
 ```
 
 Those repos do not replace the public Rusty XR catalog examples. They are the
 active lanes for portable GUI descriptors, canonical Makepad settings/profile
 resolution, Quest platform property write plans, Quest-specific Makepad app
-adapters, and the maintained Makepad fork checkout.
+adapters, the maintained Makepad fork checkout, and the Hostess app shell that
+consumes generated effective-settings reports.
+
+## Active Makepad Settings Flow
+
+For active Morphospace Makepad apps, do not hand-craft per-launch ADB extras as
+the settings authority. Resolve one canonical effective-settings report, then
+pass that report to the app shell or platform launcher:
+
+- `rusty-makepad` owns `rusty.gui.makepad.app_settings_surface.v1`,
+  `rusty.gui.makepad.settings_profile.v1`, the resolver, provenance, and
+  hotload decisions.
+- `rusty-quest-makepad` owns Quest-specific Makepad profile bundles and
+  camera-shell adapters over that surface.
+- `rusty-quest` owns platform property write/readback plans as a transport
+  layer.
+- `rusty-hostess` consumes `rusty.gui.makepad.effective_settings.v1` with
+  `--makepad-effective-settings`, `HOSTESS_MAKEPAD_EFFECTIVE_SETTINGS`, or
+  `RUSTY_MAKEPAD_EFFECTIVE_SETTINGS`.
+
+Resolve the current Quest Makepad camera-shell mesh replay profile:
+
+```powershell
+cd <workspace>\rusty-makepad
+New-Item -ItemType Directory -Force -Path .\local-artifacts | Out-Null
+cargo run -p rusty-makepad-settings-cli -- resolve --surface ..\rusty-quest-makepad\fixtures\settings\quest-makepad-camera-shell.settings.json --profile ..\rusty-quest-makepad\fixtures\profiles\mesh-replay.settings-profile.json --out .\local-artifacts\quest-makepad-effective-settings.json
+```
+
+Run Hostess Makepad from that resolved report:
+
+```powershell
+cd <workspace>\rusty-hostess
+cargo run --manifest-path apps\hostess-t-makepad\Cargo.toml -- --makepad-effective-settings ..\rusty-makepad\local-artifacts\quest-makepad-effective-settings.json --makepad-effective-settings-receipt-out .\target\hostess-makepad-effective-settings-receipt.json
+```
 
 Run the source-workspace guide from the companion repo:
 

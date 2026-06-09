@@ -756,16 +756,19 @@ public sealed class CoreModelTests
         var companion = Path.Combine(root, SourceWorkspaceGuide.CompanionRepoName);
         var rustyMakepad = Path.Combine(root, SourceWorkspaceGuide.MorphospaceMakepadRepoName);
         var rustyQuestMakepad = Path.Combine(root, SourceWorkspaceGuide.MorphospaceQuestMakepadRepoName);
+        var rustyHostess = Path.Combine(root, SourceWorkspaceGuide.MorphospaceHostessRepoName);
         try
         {
             Directory.CreateDirectory(rustyXr);
             Directory.CreateDirectory(companion);
             Directory.CreateDirectory(rustyMakepad);
             Directory.CreateDirectory(rustyQuestMakepad);
+            Directory.CreateDirectory(rustyHostess);
             File.WriteAllText(Path.Combine(rustyXr, "Cargo.toml"), string.Empty);
             File.WriteAllText(Path.Combine(companion, "RustyXr.Companion.slnx"), string.Empty);
             File.WriteAllText(Path.Combine(rustyMakepad, "Cargo.toml"), string.Empty);
             File.WriteAllText(Path.Combine(rustyQuestMakepad, "Cargo.toml"), string.Empty);
+            File.WriteAllText(Path.Combine(rustyHostess, "Cargo.toml"), string.Empty);
             Directory.CreateDirectory(Path.Combine(rustyXr, "examples", "quest-minimal-apk", "build", "outputs"));
             File.WriteAllText(
                 Path.Combine(rustyXr, "examples", "quest-minimal-apk", "build", "outputs", "rusty-xr-quest-minimal-debug.apk"),
@@ -787,11 +790,24 @@ public sealed class CoreModelTests
             Assert.Contains(
                 status.OptionalMorphospaceRepos,
                 repo => repo.Name == SourceWorkspaceGuide.MorphospaceQuestMakepadRepoName && repo.Present);
+            Assert.Contains(
+                status.OptionalMorphospaceRepos,
+                repo => repo.Name == SourceWorkspaceGuide.MorphospaceHostessRepoName && repo.Present);
             Assert.Contains(status.Commands, command => command.Id == "validate-morphospace-makepad-settings");
             Assert.Contains(status.Commands, command => command.Id == "validate-morphospace-quest-makepad");
+            Assert.Contains(
+                status.Commands,
+                command => command.Id == "resolve-morphospace-quest-makepad-effective-settings"
+                    && command.Command.Contains("rusty-quest-makepad", StringComparison.Ordinal));
+            Assert.Contains(
+                status.Commands,
+                command => command.Id == "run-hostess-makepad-effective-settings"
+                    && command.Command.Contains("--makepad-effective-settings", StringComparison.Ordinal));
             var markdown = SourceWorkspaceGuide.ToMarkdown(status);
             Assert.Contains("Rusty XR Source Workspace", markdown);
             Assert.Contains("Optional Morphospace Makepad Layout", markdown);
+            Assert.Contains("Active Makepad Settings Flow", markdown);
+            Assert.Contains("rusty.gui.makepad.effective_settings.v1", markdown);
         }
         finally
         {

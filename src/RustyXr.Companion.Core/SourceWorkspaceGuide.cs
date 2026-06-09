@@ -9,6 +9,7 @@ public static class SourceWorkspaceGuide
     public const string MorphospaceQuestRepoName = "rusty-quest";
     public const string MorphospaceQuestMakepadRepoName = "rusty-quest-makepad";
     public const string MorphospaceMakepadForkRepoName = "makepad-morphospace";
+    public const string MorphospaceHostessRepoName = "rusty-hostess";
 
     public static SourceWorkspaceStatus Evaluate(string? workspaceRoot = null, string? currentDirectory = null)
     {
@@ -20,6 +21,7 @@ public static class SourceWorkspaceGuide
         var morphospaceQuestPath = Path.Combine(root, MorphospaceQuestRepoName);
         var morphospaceQuestMakepadPath = Path.Combine(root, MorphospaceQuestMakepadRepoName);
         var morphospaceMakepadForkPath = Path.Combine(root, MorphospaceMakepadForkRepoName);
+        var morphospaceHostessPath = Path.Combine(root, MorphospaceHostessRepoName);
 
         var minimalBuildScript = Path.Combine(
             rustyXrPath,
@@ -104,7 +106,11 @@ public static class SourceWorkspaceGuide
             RepositoryStatus(
                 MorphospaceMakepadForkRepoName,
                 morphospaceMakepadForkPath,
-                "Maintained Morphospace Makepad fork checkout used by Makepad app-shell builds.")
+                "Maintained Morphospace Makepad fork checkout used by Makepad app-shell builds."),
+            RepositoryStatus(
+                MorphospaceHostessRepoName,
+                morphospaceHostessPath,
+                "Hostess app shell that consumes generated Makepad effective-settings reports.")
         };
 
         var commands = new[]
@@ -144,6 +150,21 @@ public static class SourceWorkspaceGuide
                 "Validate the optional Rusty Quest Makepad repo that owns Quest-specific Makepad app adapters.",
                 morphospaceQuestMakepadPath,
                 @"powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\check_all.ps1"),
+            new SourceWorkspaceCommand(
+                "validate-morphospace-hostess-makepad",
+                "Validate the optional Hostess Makepad app-shell consumer.",
+                morphospaceHostessPath,
+                @"cargo check --manifest-path apps\hostess-t-makepad\Cargo.toml"),
+            new SourceWorkspaceCommand(
+                "resolve-morphospace-quest-makepad-effective-settings",
+                "Resolve the Quest Makepad camera-shell profile into one canonical effective-settings report with provenance.",
+                morphospaceMakepadPath,
+                @"New-Item -ItemType Directory -Force -Path .\local-artifacts | Out-Null; cargo run -p rusty-makepad-settings-cli -- resolve --surface ..\rusty-quest-makepad\fixtures\settings\quest-makepad-camera-shell.settings.json --profile ..\rusty-quest-makepad\fixtures\profiles\mesh-replay.settings-profile.json --out .\local-artifacts\quest-makepad-effective-settings.json"),
+            new SourceWorkspaceCommand(
+                "run-hostess-makepad-effective-settings",
+                "Run the Hostess Makepad shell from the generated effective-settings report instead of hand-authored ADB launch extras.",
+                morphospaceHostessPath,
+                @"cargo run --manifest-path apps\hostess-t-makepad\Cargo.toml -- --makepad-effective-settings ..\rusty-makepad\local-artifacts\quest-makepad-effective-settings.json --makepad-effective-settings-receipt-out .\target\hostess-makepad-effective-settings-receipt.json"),
             new SourceWorkspaceCommand(
                 "build-minimal-apk",
                 "Build the public Rusty XR minimal Android smoke-test APK.",
@@ -359,6 +380,7 @@ public static class SourceWorkspaceGuide
             {
                 "Keep both public repos as siblings under one workspace folder.",
                 "Treat the optional Morphospace Makepad repos as the active Makepad/settings/profile maintenance lanes when they are present.",
+                "Resolve active Makepad behavior through rusty.gui.makepad.effective_settings.v1 reports before launching Hostess or Quest Makepad shells.",
                 "Keep public Rusty XR Makepad examples as compatibility/reference evidence, not the settings authority for new Makepad app behavior.",
                 "Use the companion-managed tooling cache for adb, hzdb, scrcpy, and optional FFmpeg media decode tooling.",
                 "Install Rust and Android build tooling only on machines that build APKs from source.",
@@ -396,6 +418,7 @@ public static class SourceWorkspaceGuide
             @"<workspace>\rusty-quest",
             @"<workspace>\rusty-quest-makepad",
             @"<workspace>\makepad-morphospace",
+            @"<workspace>\rusty-hostess",
             "```",
             string.Empty,
             "## Optional Morphospace Repo Status",
@@ -407,6 +430,14 @@ public static class SourceWorkspaceGuide
 
         lines.AddRange(new[]
         {
+            string.Empty,
+            "## Active Makepad Settings Flow",
+            string.Empty,
+            "- `rusty-makepad` owns the canonical settings surface, profiles, resolver, provenance, and hotload decision reports.",
+            "- `rusty-quest-makepad` owns Quest-specific Makepad profile bundles and camera-shell adapters over that surface.",
+            "- `rusty-quest` owns platform property write/readback plans; it is a transport layer, not a duplicate settings authority.",
+            "- `rusty-hostess` consumes generated `rusty.gui.makepad.effective_settings.v1` reports with `--makepad-effective-settings` or the matching environment variables.",
+            "- Use `resolve-morphospace-quest-makepad-effective-settings` before changing app behavior; avoid hand-authoring per-launch ADB extras for active Makepad settings.",
             string.Empty,
             "## What The Companion Manages",
             string.Empty,
@@ -489,7 +520,10 @@ public static class SourceWorkspaceGuide
         return new SourceWorkspaceRepository(
             name,
             path,
-            File.Exists(Path.Combine(path, "Cargo.toml")),
+            Directory.Exists(Path.Combine(path, ".git")) ||
+                File.Exists(Path.Combine(path, "Cargo.toml")) ||
+                File.Exists(Path.Combine(path, "Justfile")) ||
+                File.Exists(Path.Combine(path, "apps", "hostess-t-makepad", "Cargo.toml")),
             role);
     }
 
