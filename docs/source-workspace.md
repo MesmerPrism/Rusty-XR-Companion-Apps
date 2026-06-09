@@ -21,6 +21,22 @@ Keep the repositories as siblings under one workspace folder:
 That layout keeps catalog paths short and lets the companion sample catalog
 resolve Rusty XR ignored build outputs without machine-specific paths.
 
+For active Morphospace Makepad maintenance, the source-workspace guide also
+detects these optional sibling repos when they are present:
+
+```text
+<workspace>\rusty-gui
+<workspace>\rusty-makepad
+<workspace>\rusty-quest
+<workspace>\rusty-quest-makepad
+<workspace>\makepad-morphospace
+```
+
+Those repos do not replace the public Rusty XR catalog examples. They are the
+active lanes for portable GUI descriptors, canonical Makepad settings/profile
+resolution, Quest platform property write plans, Quest-specific Makepad app
+adapters, and the maintained Makepad fork checkout.
+
 Run the source-workspace guide from the companion repo:
 
 ```powershell

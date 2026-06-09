@@ -4,12 +4,22 @@ public static class SourceWorkspaceGuide
 {
     public const string RustyXrRepoName = "Rusty-XR";
     public const string CompanionRepoName = "Rusty-XR-Companion-Apps";
+    public const string MorphospaceGuiRepoName = "rusty-gui";
+    public const string MorphospaceMakepadRepoName = "rusty-makepad";
+    public const string MorphospaceQuestRepoName = "rusty-quest";
+    public const string MorphospaceQuestMakepadRepoName = "rusty-quest-makepad";
+    public const string MorphospaceMakepadForkRepoName = "makepad-morphospace";
 
     public static SourceWorkspaceStatus Evaluate(string? workspaceRoot = null, string? currentDirectory = null)
     {
         var root = ResolveWorkspaceRoot(workspaceRoot, currentDirectory ?? Directory.GetCurrentDirectory());
         var companionPath = Path.Combine(root, CompanionRepoName);
         var rustyXrPath = Path.Combine(root, RustyXrRepoName);
+        var morphospaceGuiPath = Path.Combine(root, MorphospaceGuiRepoName);
+        var morphospaceMakepadPath = Path.Combine(root, MorphospaceMakepadRepoName);
+        var morphospaceQuestPath = Path.Combine(root, MorphospaceQuestRepoName);
+        var morphospaceQuestMakepadPath = Path.Combine(root, MorphospaceQuestMakepadRepoName);
+        var morphospaceMakepadForkPath = Path.Combine(root, MorphospaceMakepadForkRepoName);
 
         var minimalBuildScript = Path.Combine(
             rustyXrPath,
@@ -73,6 +83,29 @@ public static class SourceWorkspaceGuide
             "src",
             "RustyXr.Companion.Cli",
             "RustyXr.Companion.Cli.csproj");
+        var optionalMorphospaceRepos = new[]
+        {
+            RepositoryStatus(
+                MorphospaceGuiRepoName,
+                morphospaceGuiPath,
+                "Portable GUI descriptors and widget contracts."),
+            RepositoryStatus(
+                MorphospaceMakepadRepoName,
+                morphospaceMakepadPath,
+                "Generic Makepad adapters and canonical Makepad app settings/profile resolver."),
+            RepositoryStatus(
+                MorphospaceQuestRepoName,
+                morphospaceQuestPath,
+                "Quest platform profiles, launch property write plans, and device/runtime policy."),
+            RepositoryStatus(
+                MorphospaceQuestMakepadRepoName,
+                morphospaceQuestMakepadPath,
+                "Quest-specific Makepad app adapters, including camera-shell and mesh-replay bundles."),
+            RepositoryStatus(
+                MorphospaceMakepadForkRepoName,
+                morphospaceMakepadForkPath,
+                "Maintained Morphospace Makepad fork checkout used by Makepad app-shell builds.")
+        };
 
         var commands = new[]
         {
@@ -91,6 +124,26 @@ public static class SourceWorkspaceGuide
                 "Confirm ADB sees a trusted Quest.",
                 companionPath,
                 @"dotnet run --project .\src\RustyXr.Companion.Cli -- devices"),
+            new SourceWorkspaceCommand(
+                "validate-morphospace-gui",
+                "Validate the optional Rusty GUI repo that owns portable UI descriptors used by Makepad adapters.",
+                morphospaceGuiPath,
+                @"powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\check_all.ps1"),
+            new SourceWorkspaceCommand(
+                "validate-morphospace-makepad-settings",
+                "Validate the optional Rusty Makepad repo that owns canonical settings, profiles, provenance, and hotload decisions.",
+                morphospaceMakepadPath,
+                @"powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\check_all.ps1"),
+            new SourceWorkspaceCommand(
+                "validate-morphospace-quest-profiles",
+                "Validate the optional Rusty Quest repo that owns platform profile and Android property write-plan behavior.",
+                morphospaceQuestPath,
+                @"powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\check_all.ps1"),
+            new SourceWorkspaceCommand(
+                "validate-morphospace-quest-makepad",
+                "Validate the optional Rusty Quest Makepad repo that owns Quest-specific Makepad app adapters.",
+                morphospaceQuestMakepadPath,
+                @"powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\check_all.ps1"),
             new SourceWorkspaceCommand(
                 "build-minimal-apk",
                 "Build the public Rusty XR minimal Android smoke-test APK.",
@@ -305,11 +358,14 @@ public static class SourceWorkspaceGuide
             new[]
             {
                 "Keep both public repos as siblings under one workspace folder.",
+                "Treat the optional Morphospace Makepad repos as the active Makepad/settings/profile maintenance lanes when they are present.",
+                "Keep public Rusty XR Makepad examples as compatibility/reference evidence, not the settings authority for new Makepad app behavior.",
                 "Use the companion-managed tooling cache for adb, hzdb, scrcpy, and optional FFmpeg media decode tooling.",
                 "Install Rust and Android build tooling only on machines that build APKs from source.",
                 "Build APK bytes under Rusty XR ignored build folders, then verify them through catalog commands.",
                 "Keep diagnostics, screenshots, media frames, APKs, signing material, and local caches out of git."
             },
+            optionalMorphospaceRepos,
             commands);
     }
 
@@ -330,6 +386,28 @@ public static class SourceWorkspaceGuide
             @"<workspace>\Rusty-XR-Companion-Apps",
             "```",
             string.Empty,
+            "## Optional Morphospace Makepad Layout",
+            string.Empty,
+            "These sibling repos are optional for public Rusty XR Companion users. When present, they are the active Morphospace Makepad maintenance lanes; the public Rusty XR Makepad example remains compatibility/reference evidence.",
+            string.Empty,
+            "```text",
+            @"<workspace>\rusty-gui",
+            @"<workspace>\rusty-makepad",
+            @"<workspace>\rusty-quest",
+            @"<workspace>\rusty-quest-makepad",
+            @"<workspace>\makepad-morphospace",
+            "```",
+            string.Empty,
+            "## Optional Morphospace Repo Status",
+            string.Empty
+        };
+
+        lines.AddRange(status.OptionalMorphospaceRepos.Select(repo =>
+            $"- `{repo.Name}`: `{repo.Path}` ({FoundLabel(repo.Present)}) - {repo.Role}"));
+
+        lines.AddRange(new[]
+        {
+            string.Empty,
             "## What The Companion Manages",
             string.Empty,
             "- Android platform-tools / adb",
@@ -348,7 +426,7 @@ public static class SourceWorkspaceGuide
             string.Empty,
             "## Agent Steps",
             string.Empty
-        };
+        });
 
         lines.AddRange(status.AgentSteps.Select(static step => $"- {step}"));
         lines.AddRange(new[] { string.Empty, "## Commands", string.Empty });
@@ -406,6 +484,15 @@ public static class SourceWorkspaceGuide
         return null;
     }
 
+    private static SourceWorkspaceRepository RepositoryStatus(string name, string path, string role)
+    {
+        return new SourceWorkspaceRepository(
+            name,
+            path,
+            File.Exists(Path.Combine(path, "Cargo.toml")),
+            role);
+    }
+
     private static string FoundLabel(bool found) => found ? "found" : "missing";
 }
 
@@ -429,7 +516,14 @@ public sealed record SourceWorkspaceStatus(
     string BrokerApkPath,
     bool BrokerApkPresent,
     IReadOnlyList<string> AgentSteps,
+    IReadOnlyList<SourceWorkspaceRepository> OptionalMorphospaceRepos,
     IReadOnlyList<SourceWorkspaceCommand> Commands);
+
+public sealed record SourceWorkspaceRepository(
+    string Name,
+    string Path,
+    bool Present,
+    string Role);
 
 public sealed record SourceWorkspaceCommand(
     string Id,

@@ -754,12 +754,18 @@ public sealed class CoreModelTests
         var root = Path.Combine(Path.GetTempPath(), $"rusty-xr-workspace-{Guid.NewGuid():N}");
         var rustyXr = Path.Combine(root, SourceWorkspaceGuide.RustyXrRepoName);
         var companion = Path.Combine(root, SourceWorkspaceGuide.CompanionRepoName);
+        var rustyMakepad = Path.Combine(root, SourceWorkspaceGuide.MorphospaceMakepadRepoName);
+        var rustyQuestMakepad = Path.Combine(root, SourceWorkspaceGuide.MorphospaceQuestMakepadRepoName);
         try
         {
             Directory.CreateDirectory(rustyXr);
             Directory.CreateDirectory(companion);
+            Directory.CreateDirectory(rustyMakepad);
+            Directory.CreateDirectory(rustyQuestMakepad);
             File.WriteAllText(Path.Combine(rustyXr, "Cargo.toml"), string.Empty);
             File.WriteAllText(Path.Combine(companion, "RustyXr.Companion.slnx"), string.Empty);
+            File.WriteAllText(Path.Combine(rustyMakepad, "Cargo.toml"), string.Empty);
+            File.WriteAllText(Path.Combine(rustyQuestMakepad, "Cargo.toml"), string.Empty);
             Directory.CreateDirectory(Path.Combine(rustyXr, "examples", "quest-minimal-apk", "build", "outputs"));
             File.WriteAllText(
                 Path.Combine(rustyXr, "examples", "quest-minimal-apk", "build", "outputs", "rusty-xr-quest-minimal-debug.apk"),
@@ -775,7 +781,17 @@ public sealed class CoreModelTests
             Assert.Contains(status.Commands, command => command.Id == "verify-minimal-apk");
             Assert.Contains(status.Commands, command => command.Id == "verify-broker-apk");
             Assert.Contains(status.Commands, command => command.Id == "open-broker-system-console");
-            Assert.Contains("Rusty XR Source Workspace", SourceWorkspaceGuide.ToMarkdown(status));
+            Assert.Contains(
+                status.OptionalMorphospaceRepos,
+                repo => repo.Name == SourceWorkspaceGuide.MorphospaceMakepadRepoName && repo.Present);
+            Assert.Contains(
+                status.OptionalMorphospaceRepos,
+                repo => repo.Name == SourceWorkspaceGuide.MorphospaceQuestMakepadRepoName && repo.Present);
+            Assert.Contains(status.Commands, command => command.Id == "validate-morphospace-makepad-settings");
+            Assert.Contains(status.Commands, command => command.Id == "validate-morphospace-quest-makepad");
+            var markdown = SourceWorkspaceGuide.ToMarkdown(status);
+            Assert.Contains("Rusty XR Source Workspace", markdown);
+            Assert.Contains("Optional Morphospace Makepad Layout", markdown);
         }
         finally
         {
