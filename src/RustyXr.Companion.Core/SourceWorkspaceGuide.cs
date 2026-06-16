@@ -382,7 +382,7 @@ public static class SourceWorkspaceGuide
                 "Treat the optional Morphospace Makepad repos as the active Makepad/settings/profile maintenance lanes when they are present.",
                 "Resolve active Makepad behavior through rusty.gui.makepad.effective_settings.v1 reports before launching Hostess or Quest Makepad shells.",
                 "Keep public Rusty XR Makepad examples as compatibility/reference evidence, not the settings authority for new Makepad app behavior.",
-                "Use the companion-managed tooling cache for adb, hzdb, scrcpy, and optional FFmpeg media decode tooling.",
+                "Use the companion-managed tooling cache for adb, Meta VR CLI / hzdb compatibility, scrcpy, and optional FFmpeg media decode tooling.",
                 "Install Rust and Android build tooling only on machines that build APKs from source.",
                 "Build APK bytes under Rusty XR ignored build folders, then verify them through catalog commands.",
                 "Keep diagnostics, screenshots, media frames, APKs, signing material, and local caches out of git."
@@ -442,7 +442,7 @@ public static class SourceWorkspaceGuide
             "## What The Companion Manages",
             string.Empty,
             "- Android platform-tools / adb",
-            "- Meta hzdb",
+            "- Meta VR CLI / hzdb compatibility tooling",
             "- scrcpy for display casting",
             "- optional FFmpeg media runtime for decode/probe previews",
             "- catalog APK downloads and verification bundles",

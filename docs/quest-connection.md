@@ -49,9 +49,12 @@ operator tooling:
 dotnet run --project src/RustyXr.Companion.Cli -- tooling install-official
 ```
 
-That fetches Meta `hzdb`, Android platform-tools, and `scrcpy` from their
-upstream release locations and keeps their licenses separate from this MIT
-repo.
+That fetches Meta VR CLI / `hzdb` compatibility tooling, Android
+platform-tools, and `scrcpy` from their upstream release locations and keeps
+their licenses separate from this MIT repo. The current public manual Meta
+route is `npx -y metavr`; the managed cache keeps the Windows `hzdb.exe`
+compatibility binary because `metavr` pulls that package as its platform
+dependency.
 
 The optional media runtime is separate from Quest connection tooling. Install
 it only when you want saved H.264 preview decode through FFmpeg:
@@ -131,8 +134,9 @@ clear the visual blocker before diagnosing app logic.
 
 ## Proximity Keep-Awake
 
-For off-face development sessions, `hzdb` can request a keep-awake hold by
-disabling normal wear-sensor sleep behavior for a duration:
+For off-face development sessions, the companion's `hzdb` compatibility command
+can request a keep-awake hold by disabling normal wear-sensor sleep behavior
+for a duration:
 
 ```powershell
 dotnet run --project src/RustyXr.Companion.Cli -- hzdb proximity keep-awake --serial <serial> --duration-ms 28800000

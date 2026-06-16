@@ -11,8 +11,8 @@ operator workflows.
 Use it when you need to:
 
 - confirm ADB, optional Quest tooling, and optional casting tools are available
-- install managed `hzdb`, Android platform-tools, `scrcpy`, and optional
-  FFmpeg media preview tooling
+- install managed Meta VR CLI / `hzdb` compatibility tooling, Android
+  platform-tools, `scrcpy`, and optional FFmpeg media preview tooling
 - find Quest devices over ADB
 - connect to a Quest over Wi-Fi ADB
 - read headset battery, controller batteries, wake state, and proximity state

@@ -185,8 +185,8 @@ public sealed class OfficialQuestToolingService : IDisposable
         CancellationToken cancellationToken = default)
     {
         progress?.Report(new OfficialQuestToolingProgress(
-            "Checking Meta hzdb release",
-            "Reading the latest published Windows hzdb metadata from Meta's npm package.",
+            "Checking Meta VR CLI compatibility release",
+            "Reading the latest published Windows hzdb package metadata used by Meta VR CLI.",
             5));
         var hzdbRelease = await FetchHzdbReleaseAsync(cancellationToken).ConfigureAwait(false);
 
@@ -203,7 +203,7 @@ public sealed class OfficialQuestToolingService : IDisposable
         var scrcpyRelease = await FetchScrcpyReleaseAsync(cancellationToken).ConfigureAwait(false);
 
         progress?.Report(new OfficialQuestToolingProgress(
-            "Installing Meta hzdb",
+            "Installing Meta VR CLI compatibility binary",
             $"Downloading Meta's Windows hzdb package {hzdbRelease.Version}.",
             40));
         var hzdbChanged = await EnsureHzdbAsync(hzdbRelease, cancellationToken).ConfigureAwait(false);
@@ -436,7 +436,7 @@ public sealed class OfficialQuestToolingService : IDisposable
     private OfficialQuestToolStatus BuildHzdbStatus(string? installedVersion, string? availableVersion)
         => new(
             Id: "meta-hzdb",
-            DisplayName: "Meta Horizon Debug Bridge (hzdb)",
+            DisplayName: "Meta VR CLI compatibility binary (hzdb)",
             IsInstalled: File.Exists(OfficialQuestToolingLayout.HzdbExecutablePath),
             InstalledVersion: installedVersion,
             AvailableVersion: availableVersion,

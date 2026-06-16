@@ -96,7 +96,7 @@ internal static class Program
         PortableInstallRegistration.CreateReleaseShortcut(installRoot);
         PortableInstallRegistration.RegisterReleaseInstall(installRoot);
 
-        progress.Report(new InstallerProgress("Refreshing Quest tooling", "Installing or updating managed hzdb, Android platform-tools, and scrcpy.", 88));
+        progress.Report(new InstallerProgress("Refreshing Quest tooling", "Installing or updating managed Meta VR CLI compatibility tooling, Android platform-tools, and scrcpy.", 88));
         try
         {
             using var tooling = new OfficialQuestToolingService();

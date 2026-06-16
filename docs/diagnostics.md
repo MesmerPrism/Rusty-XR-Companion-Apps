@@ -20,7 +20,8 @@ The command writes:
 The report includes:
 
 - Windows and .NET version
-- ADB, hzdb, scrcpy, FFmpeg, and FFprobe discovery
+- ADB, Meta VR CLI / `hzdb` compatibility tooling, scrcpy, FFmpeg, and
+  FFprobe discovery
 - ADB device list
 - optional live headset snapshots with headset battery, controller batteries, wake state, foreground app, and proximity readback
 - notes for command failures

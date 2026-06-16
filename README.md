@@ -73,8 +73,9 @@ on one visible button.
   wake state, foreground app, and proximity sensor state
 - public sample catalog metadata aligned with the Rusty XR core
   `quest-app-catalog` schema
-- managed LocalAppData tool cache for Meta `hzdb`, Android platform-tools,
-  `scrcpy`, and optional FFmpeg media preview tooling
+- managed LocalAppData tool cache for Meta VR CLI / `hzdb` compatibility
+  tooling, Android platform-tools, `scrcpy`, and optional FFmpeg media preview
+  tooling
 - source-workspace guide for sibling Rusty XR and Companion checkouts
 - installed `agent-onboarding\` docs in the app and CLI release zips
 - GitHub Pages docs and onboarding

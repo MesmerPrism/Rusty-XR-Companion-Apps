@@ -50,9 +50,9 @@ powershell -ExecutionPolicy Bypass -File .\tools\app\Start-Desktop-App.ps1
 dotnet run --project src/RustyXr.Companion.Cli -- devices
 ```
 
-4. Install managed tooling if you want Wi-Fi ADB bootstrap, `hzdb`
-   proximity/wake controls, and display casting without separate manual tool
-   setup:
+4. Install managed tooling if you want Wi-Fi ADB bootstrap, Meta VR CLI /
+   `hzdb` compatibility proximity/wake controls, and display casting without
+   separate manual tool setup:
 
 ```powershell
 dotnet run --project src/RustyXr.Companion.Cli -- tooling install-official

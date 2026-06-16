@@ -266,7 +266,7 @@
                 <Border Style="{StaticResource PanelBorder}">
                     <StackPanel>
                         <TextBlock Text="Tooling" FontWeight="SemiBold" FontSize="15" />
-                        <TextBlock Text="ADB is required. Managed tooling can install official hzdb, Android platform-tools, scrcpy, and the optional FFmpeg media runtime into LocalAppData." Margin="0,4,0,10" />
+                        <TextBlock Text="ADB is required. Managed tooling can install official Meta VR CLI compatibility tooling, Android platform-tools, scrcpy, and the optional FFmpeg media runtime into LocalAppData." Margin="0,4,0,10" />
                         <Button Content="Refresh Tooling" Command="{Binding RefreshToolsCommand}" />
                         <Button Content="Install / Update Managed Tooling" Command="{Binding InstallToolingCommand}" />
                         <Button Content="Install / Update Media Runtime" Command="{Binding InstallMediaToolingCommand}" />

@@ -14,10 +14,11 @@ into the user's LocalAppData tool cache.
 ## Meta Quest Tooling
 
 Meta Quest command-line tools are provided by Meta under Meta's own terms.
-This repository can locate such tools when they are already installed, and it
-can download Meta's published `@meta-quest/hzdb-win32-x64` package into the
-user's LocalAppData tool cache. Rusty XR Companion does not relicense Meta
-tools.
+Meta's current public manual route is Meta VR CLI (`metavr`). This repository
+can locate compatible tools when they are already installed, and it can
+download Meta's published `@meta-quest/hzdb-win32-x64` platform package into
+the user's LocalAppData tool cache because `metavr` depends on that Windows
+binary package. Rusty XR Companion does not relicense Meta tools.
 
 ## scrcpy
 

@@ -119,7 +119,7 @@ $managedTools = @(
     }
     [ordered]@{
         id = 'meta-hzdb'
-        displayName = 'Meta Horizon Debug Bridge (hzdb)'
+        displayName = 'Meta VR CLI compatibility binary (hzdb)'
         bundled = $false
         installMode = 'explicit managed download or user-supplied path'
         destination = '%LOCALAPPDATA%\RustyXrCompanion\tooling\hzdb'

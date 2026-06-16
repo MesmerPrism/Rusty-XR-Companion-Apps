@@ -35,7 +35,7 @@ CompanionOperationPlanner
   - managed official Quest tooling installer
   - managed optional FFmpeg media runtime installer
   - ADB command services
-  - `hzdb` wake, proximity, and screenshot helpers
+  - Meta VR CLI / `hzdb` compatibility wake, proximity, and screenshot helpers
   - catalog loading
   - API/CLI/MCP operation surface metadata
   - scrcpy launch wrapper

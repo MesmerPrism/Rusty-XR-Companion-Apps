@@ -96,7 +96,7 @@ The release app and CLI manage the operator-side pieces that can reasonably be
 shipped or downloaded into a per-user cache:
 
 - Android platform-tools / `adb`
-- Meta `hzdb`
+- Meta VR CLI / `hzdb` compatibility tooling
 - `scrcpy` for display casting
 - optional FFmpeg media runtime for saved H.264 preview decode and probing
 - catalog APK downloads from public release assets

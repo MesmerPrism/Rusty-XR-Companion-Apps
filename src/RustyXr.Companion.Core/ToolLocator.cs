@@ -20,7 +20,7 @@ public sealed class ToolLocator
         return new[]
         {
             await BuildToolStatusAsync(ToolKind.Adb, "Android Debug Bridge", adbPath, "version", cancellationToken).ConfigureAwait(false),
-            await BuildToolStatusAsync(ToolKind.Hzdb, "Meta Quest hzdb", hzdbPath, "--version", cancellationToken).ConfigureAwait(false),
+            await BuildToolStatusAsync(ToolKind.Hzdb, "Meta VR CLI compatibility binary", hzdbPath, "--version", cancellationToken).ConfigureAwait(false),
             await BuildToolStatusAsync(ToolKind.Scrcpy, "scrcpy display cast", scrcpyPath, "--version", cancellationToken).ConfigureAwait(false),
             await BuildToolStatusAsync(ToolKind.Ffmpeg, "FFmpeg media sidecar", ffmpegPath, "-version", cancellationToken).ConfigureAwait(false),
             await BuildToolStatusAsync(ToolKind.Ffprobe, "FFprobe media sidecar", ffprobePath, "-version", cancellationToken).ConfigureAwait(false)

@@ -30,7 +30,8 @@ the bundled APK is present.
 
 Use the left column first:
 
-- **Install / Update Managed Tooling** installs `adb`, `hzdb`, and `scrcpy` into the app-managed LocalAppData cache.
+- **Install / Update Managed Tooling** installs `adb`, Meta VR CLI / `hzdb`
+  compatibility tooling, and `scrcpy` into the app-managed LocalAppData cache.
 - **Install / Update Media Runtime** installs the optional FFmpeg media
   runtime used for saved H.264 preview decode. The app zip does not bundle
   FFmpeg; this action downloads a verified upstream LGPL shared build into the

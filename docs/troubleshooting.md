@@ -105,7 +105,8 @@ not by itself mean capture failed.
 
 ## Proximity Or Screenshot Commands Fail
 
-- run `tooling status --latest` and confirm managed `hzdb` is installed
+- run `tooling status --latest` and confirm managed Meta VR CLI / `hzdb`
+  compatibility tooling is installed
 - confirm the selected serial is visible through `devices`
 - use `hzdb status --serial <serial>` to read `dumpsys vrpowermanager`
 - use `hzdb screenshot --method screencap` first, then try `--method metacam`

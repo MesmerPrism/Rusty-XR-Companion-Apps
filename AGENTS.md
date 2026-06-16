@@ -28,7 +28,7 @@ Quest", "device profile", and "runtime profile".
 ## Release And Third-Party Dependencies
 
 Before changing release packaging, managed tool installs, self-update behavior,
-bundled catalog APKs, scrcpy/hzdb/platform-tools handling, or video/codec
+bundled catalog APKs, scrcpy/Meta VR CLI compatibility/platform-tools handling, or video/codec
 bridges:
 
 - Make third-party tool installs explicit and user-controlled.
@@ -111,8 +111,8 @@ Use the CLI guide before changing catalog or build-flow docs:
 dotnet run --project src/RustyXr.Companion.Cli -- workspace guide --root <workspace>
 ```
 
-The companion owns managed `adb`, `hzdb`, `scrcpy`, install, launch, cast,
-diagnostics, and catalog verification. Rusty XR owns the public Rust contracts,
-schemas, examples, and APK source. Do not copy APK bytes, signing material,
-diagnostics bundles, screenshots, media frames, or local caches into either
-repo.
+The companion owns managed `adb`, Meta VR CLI / `hzdb` compatibility tooling,
+`scrcpy`, install, launch, cast, diagnostics, and catalog verification. Rusty
+XR owns the public Rust contracts, schemas, examples, and APK source. Do not
+copy APK bytes, signing material, diagnostics bundles, screenshots, media
+frames, or local caches into either repo.
